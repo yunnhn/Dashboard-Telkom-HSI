@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AnalysisDigitalProductController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\DashboardDigitalProductController;
 use App\Http\Controllers\ManualUpdateController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
@@ -21,10 +22,7 @@ Route::get('/', function () {
 // Rute yang memerlukan autentikasi
 Route::middleware(['auth', 'verified'])->group(function () {
 
-    // DashboardDigitalProduct
-    Route::get('/dashboardDigitalProduct', function () {
-        return Inertia::render('DashboardDigitalProduct');
-    })->name('dashboardDigitalProduct');
+    Route::get('/dashboardDigitalProduct', [DashboardDigitalProductController::class, 'index'])->name('dashboardDigitalProduct');
 
     // Fitur AnalysisDigitalProduct
     Route::get('/analysisDigitalProduct', [AnalysisDigitalProductController::class, 'index'])->name('analysisDigitalProduct');

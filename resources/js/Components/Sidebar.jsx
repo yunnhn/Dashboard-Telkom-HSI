@@ -24,7 +24,6 @@ const NavLink = ({ href, active, icon, children }) => (
 const UserProfile = ({ name }) => (
     <div className="mt-auto p-4 border-t border-gray-200">
         <div className="flex items-center">
-            <img className="h-10 w-10 rounded-full object-cover" src="https://via.placeholder.com/150" alt="User avatar" />
             <div className="ml-4">
                 <p className="font-semibold text-gray-800">{name}</p>
             </div>

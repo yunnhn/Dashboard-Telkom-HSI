@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, router, Link } from '@inertiajs/react';
 import StatsCard from '@/Components/StatsCard';
@@ -6,6 +6,7 @@ import { FaDollarSign, FaShoppingCart, FaChartPie, FaChartLine, FaUsers } from '
 import { Line } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, Filler } from 'chart.js';
 import RevenueBySubTypeChart from '@/Components/RevenueBySubTypeChart';
+import AmountBySubTypeChart from '@/Components/AmountBySubTypeChart';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, Filler);
 
@@ -17,7 +18,7 @@ const StatusBadge = ({ text, color }) => (
 );
 
 // [PERBAIKAN] Menambahkan nilai default `{}` untuk prop 'filters'
-export default function DashboardDigitalProduct({ auth, revenueBySubTypeData, dataPreview, filters = {} }) {
+export default function DashboardDigitalProduct({ auth, revenueBySubTypeData, amountBySubTypeData, dataPreview, filters = {} }) {
 
     const generatePeriodOptions = () => {
         const options = [];
@@ -43,6 +44,21 @@ export default function DashboardDigitalProduct({ auth, revenueBySubTypeData, da
             preserveScroll: true,
         });
     }
+
+    const products = [
+        { name: 'Netmonk', color: '#8884d8' },
+        { name: 'OCA', color: '#82ca9d' },
+        { name: 'Antares Eazy', color: '#ffc658' },
+        { name: 'Pijar Sekolah', color: '#ff8042' },
+    ];
+
+    // Logika untuk memastikan urutan sub-tipe benar
+    const sortedAmountData = useMemo(() => {
+        if (!Array.isArray(amountBySubTypeData)) return [];
+        const subTypeOrder = ['AO', 'SO', 'DO', 'MO', 'RO'];
+        const dataMap = new Map(amountBySubTypeData.map(item => [item.sub_type, item]));
+        return subTypeOrder.map(subType => dataMap.get(subType) || { sub_type: subType });
+    }, [amountBySubTypeData]);
 
     return (
         <AuthenticatedLayout
@@ -73,9 +89,22 @@ export default function DashboardDigitalProduct({ auth, revenueBySubTypeData, da
                 <StatsCard title="Segment by Product" value="154" icon={<FaUsers color="white" />} color="bg-indigo-500" />
             </div>
 
-            <div className="bg-white p-6 rounded-lg shadow-md mt-6">
-                <h3 className="font-semibold text-lg text-gray-800 mb-4">Revenue by Sub-type</h3>
-                <RevenueBySubTypeChart data={revenueBySubTypeData} />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+
+                {/* Kartu untuk Chart Revenue */}
+                <div className="bg-white p-6 rounded-lg shadow-md">
+                    <h3 className="font-semibold text-lg text-gray-800 mb-4">Revenue by Sub-type</h3>
+                    <RevenueBySubTypeChart data={revenueBySubTypeData} />
+                </div>
+
+                {/* Kartu untuk Chart Amount */}
+                <div className="bg-white p-6 rounded-lg shadow-md">
+                    <div className="bg-white p-6 rounded-lg shadow-md">
+                        <h3 className="font-semibold text-lg text-gray-800 mb-4">Amount by Sub-type</h3>
+                        <AmountBySubTypeChart data={amountBySubTypeData} />
+                    </div>
+                </div>
+
             </div>
 
             {/* Bagian Tabel Data Preview */}

@@ -53,18 +53,31 @@ class DashboardDigitalProductController extends Controller
 
         $revenueBySubTypeData = $revenueBySubTypeQuery->get();
 
+        $amountBySubTypeQuery = DocumentData::query()
+            ->select(
+                DB::raw($caseStatement . " as sub_type"),
+                'product',
+                DB::raw('COUNT(*) as total_amount') // Menghitung jumlah order
+            )
+            ->whereNotNull(DB::raw($caseStatement))
+            ->whereYear('order_date', $date->year)
+            ->whereMonth('order_date', $date->month)
+            ->groupBy('sub_type', 'product');
+
+        $amountBySubTypeData = $amountBySubTypeQuery->get();
+
         // --- [BARU] Query untuk Tabel Data Preview ---
         $dataPreview = DocumentData::query()
-            ->select('order_id', 'product', 'milestone', 'nama_witel', 'status_wfm', 'order_created_date')
-            // [TAMBAHKAN] Filter berdasarkan periode yang sama dengan chart
-            ->whereYear('order_created_date', $date->year)
-            ->whereMonth('order_created_date', $date->month)
-            ->orderBy('order_created_date', 'desc')
+            ->select('order_id', 'product', 'milestone', 'nama_witel', 'status_wfm', 'order_created_date', 'order_date') // Optional: tambahkan 'order_date' jika ingin ditampilkan
+            ->whereYear('order_date', $date->year)
+            ->whereMonth('order_date', $date->month)
+            ->orderBy('order_date', 'desc')
             ->paginate($limit)
-            ->withQueryString();;
+            ->withQueryString();
 
         return Inertia::render('DashboardDigitalProduct', [
             'revenueBySubTypeData' => $revenueBySubTypeData,
+            'amountBySubTypeData' => $amountBySubTypeData,
             'dataPreview' => $dataPreview,
             'filters' => [
                 'period' => $period,

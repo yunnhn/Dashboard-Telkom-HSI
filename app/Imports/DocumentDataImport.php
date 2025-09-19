@@ -22,9 +22,8 @@ class DocumentDataImport implements ToModel, WithStartRow
         $orderIdRaw = $row[9] ?? null;
         $namaProduk = $row[0] ?? null;
         $namaWitel  = $row[7] ?? null;
-        $layanan    = $row[24] ?? null;
+        $layanan    = $row[23] ?? null;
 
-        // [PERBAIKAN] Menambahkan '?? ''' untuk menangani sel kosong dengan aman
         if (empty($orderIdRaw) ||
             str_contains(strtolower($namaProduk ?? ''), 'kidi') ||
             str_contains(strtoupper($namaWitel ?? ''), 'JATENG') ||
@@ -44,13 +43,11 @@ class DocumentDataImport implements ToModel, WithStartRow
         $segmenN = $row[36] ?? null;
         $segment = (in_array($segmenN, ['RBS', 'SME'])) ? 'SME' : 'LEGS';
 
-        // CATATAN: 'milestoneValue' dan 'layanan' mengambil dari kolom yang sama (indeks 24). Mohon pastikan ini benar.
         $milestoneValue = $row[24] ?? null;
 
         $status_wfm = 'in progress';
         $doneMilestones = ['completed', 'complete', 'baso started', 'fulfill billing complete'];
 
-        // [PERBAIKAN] Menambahkan '?? ''' untuk menangani milestone yang kosong
         if ($milestoneValue && in_array(strtolower(trim($milestoneValue ?? '')), $doneMilestones)) {
             $status_wfm = 'done close bima';
         }

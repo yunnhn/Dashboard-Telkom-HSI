@@ -465,8 +465,8 @@ const InProgressTable = ({ data = [] }) => {
     };
 
     const handleCancelClick = (orderId) => {
-        if (confirm(`PERINGATAN: Anda akan MENGHAPUS PERMANEN Order ID: ${orderId}. Aksi ini tidak dapat dibatalkan. Lanjutkan?`)) {
-            router.delete(route('manual.update.cancel', { order_id: orderId }), {
+        if (confirm(`Anda yakin ingin membatalkan Order ID: ${orderId}? Statusnya akan diubah menjadi 'CANCEL'.`)) {
+            router.put(route('manual.update.cancel', { order_id: orderId }), {}, {
                 preserveScroll: true,
             });
         }
@@ -482,7 +482,7 @@ const InProgressTable = ({ data = [] }) => {
 
     return (
         <div className="overflow-x-auto text-sm">
-            <table className="w-full whitespace-nowrap">
+            <table className="w-full">
                 <thead className="bg-gray-50">
                     <tr className="text-left font-semibold text-gray-600">
                         {/* ... header tabel tidak berubah ... */}
@@ -504,7 +504,7 @@ const InProgressTable = ({ data = [] }) => {
                             <td className="p-3">{index + 1}</td>
                             <td className="p-3">{item.milestone}</td>
                             <td className="p-3">{item.segment}</td>
-                            <td className="p-3">
+                            <td className="p-3 whitespace-nowrap">
                                 <span className="px-2 py-1 font-semibold leading-tight text-blue-700 bg-blue-100 rounded-full">
                                     {item.order_status_n}
                                 </span>
@@ -587,12 +587,14 @@ const HistoryTable = ({ data = [] }) => {
                                 </span>
                             </td>
                             <td className="p-3">
-                                <span className="px-2 py-1 font-semibold leading-tight text-green-700 bg-green-100 rounded-full">
+                                <span className={`px-2 py-1 font-semibold leading-tight rounded-full ${item.order_status_n.toUpperCase() === 'CANCEL'
+                                    ? 'text-red-700 bg-red-100'
+                                    : 'text-green-700 bg-green-100'
+                                    }`}>
                                     {item.order_status_n.toUpperCase()}
                                 </span>
                             </td>
                             <td className="p-3">{item.product_name}</td>
-                            <td className="p-3">{item.product_name}</td> {/* Pastikan properti ini ada dari backend */}
                             <td className="p-3 font-mono">{item.order_id}</td>
                             <td className="p-3">{item.nama_witel}</td>
                             <td className="p-3">{item.customer_name}</td>
@@ -681,7 +683,7 @@ const generateYearOptions = () => {
 // KOMPONEN UTAMA ANALYSISDigitalProduct
 // ===================================================================
 // Ganti seluruh fungsi AnalysisDigitalProduct di file AnalysisDigitalProduct.jsx dengan ini
-export default function AnalysisDigitalProduct({ reportData = [], currentSegment = 'SME', period = '', inProgressData = [], historyData = [], kpiData = [], currentInProgressYear, flash = {}, errors: pageErrors = {} }) {
+export default function AnalysisDigitalProduct({ reportData = [], currentSegment = 'SME', period = '', inProgressData = [], newData = [], historyData = [], kpiData = [], currentInProgressYear, flash = {}, errors: pageErrors = {} }) {
 
     const [activeDetailView, setActiveDetailView] = useState('inprogress');
     const [witelFilter, setWitelFilter] = useState('ALL');
@@ -759,7 +761,6 @@ export default function AnalysisDigitalProduct({ reportData = [], currentSegment
         return { ...totals, total: totals.ogp + totals.closed };
     }, [reportData, currentSegment]);
 
-    // Fungsi untuk membuat opsi dropdown periode (misal: 12 bulan terakhir)
     const generatePeriodOptions = () => {
         const options = [];
         let date = new Date();
@@ -810,6 +811,67 @@ export default function AnalysisDigitalProduct({ reportData = [], currentSegment
         </button>
     );
 
+    const NewDataTable = ({ data = [] }) => {
+        const formatDate = (dateString) => {
+            if (!dateString) return '-';
+            return new Date(dateString).toLocaleString('id-ID', {
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit'
+            });
+        };
+
+        const getStatusChip = (status) => {
+            const lowerStatus = status?.toLowerCase() || '';
+            if (lowerStatus.includes('progress')) {
+                return <span className="px-2 py-1 text-xs font-semibold leading-tight text-blue-700 bg-blue-100 rounded-full">{status}</span>;
+            }
+            if (lowerStatus.includes('done')) {
+                return <span className="px-2 py-1 text-xs font-semibold leading-tight text-green-700 bg-green-100 rounded-full">{status}</span>;
+            }
+            return <span className="px-2 py-1 text-xs font-semibold leading-tight text-gray-700 bg-gray-100 rounded-full">{status}</span>;
+        };
+
+        return (
+            <div className="overflow-x-auto text-sm">
+                <p className="text-gray-500 mb-2">Menampilkan 10 data terbaru yang diunggah.</p>
+                <table className="w-full">
+                    <thead className="bg-gray-50">
+                        <tr className="text-left font-semibold text-gray-600">
+                            <th className="p-3">No.</th>
+                            <th className="p-3">Milestone</th>
+                            <th className="p-3">Order Status</th>
+                            <th className="p-3">Product Name</th>
+                            <th className="p-3">Order ID</th>
+                            <th className="p-3">Witel</th>
+                            <th className="p-3">Customer Name</th>
+                            <th className="p-3">Created Time</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y bg-white">
+                        {data.length > 0 ? data.map((item, index) => (
+                            <tr key={item.order_id} className="text-gray-700 hover:bg-gray-50">
+                                <td className="p-3">{index + 1}</td>
+                                <td className="p-3 whitespace-normal">{item.milestone}</td>
+                                <td className="p-3">{getStatusChip(item.order_status_n)}</td>
+                                <td className="p-3">{item.product_name}</td>
+                                <td className="p-3 font-mono">{item.order_id}</td>
+                                <td className="p-3">{item.nama_witel}</td>
+                                <td className="p-3">{item.customer_name}</td>
+                                <td className="p-3 font-semibold">{formatDate(item.created_at)}</td>
+                            </tr>
+                        )) : (
+                            <tr>
+                                <td colSpan="8" className="p-4 text-center text-gray-500">
+                                    Belum ada data baru yang diunggah.
+                                </td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
+            </div>
+        );
+    };
+
     return (
         <AuthenticatedLayout header="Analysis Digital Product">
             <Head title="Analysis Digital Product" />
@@ -859,6 +921,9 @@ export default function AnalysisDigitalProduct({ reportData = [], currentSegment
                                 <DetailTabButton viewName="history" currentView={activeDetailView} setView={setActiveDetailView}>
                                     Update History ({historyData.length > 10 ? '10+' : historyData.length})
                                 </DetailTabButton>
+                                <DetailTabButton viewName="newdata" currentView={activeDetailView} setView={setActiveDetailView}>
+                                    Data Baru ({newData.length})
+                                </DetailTabButton>
                                 <DetailTabButton viewName="kpi" currentView={activeDetailView} setView={setActiveDetailView}>
                                     KPI PO
                                 </DetailTabButton>
@@ -875,6 +940,7 @@ export default function AnalysisDigitalProduct({ reportData = [], currentSegment
                             )}
                         </div>
                         {activeDetailView === 'inprogress' && <InProgressTable data={filteredInProgressData} />}
+                        {activeDetailView === 'newdata' && <NewDataTable data={newData} />}
                         {activeDetailView === 'history' && <HistoryTable data={historyData.slice(0, 10)} />}
                         {activeDetailView === 'kpi' && <KpiTable data={kpiData} />}
                     </div>

@@ -7,6 +7,11 @@ import { Line } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, Filler } from 'chart.js';
 import RevenueBySubTypeChart from '@/Components/RevenueBySubTypeChart';
 import AmountBySubTypeChart from '@/Components/AmountBySubTypeChart';
+import SessionSubTypeChart from '@/Components/SessionSubTypeChart';
+import ProductRadarChart from '@/Components/ProductRadarChart';
+import WitelPieChart from '@/Components/WitelPieChart';
+
+import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, Filler);
 
@@ -18,7 +23,26 @@ const StatusBadge = ({ text, color }) => (
 );
 
 // [PERBAIKAN] Menambahkan nilai default `{}` untuk prop 'filters'
-export default function DashboardDigitalProduct({ auth, revenueBySubTypeData, amountBySubTypeData, dataPreview, filters = {} }) {
+export default function DashboardDigitalProduct({ auth, revenueBySubTypeData, amountBySubTypeData, dataPreview, sessionBySubType, productRadarData, witelPieData, filters = {} }) {
+
+    const products = [
+        { name: 'Netmonk', color: '#8884d8' },
+        { name: 'OCA', color: '#82ca9d' },
+        { name: 'Antares Eazy', color: '#ffc658' },
+        { name: 'Pijar', color: '#ff8042' },
+    ];
+
+    const transformedRadarData = useMemo(() => {
+        if (!productRadarData || productRadarData.length === 0) return [];
+        const productNames = ['Netmonk', 'OCA', 'Antares Eazy', 'Pijar']; // <-- Perubahan di sini
+        return productNames.map(product => {
+            const entry = { product_name: product };
+            productRadarData.forEach(witelData => {
+                entry[witelData.nama_witel] = witelData[product];
+            });
+            return entry;
+        });
+    }, [productRadarData]);
 
     const generatePeriodOptions = () => {
         const options = [];
@@ -44,13 +68,6 @@ export default function DashboardDigitalProduct({ auth, revenueBySubTypeData, am
             preserveScroll: true,
         });
     }
-
-    const products = [
-        { name: 'Netmonk', color: '#8884d8' },
-        { name: 'OCA', color: '#82ca9d' },
-        { name: 'Antares Eazy', color: '#ffc658' },
-        { name: 'Pijar Sekolah', color: '#ff8042' },
-    ];
 
     // Logika untuk memastikan urutan sub-tipe benar
     const sortedAmountData = useMemo(() => {
@@ -81,13 +98,13 @@ export default function DashboardDigitalProduct({ auth, revenueBySubTypeData, am
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-6 mb-6">
+            {/* <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-6 mb-6">
                 <StatsCard title="Revenue By Product" value="$250M" icon={<FaDollarSign color="white" />} color="bg-green-500" />
                 <StatsCard title="Amount by Product" value="$350M" icon={<FaShoppingCart color="white" />} color="bg-blue-500" />
                 <StatsCard title="Value Pie Chart" value="13B" icon={<FaChartPie color="white" />} color="bg-red-500" />
                 <StatsCard title="Segment Chart" value="520" icon={<FaChartLine color="white" />} color="bg-purple-500" />
                 <StatsCard title="Segment by Product" value="154" icon={<FaUsers color="white" />} color="bg-indigo-500" />
-            </div>
+            </div> */}
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
 
@@ -99,10 +116,33 @@ export default function DashboardDigitalProduct({ auth, revenueBySubTypeData, am
 
                 {/* Kartu untuk Chart Amount */}
                 <div className="bg-white p-6 rounded-lg shadow-md">
-                    <div className="bg-white p-6 rounded-lg shadow-md">
-                        <h3 className="font-semibold text-lg text-gray-800 mb-4">Amount by Sub-type</h3>
-                        <AmountBySubTypeChart data={amountBySubTypeData} />
-                    </div>
+                    <h3 className="font-semibold text-lg text-gray-800 mb-4">Amount by Sub-type</h3>
+                    <AmountBySubTypeChart data={amountBySubTypeData} />
+                </div>
+
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
+
+                {/* Kolom 1: Session by Sub-type */}
+                <div className="bg-white p-6 rounded-lg shadow-md">
+                    <h3 className="font-semibold text-lg text-gray-800 mb-4">Session by Sub-type</h3>
+                    <p className="text-sm text-gray-500 mb-2">Showing data for order sub-type (AO|SO|DO|MO|RO).</p>
+                    <SessionSubTypeChart data={sessionBySubType} />
+                </div>
+
+                {/* Kolom 2: Product Radar Chart */}
+                <div className="bg-white p-6 rounded-lg shadow-md">
+                    <h3 className="font-semibold text-lg text-gray-800 mb-4">Product Radar Chart per Witel</h3>
+                    <p className="text-sm text-gray-500 mb-2">Showing data for product per witel in ALL.</p>
+                    <ProductRadarChart data={transformedRadarData} />
+                </div>
+
+                {/* Kolom 3: Witel Pie Chart */}
+                <div className="bg-white p-6 rounded-lg shadow-md">
+                    <h3 className="font-semibold text-lg text-gray-800 mb-4">Witel Pie Chart</h3>
+                    <p className="text-sm text-gray-500 mb-2">Showing category of witel in ALL.</p>
+                    <WitelPieChart data={witelPieData} />
                 </div>
 
             </div>
@@ -179,7 +219,7 @@ export default function DashboardDigitalProduct({ auth, revenueBySubTypeData, am
                     </div>
                 )}
             </div>
-        </AuthenticatedLayout>
+        </AuthenticatedLayout >
     );
 }
 

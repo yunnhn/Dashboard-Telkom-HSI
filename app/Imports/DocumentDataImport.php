@@ -24,11 +24,13 @@ class DocumentDataImport implements ToModel, WithStartRow
         $namaWitel  = $row[7] ?? null;
         $layanan    = $row[23] ?? null;
 
-        if (empty($orderIdRaw) ||
+        if (
+            empty($orderIdRaw) ||
             str_contains(strtolower($namaProduk ?? ''), 'kidi') ||
             str_contains(strtoupper($namaWitel ?? ''), 'JATENG') ||
-            str_contains(strtolower($layanan ?? ''), 'mahir')) {
-            return null;
+            (str_contains(strtolower($layanan ?? ''), 'mahir') && !str_contains($namaProduk ?? '', '-'))
+            ) {
+                return null;
         }
 
         $parseDate = fn($date) => empty($date) ? null : Carbon::parse($date)->format('Y-m-d H:i:s');

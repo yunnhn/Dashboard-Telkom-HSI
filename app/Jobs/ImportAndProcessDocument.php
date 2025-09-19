@@ -30,7 +30,6 @@ class ImportAndProcessDocument implements ShouldQueue
     {
         Log::info("Memulai job gabungan untuk file: {$this->filePath}");
 
-        // --- FASE 1: Impor Data Mentah dari File ---
         try {
             Log::info("Memulai Fase 1: Impor data mentah...");
             Excel::import(new \App\Imports\DocumentDataImport, $this->filePath);
@@ -41,31 +40,31 @@ class ImportAndProcessDocument implements ShouldQueue
             return;
         }
 
-        // --- FASE 2: Memproses Produk ---
         Log::info("Memulai Fase 2: Memproses Produk...");
         try {
             DB::transaction(function () {
-                // Kita hanya proses dokumen yang belum diproses product-nya
                 DocumentData::where('products_processed', false)
                     ->chunkById(100, function ($orders) {
 
                     foreach ($orders as $order) {
                         $productString = $order->product ?? '';
 
-                        // [PERBAIKAN 1] Normalisasi string produk: ganti baris baru dengan tanda '-'
                         $normalizedString = str_replace(["\r\n", "\n", "\r"], '-', $productString);
 
-                        // [PERBAIKAN 2] Cek apakah produk adalah bundling SETELAH normalisasi
                         if (str_contains($normalizedString, '-')) {
 
-                            // Hapus entri lama di order_products HANYA jika ini adalah bundling
                             OrderProduct::where('order_id', $order->order_id)->delete();
 
-                            // Pecah produk berdasarkan tanda '-'
                             $productNames = array_filter(array_map('trim', explode('-', $normalizedString)));
 
                             foreach ($productNames as $productName) {
-                                if(empty($productName) || stripos($productName, 'kidi') !== false) continue;
+                                if (
+                                    empty($productName) ||
+                                    stripos($productName, 'kidi') !== false ||
+                                    (stripos($order->layanan ?? '', 'mahir') !== false && stripos($productName, 'pijar') !== false)
+                                ) {
+                                    continue;
+                                }
 
                                 OrderProduct::create([
                                     'order_id'     => $order->order_id,
@@ -76,10 +75,7 @@ class ImportAndProcessDocument implements ShouldQueue
                                 ]);
                             }
                         }
-                        // Jika BUKAN bundling, kita tidak melakukan apa-apa terhadap tabel order_products.
-                        // Data produk tunggal tetap ada di tabel document_data.
 
-                        // Tandai bahwa order ini sudah diproses
                         $order->products_processed = true;
                         $order->save();
                     }

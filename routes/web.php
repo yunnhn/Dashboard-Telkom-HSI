@@ -34,6 +34,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Aksi Manual Update (dipindahkan ke sini agar terlindungi)
     Route::put('/manual-update/{order_id}/complete', [ManualUpdateController::class, 'complete'])->name('manual.update.complete');
     Route::delete('/manual-update/{order_id}/cancel', [ManualUpdateController::class, 'cancel'])->name('manual.update.cancel');
+    Route::put('/manual-update/cancel/{order_id}', [AnalysisDigitalProductController::class, 'updateManualCancel'])->name('manual.update.cancel');
+    Route::put('/manual-update/complete/{order_id}', [AnalysisDigitalProductController::class, 'updateManualComplete'])->name('manual.update.complete');
 
     // Profil Pengguna
     Route::prefix('profile')->controller(ProfileController::class)->group(function () {

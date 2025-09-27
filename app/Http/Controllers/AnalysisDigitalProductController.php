@@ -196,7 +196,12 @@ class AnalysisDigitalProductController extends Controller
         }
 
         $inProgressData = DocumentData::where('status_wfm', 'in progress')->where('segment', $selectedSegment)->whereYear('order_created_date', $inProgressYear)->orderBy('order_created_date', 'desc')->get();
-        $historyData = UpdateLog::latest()->paginate(10);
+
+        // =================================================================================================
+        // == PERUBAHAN UTAMA DI SINI ==
+        $historyData = UpdateLog::latest()->paginate(10); // Menggunakan paginate(10)
+        // =================================================================================================
+
         $qcData = DocumentData::where('status_wfm', '')->orderBy('updated_at', 'desc')->get();
         $newStatusData = DocumentData::where('batch_id', Cache::get('last_successful_batch_id'))->whereNotNull('previous_milestone')->orderBy('updated_at', 'desc')->get();
 
@@ -270,7 +275,7 @@ class AnalysisDigitalProductController extends Controller
         ]);
     }
 
-    private function getDefaultSMeConfig(): array
+    private function getDefaultSmeConfig(): array
     {
         // Isi dari metode ini adalah konversi langsung dari state React Anda ke array PHP
         return [

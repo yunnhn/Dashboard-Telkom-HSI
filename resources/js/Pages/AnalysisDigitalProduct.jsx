@@ -1193,3 +1193,4 @@ export default function AnalysisDigitalProduct({ auth, reportData = [], currentS
         </AuthenticatedLayout>
     );
 }
+//hahahhaah

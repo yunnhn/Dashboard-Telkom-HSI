@@ -6,16 +6,23 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    /**
+     * Run the migrations.
+     */
     public function up(): void
     {
-        Schema::create('completed_orders', function (Blueprint $table) {
-            $table->string('order_id')->primary();
+        Schema::create('canceled_orders', function (Blueprint $table) {
+            $table->id();
+            $table->string('order_id')->unique();
             $table->timestamps();
         });
     }
 
+    /**
+     * Reverse the migrations.
+     */
     public function down(): void
     {
-        Schema::dropIfExists('completed_orders');
+        Schema::dropIfExists('canceled_orders');
     }
 };

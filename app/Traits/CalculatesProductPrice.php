@@ -19,18 +19,18 @@ trait CalculatesProductPrice
         $lowerProductName = strtolower($productName);
 
         if (stripos($lowerProductName, 'netmonk') !== false) {
-            return ($segment === 'LEGS') ? 26100 : (($witel === 'BALI') ? 26100 : 21600);
+            return 21600;
         }
 
-        if (stripos($lowerProductName, 'oca') !== false) {
-            return ($segment === 'LEGS') ? 104000 : (($witel === 'NUSA TENGGARA') ? 104000 : 103950);
+        if (stripos($lowerProductName, 'OCA') !== false) {
+            return 104000;
         }
 
-        if (stripos($lowerProductName, 'antares eazy') !== false) {
+        if (stripos($lowerProductName, 'antares') !== false) {
             return 35000;
         }
 
-        if (stripos($lowerProductName, 'pijar sekolah') !== false) {
+        if (stripos($lowerProductName, 'pijar') !== false) {
             return 582750;
         }
 

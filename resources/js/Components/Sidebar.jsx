@@ -128,8 +128,8 @@ export default function Sidebar({ user }) {
                     {isReportsOpen && (
                         <div className="pl-12 pr-4 py-2 flex flex-col space-y-1 bg-white">
                             <Link
-                                href={route('analysisDigitalProduct')}
-                                className={`block px-4 py-2 text-sm rounded-md transition-colors ${route().current('analysisDigitalProduct')
+                                href={route('analysisDigitalProduct.index')}
+                                className={`block px-4 py-2 text-sm rounded-md transition-colors ${route().current('analysisDigitalProduct.index')
                                     ? 'bg-blue-100 text-blue-700 font-semibold'
                                     : 'text-gray-700 hover:bg-gray-100'
                                     }`}

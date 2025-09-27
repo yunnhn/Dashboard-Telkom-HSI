@@ -193,127 +193,127 @@ const EditReportForm = ({ currentSegment, reportData, period }) => {
     );
 };
 
-// const LegsReportTable = ({ data = [] }) => {
-//     // Kalkulasi untuk baris GRAND TOTAL
-//     const totals = data.reduce((acc, item) => {
-//         acc.in_progress_n += formatNumber(item.in_progress_n);
-//         acc.in_progress_o += formatNumber(item.in_progress_o);
-//         acc.in_progress_ae += formatNumber(item.in_progress_ae);
-//         acc.in_progress_ps += formatNumber(item.in_progress_ps);
+const LegsReportTable = ({ data = [] }) => {
+    // Kalkulasi untuk baris GRAND TOTAL
+    const totals = data.reduce((acc, item) => {
+        acc.in_progress_n += formatNumber(item.in_progress_n);
+        acc.in_progress_o += formatNumber(item.in_progress_o);
+        acc.in_progress_ae += formatNumber(item.in_progress_ae);
+        acc.in_progress_ps += formatNumber(item.in_progress_ps);
 
-//         acc.prov_comp_n_realisasi += formatNumber(item.prov_comp_n_realisasi);
-//         acc.prov_comp_o_realisasi += formatNumber(item.prov_comp_o_realisasi);
-//         acc.prov_comp_ae_realisasi += formatNumber(item.prov_comp_ae_realisasi);
-//         acc.prov_comp_ps_realisasi += formatNumber(item.prov_comp_ps_realisasi);
+        acc.prov_comp_n_realisasi += formatNumber(item.prov_comp_n_realisasi);
+        acc.prov_comp_o_realisasi += formatNumber(item.prov_comp_o_realisasi);
+        acc.prov_comp_ae_realisasi += formatNumber(item.prov_comp_ae_realisasi);
+        acc.prov_comp_ps_realisasi += formatNumber(item.prov_comp_ps_realisasi);
 
-//         // Untuk LEGS, Prov Comp tidak memiliki target, jadi kita hitung realisasi saja.
-//         // Namun, Revenue memiliki target.
-//         acc.revenue_n_target += formatNumber(item.revenue_n_target);
-//         acc.revenue_n_ach += formatNumber(item.revenue_n_ach);
-//         acc.revenue_o_target += formatNumber(item.revenue_o_target);
-//         acc.revenue_o_ach += formatNumber(item.revenue_o_ach);
-//         acc.revenue_ae_target += formatNumber(item.revenue_ae_target);
-//         acc.revenue_ae_ach += formatNumber(item.revenue_ae_ach);
-//         acc.revenue_ps_target += formatNumber(item.revenue_ps_target);
-//         acc.revenue_ps_ach += formatNumber(item.revenue_ps_ach);
+        // Untuk LEGS, Prov Comp tidak memiliki target, jadi kita hitung realisasi saja.
+        // Namun, Revenue memiliki target.
+        acc.revenue_n_target += formatNumber(item.revenue_n_target);
+        acc.revenue_n_ach += formatNumber(item.revenue_n_ach);
+        acc.revenue_o_target += formatNumber(item.revenue_o_target);
+        acc.revenue_o_ach += formatNumber(item.revenue_o_ach);
+        acc.revenue_ae_target += formatNumber(item.revenue_ae_target);
+        acc.revenue_ae_ach += formatNumber(item.revenue_ae_ach);
+        acc.revenue_ps_target += formatNumber(item.revenue_ps_target);
+        acc.revenue_ps_ach += formatNumber(item.revenue_ps_ach);
 
-//         return acc;
-//     }, {
-//         in_progress_n: 0, in_progress_o: 0, in_progress_ae: 0, in_progress_ps: 0,
-//         prov_comp_n_realisasi: 0, prov_comp_o_realisasi: 0, prov_comp_ae_realisasi: 0, prov_comp_ps_realisasi: 0,
-//         revenue_n_target: 0, revenue_n_ach: 0, revenue_o_target: 0, revenue_o_ach: 0,
-//         revenue_ae_target: 0, revenue_ae_ach: 0, revenue_ps_target: 0, revenue_ps_ach: 0,
-//     });
+        return acc;
+    }, {
+        in_progress_n: 0, in_progress_o: 0, in_progress_ae: 0, in_progress_ps: 0,
+        prov_comp_n_realisasi: 0, prov_comp_o_realisasi: 0, prov_comp_ae_realisasi: 0, prov_comp_ps_realisasi: 0,
+        revenue_n_target: 0, revenue_n_ach: 0, revenue_o_target: 0, revenue_o_ach: 0,
+        revenue_ae_target: 0, revenue_ae_ach: 0, revenue_ps_target: 0, revenue_ps_ach: 0,
+    });
 
-//     const grandTotalRealisasi = totals.in_progress_n + totals.in_progress_o + totals.in_progress_ae + totals.in_progress_ps +
-//         totals.prov_comp_n_realisasi + totals.prov_comp_o_realisasi + totals.prov_comp_ae_realisasi + totals.prov_comp_ps_realisasi;
+    const grandTotalRealisasi = totals.in_progress_n + totals.in_progress_o + totals.in_progress_ae + totals.in_progress_ps +
+        totals.prov_comp_n_realisasi + totals.prov_comp_o_realisasi + totals.prov_comp_ae_realisasi + totals.prov_comp_ps_realisasi;
 
-//     return (
-//         <div className="overflow-x-auto text-xs">
-//             <table className="w-full border-collapse text-center">
-//                 <thead className="bg-gray-800 text-white">
-//                     <tr>
-//                         <th className="border p-2 align-middle" rowSpan="2">WILAYAH TELKOM</th>
-//                         <th className="border p-2 bg-blue-600" colSpan="4">In Progress</th>
-//                         <th className="border p-2 bg-orange-600" colSpan="4">Proving Complete</th>
-//                         <th className="border p-2 bg-green-700" colSpan="8">REVENUE (Rp Juta)</th>
-//                         <th className="border p-2 bg-gray-600" rowSpan="2">Grand Total</th>
-//                     </tr>
-//                     <tr className="font-semibold">
-//                         {['N', 'O', 'AE', 'PS'].map(cat => <th key={`ip-${cat}`} className="border p-2 bg-blue-500">{cat}</th>)}
-//                         {['N', 'O', 'AE', 'PS'].map(cat => <th key={`pc-${cat}`} className="border p-2 bg-orange-500">{cat}</th>)}
-//                         {['N', 'O', 'AE', 'PS'].map(cat => <React.Fragment key={`rev-${cat}`}><th className="border p-1 bg-green-600">T</th><th className="border p-1 bg-green-600">ACH</th></React.Fragment>)}
-//                     </tr>
-//                 </thead>
-//                 <tbody>
-//                     {data.length > 0 ? data.map(item => {
-//                         const rowTotal = formatNumber(item.in_progress_n) + formatNumber(item.in_progress_o) +
-//                             formatNumber(item.in_progress_ae) + formatNumber(item.in_progress_ps) +
-//                             formatNumber(item.prov_comp_n_realisasi) + formatNumber(item.prov_comp_o_realisasi) +
-//                             formatNumber(item.prov_comp_ae_realisasi) + formatNumber(item.prov_comp_ps_realisasi);
+    return (
+        <div className="overflow-x-auto text-xs">
+            <table className="w-full border-collapse text-center">
+                <thead className="bg-gray-800 text-white">
+                    <tr>
+                        <th className="border p-2 align-middle" rowSpan="2">WILAYAH TELKOM</th>
+                        <th className="border p-2 bg-blue-600" colSpan="4">In Progress</th>
+                        <th className="border p-2 bg-orange-600" colSpan="4">Proving Complete</th>
+                        <th className="border p-2 bg-green-700" colSpan="8">REVENUE (Rp Juta)</th>
+                        <th className="border p-2 bg-gray-600" rowSpan="2">Grand Total</th>
+                    </tr>
+                    <tr className="font-semibold">
+                        {['N', 'O', 'AE', 'PS'].map(cat => <th key={`ip-${cat}`} className="border p-2 bg-blue-500">{cat}</th>)}
+                        {['N', 'O', 'AE', 'PS'].map(cat => <th key={`pc-${cat}`} className="border p-2 bg-orange-500">{cat}</th>)}
+                        {['N', 'O', 'AE', 'PS'].map(cat => <React.Fragment key={`rev-${cat}`}><th className="border p-1 bg-green-600">T</th><th className="border p-1 bg-green-600">ACH</th></React.Fragment>)}
+                    </tr>
+                </thead>
+                <tbody>
+                    {data.length > 0 ? data.map(item => {
+                        const rowTotal = formatNumber(item.in_progress_n) + formatNumber(item.in_progress_o) +
+                            formatNumber(item.in_progress_ae) + formatNumber(item.in_progress_ps) +
+                            formatNumber(item.prov_comp_n_realisasi) + formatNumber(item.prov_comp_o_realisasi) +
+                            formatNumber(item.prov_comp_ae_realisasi) + formatNumber(item.prov_comp_ps_realisasi);
 
-//                         return (
-//                             <tr key={item.nama_witel} className="bg-white hover:bg-gray-50">
-//                                 <td className="border p-2 font-semibold text-left text-gray-800">{item.nama_witel}</td>
+                        return (
+                            <tr key={item.nama_witel} className="bg-white hover:bg-gray-50">
+                                <td className="border p-2 font-semibold text-left text-gray-800">{item.nama_witel}</td>
 
-//                                 {/* In Progress */}
-//                                 <td className="border p-2">{formatNumber(item.in_progress_n)}</td>
-//                                 <td className="border p-2">{formatNumber(item.in_progress_o)}</td>
-//                                 <td className="border p-2">{formatNumber(item.in_progress_ae)}</td>
-//                                 <td className="border p-2">{formatNumber(item.in_progress_ps)}</td>
+                                {/* In Progress */}
+                                <td className="border p-2">{formatNumber(item.in_progress_n)}</td>
+                                <td className="border p-2">{formatNumber(item.in_progress_o)}</td>
+                                <td className="border p-2">{formatNumber(item.in_progress_ae)}</td>
+                                <td className="border p-2">{formatNumber(item.in_progress_ps)}</td>
 
-//                                 {/* Proving Complete (hanya realisasi untuk LEGS) */}
-//                                 <td className="border p-2">{formatNumber(item.prov_comp_n_realisasi)}</td>
-//                                 <td className="border p-2">{formatNumber(item.prov_comp_o_realisasi)}</td>
-//                                 <td className="border p-2">{formatNumber(item.prov_comp_ae_realisasi)}</td>
-//                                 <td className="border p-2">{formatNumber(item.prov_comp_ps_realisasi)}</td>
+                                {/* Proving Complete (hanya realisasi untuk LEGS) */}
+                                <td className="border p-2">{formatNumber(item.prov_comp_n_realisasi)}</td>
+                                <td className="border p-2">{formatNumber(item.prov_comp_o_realisasi)}</td>
+                                <td className="border p-2">{formatNumber(item.prov_comp_ae_realisasi)}</td>
+                                <td className="border p-2">{formatNumber(item.prov_comp_ps_realisasi)}</td>
 
-//                                 {/* Revenue (Target & Achievement) */}
-//                                 <td className="border p-2">{formatRupiah(item.revenue_n_target, decimalPlaces)}</td>
-//                                 <td className="border p-2 font-bold text-green-700 bg-green-50">{formatRupiah(item.revenue_n_ach, decimalPlaces)}</td>
-//                                 <td className="border p-2">{formatRupiah(item.revenue_o_target, decimalPlaces)}</td>
-//                                 <td className="border p-2 font-bold text-green-700 bg-green-50">{formatRupiah(item.revenue_o_ach, decimalPlaces)}</td>
-//                                 <td className="border p-2">{formatRupiah(item.revenue_ae_target, decimalPlaces)}</td>
-//                                 <td className="border p-2 font-bold text-green-700 bg-green-50">{formatRupiah(item.revenue_ae_ach, decimalPlaces)}</td>
-//                                 <td className="border p-2">{formatRupiah(item.revenue_ps_target, decimalPlaces)}</td>
-//                                 <td className="border p-2 font-bold text-green-700 bg-green-50">{formatRupiah(item.revenue_ps_ach, decimalPlaces)}</td>
+                                {/* Revenue (Target & Achievement) */}
+                                <td className="border p-2">{formatRupiah(item.revenue_n_target, decimalPlaces)}</td>
+                                <td className="border p-2 font-bold text-green-700 bg-green-50">{formatRupiah(item.revenue_n_ach, decimalPlaces)}</td>
+                                <td className="border p-2">{formatRupiah(item.revenue_o_target, decimalPlaces)}</td>
+                                <td className="border p-2 font-bold text-green-700 bg-green-50">{formatRupiah(item.revenue_o_ach, decimalPlaces)}</td>
+                                <td className="border p-2">{formatRupiah(item.revenue_ae_target, decimalPlaces)}</td>
+                                <td className="border p-2 font-bold text-green-700 bg-green-50">{formatRupiah(item.revenue_ae_ach, decimalPlaces)}</td>
+                                <td className="border p-2">{formatRupiah(item.revenue_ps_target, decimalPlaces)}</td>
+                                <td className="border p-2 font-bold text-green-700 bg-green-50">{formatRupiah(item.revenue_ps_ach, decimalPlaces)}</td>
 
-//                                 <td className="border p-2 font-bold bg-gray-100">{rowTotal}</td>
-//                             </tr>
-//                         );
-//                     }) : (
-//                         <tr><td colSpan="21" className="text-center p-4 border text-gray-500">Tidak ada data untuk ditampilkan.</td></tr>
-//                     )}
+                                <td className="border p-2 font-bold bg-gray-100">{rowTotal}</td>
+                            </tr>
+                        );
+                    }) : (
+                        <tr><td colSpan="21" className="text-center p-4 border text-gray-500">Tidak ada data untuk ditampilkan.</td></tr>
+                    )}
 
-//                     {/* Baris Grand Total */}
-//                     <tr className="font-bold text-white">
-//                         <td className="border p-2 text-left bg-gray-800">GRAND TOTAL</td>
-//                         <td className="border p-2 bg-blue-600">{totals.in_progress_n}</td>
-//                         <td className="border p-2 bg-blue-600">{totals.in_progress_o}</td>
-//                         <td className="border p-2 bg-blue-600">{totals.in_progress_ae}</td>
-//                         <td className="border p-2 bg-blue-600">{totals.in_progress_ps}</td>
+                    {/* Baris Grand Total */}
+                    <tr className="font-bold text-white">
+                        <td className="border p-2 text-left bg-gray-800">GRAND TOTAL</td>
+                        <td className="border p-2 bg-blue-600">{totals.in_progress_n}</td>
+                        <td className="border p-2 bg-blue-600">{totals.in_progress_o}</td>
+                        <td className="border p-2 bg-blue-600">{totals.in_progress_ae}</td>
+                        <td className="border p-2 bg-blue-600">{totals.in_progress_ps}</td>
 
-//                         <td className="border p-2 bg-orange-600">{totals.prov_comp_n_realisasi}</td>
-//                         <td className="border p-2 bg-orange-600">{totals.prov_comp_o_realisasi}</td>
-//                         <td className="border p-2 bg-orange-600">{totals.prov_comp_ae_realisasi}</td>
-//                         <td className="border p-2 bg-orange-600">{totals.prov_comp_ps_realisasi}</td>
+                        <td className="border p-2 bg-orange-600">{totals.prov_comp_n_realisasi}</td>
+                        <td className="border p-2 bg-orange-600">{totals.prov_comp_o_realisasi}</td>
+                        <td className="border p-2 bg-orange-600">{totals.prov_comp_ae_realisasi}</td>
+                        <td className="border p-2 bg-orange-600">{totals.prov_comp_ps_realisasi}</td>
 
-//                         <td className="border p-2 bg-green-700">{formatRupiah(totals.revenue_n_target, decimalPlaces)}</td>
-//                         <td className="border p-2 bg-green-700">{formatRupiah(totals.revenue_n_ach, decimalPlaces)}</td>
-//                         <td className="border p-2 bg-green-700">{formatRupiah(totals.revenue_o_target, decimalPlaces)}</td>
-//                         <td className="border p-2 bg-green-700">{formatRupiah(totals.revenue_o_ach, decimalPlaces)}</td>
-//                         <td className="border p-2 bg-green-700">{formatRupiah(totals.revenue_ae_target, decimalPlaces)}</td>
-//                         <td className="border p-2 bg-green-700">{formatRupiah(totals.revenue_ae_ach, decimalPlaces)}</td>
-//                         <td className="border p-2 bg-green-700">{formatRupiah(totals.revenue_ps_target, decimalPlaces)}</td>
-//                         <td className="border p-2 bg-green-700">{formatRupiah(totals.revenue_ps_ach, decimalPlaces)}</td>
+                        <td className="border p-2 bg-green-700">{formatRupiah(totals.revenue_n_target, decimalPlaces)}</td>
+                        <td className="border p-2 bg-green-700">{formatRupiah(totals.revenue_n_ach, decimalPlaces)}</td>
+                        <td className="border p-2 bg-green-700">{formatRupiah(totals.revenue_o_target, decimalPlaces)}</td>
+                        <td className="border p-2 bg-green-700">{formatRupiah(totals.revenue_o_ach, decimalPlaces)}</td>
+                        <td className="border p-2 bg-green-700">{formatRupiah(totals.revenue_ae_target, decimalPlaces)}</td>
+                        <td className="border p-2 bg-green-700">{formatRupiah(totals.revenue_ae_ach, decimalPlaces)}</td>
+                        <td className="border p-2 bg-green-700">{formatRupiah(totals.revenue_ps_target, decimalPlaces)}</td>
+                        <td className="border p-2 bg-green-700">{formatRupiah(totals.revenue_ps_ach, decimalPlaces)}</td>
 
-//                         <td className="border p-2 bg-gray-600">{grandTotalRealisasi}</td>
-//                     </tr>
-//                 </tbody>
-//             </table>
-//         </div>
-//     );
-// };
+                        <td className="border p-2 bg-gray-600">{grandTotalRealisasi}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    );
+};
 
 const formatPercent = (value) => {
     const num = Number(value);
@@ -321,7 +321,7 @@ const formatPercent = (value) => {
     return `${num.toFixed(1)}%`;
 };
 
-const formatRupiah = (value, decimals = 3) => (Number(value) || 0).toFixed(decimals);
+const formatRupiah = (value, decimals = 5) => (Number(value) || 0).toFixed(decimals);
 const formatNumber = (value) => Number(value) || 0;
 
 // Komponen untuk membuat header bisa di-drag
@@ -357,219 +357,12 @@ const DraggableHeaderCell = ({ group, children, colSpan }) => {
 
 // Di dalam AnalysisDigitalProduct.jsx
 
-// const SmeReportTable = ({ data = [], decimalPlaces, tableConfig, setTableConfig }) => {
-//     const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates, }));
+const SmeReportTable = ({ data = [], decimalPlaces, tableConfig, setTableConfig }) => {
+    const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates, }));
 
-//     const getDataKeys = (config) => {
-//         const keys = [];
-//         config.forEach(group => {
-//             group.columns.forEach(col => {
-//                 if (col.subColumns) {
-//                     col.subColumns.forEach(sc => {
-//                         if (sc.type !== 'calculation') keys.push(col.key + sc.key);
-//                     });
-//                 } else if (col.type !== 'calculation') {
-//                     keys.push(col.key);
-//                 }
-//             });
-//         });
-//         return keys;
-//     };
-
-//     const totals = useMemo(() => {
-//         const dataKeys = getDataKeys(tableConfig);
-//         const initialTotals = Object.fromEntries(dataKeys.map(key => [key, 0]));
-
-//         data.forEach(item => {
-//             dataKeys.forEach(key => {
-//                 initialTotals[key] += formatNumber(item[key]);
-//             });
-//         });
-//         return initialTotals;
-//     }, [data, tableConfig]);
-
-//     function handleDragEnd(event) {
-//         const { active, over } = event;
-//         if (active.id !== over.id) {
-//             setTableConfig((config) => {
-//                 const oldIndex = config.findIndex(g => g.groupTitle === active.id);
-//                 const newIndex = config.findIndex(g => g.groupTitle === over.id);
-//                 return arrayMove(config, oldIndex, newIndex);
-//             });
-//         }
-//     }
-
-//     // =======================================================
-//     // MESIN KALKULASI UTAMA ADA DI FUNGSI INI
-//     // =======================================================
-//     const getCellValue = (item, columnDef) => {
-//         if (columnDef.type === 'calculation') {
-//             const { operation, operands } = columnDef.calculation;
-//             const values = operands.map(opKey => {
-//                 const opDef = findColumnDefinition(opKey, tableConfig);
-//                 return opDef?.type === 'calculation' ? getCellValue(item, opDef) : formatNumber(item[opKey]);
-//             });
-
-//             switch (operation) {
-//                 case 'percentage':
-//                     // operands: [pembilang, penyebut]
-//                     const [numerator, denominator] = values;
-//                     if (denominator === 0) return formatPercent(0);
-//                     return formatPercent((numerator / denominator) * 100);
-
-//                 case 'sum':
-//                     // operands: [angka1, angka2, ...]
-//                     return formatNumber(values.reduce((a, b) => a + b, 0));
-
-//                 case 'average':
-//                     if (values.length === 0) return 0;
-//                     const sum = values.reduce((a, b) => a + b, 0);
-//                     // Menghindari pembagian dengan nol
-//                     return formatNumber(sum / values.length);
-
-//                 case 'count':
-//                     // Menghitung berapa banyak operand yang nilainya bukan nol
-//                     return values.filter(v => v !== 0).length;
-
-//                 default:
-//                     return 'N/A'; // Operasi tidak dikenal
-//             }
-//         }
-//         return item[columnDef.key];
-//     };
-
-//     const findColumnDefinition = (keyToFind) => {
-//         for (const group of tableConfig) {
-//             for (const col of group.columns) {
-//                 if (col.key === keyToFind) return col;
-//                 if (col.subColumns) {
-//                     for (const subCol of col.subColumns) {
-//                         if ((col.key + subCol.key) === keyToFind) return subCol;
-//                     }
-//                 }
-//             }
-//         }
-//         return null;
-//     };
-
-//     // =======================================================
-//     // JSX di bawah ini di-refactor agar lebih ringkas
-//     // =======================================================
-//     const renderCell = (item, col, subCol = null) => {
-//         const columnDef = subCol || col;
-//         return (
-//             <td key={`${item.nama_witel || 'total'}-${columnDef.key}`} className="border p-2">
-//                 {getCellValue(item, columnDef)}
-//             </td>
-//         );
-//     };
-
-//     const renderTotalCell = (group, col, subCol = null) => {
-//         const columnDef = subCol || col;
-//         return (
-//             <td key={`total-${columnDef.key}`} className={`border p-2 ${group.groupClass}`}>
-//                 {getCellValue(totals, columnDef)}
-//             </td>
-//         );
-//     };
-
-//     return (
-//         <div className="overflow-x-auto text-xs">
-//             <table className="w-full border-collapse text-center">
-//                 <thead className="bg-gray-800 text-white">
-//                     {/* Baris 1: Judul Grup Utama */}
-//                     <tr>
-//                         <th className="border p-2 align-middle" rowSpan={3}>WILAYAH TELKOM</th>
-//                         {tableConfig.map(group => (
-//                             <th key={group.groupTitle} className={`border p-2 ${group.groupClass}`} colSpan={group.columns.reduce((sum, col) => sum + (col.subColumns?.length || 1), 0)}>
-//                                 {group.groupTitle}
-//                             </th>
-//                         ))}
-//                     </tr>
-
-//                     {/* Baris 2: Judul Kolom Produk */}
-//                     <tr className="font-semibold">
-//                         {tableConfig.map(group =>
-//                             group.columns.map(col => (
-//                                 <th key={col.key} className={`border p-2 ${group.columnClass || 'bg-gray-700'}`} colSpan={col.subColumns?.length || 1} rowSpan={col.subColumns ? 1 : 2}>
-//                                     {col.title}
-//                                 </th>
-//                             ))
-//                         )}
-//                     </tr>
-
-//                     {/* Baris 3: Judul Sub-Kolom */}
-//                     <tr className="font-medium">
-//                         {tableConfig.map(group =>
-//                             group.columns.map(col =>
-//                                 col.subColumns?.map(subCol => (
-//                                     <th key={`${col.key}${subCol.key}`} className={`border p-1 ${group.subColumnClass || 'bg-gray-600'}`}>
-//                                         {subCol.title}
-//                                     </th>
-//                                 ))
-//                             )
-//                         )}
-//                     </tr>
-//                 </thead>
-//                 <tbody>
-//                     {/* Baris Data */}
-//                     {data.length > 0 ? data.map(item => (
-//                         <tr key={item.nama_witel} className="bg-white hover:bg-gray-50 text-black">
-//                             <td className="border p-2 font-semibold text-left">{item.nama_witel}</td>
-//                             {tableConfig.map(group =>
-//                                 group.columns.map(col =>
-//                                     col.subColumns ? (
-//                                         col.subColumns.map(subCol => (
-//                                             // Menggunakan `cellClassName` yang baru
-//                                             <td key={`${item.nama_witel}-${col.key}-${subCol.key}`} className={`border p-2 ${subCol.cellClassName || ''}`}>
-//                                                 {getCellValue(item, subCol, col)}
-//                                             </td>
-//                                         ))
-//                                     ) : (
-//                                         // Fallback untuk grup seperti "In Progress"
-//                                         <td key={`${item.nama_witel}-${col.key}`} className="border p-2 bg-blue-100">
-//                                             {getCellValue(item, col)}
-//                                         </td>
-//                                     )
-//                                 )
-//                             )}
-//                         </tr>
-//                     )) : (
-//                         <tr><td colSpan={100} className="text-center p-4 border text-gray-500">Tidak ada data.</td></tr>
-//                     )}
-
-//                     {/* Baris Grand Total */}
-//                     <tr className="font-bold text-white">
-//                         <td className="border p-2 text-left bg-gray-800">GRAND TOTAL</td>
-//                         {tableConfig.map(group =>
-//                             group.columns.map(col =>
-//                                 col.subColumns ? (
-//                                     col.subColumns.map(subCol => (
-//                                         // Selalu gunakan warna grup utama
-//                                         <td key={`total-${col.key}-${subCol.key}`} className={`border p-2 ${group.groupClass}`}>
-//                                             {getCellValue(totals, subCol, col)}
-//                                         </td>
-//                                     ))
-//                                 ) : (
-//                                     <td key={`total-${col.key}`} className={`border p-2 ${group.groupClass}`}>
-//                                         {getCellValue(totals, col)}
-//                                     </td>
-//                                 )
-//                             )
-//                         )}
-//                     </tr>
-//                 </tbody>
-//             </table>
-//         </div>
-//     );
-// };
-
-const DynamicReportTable = ({ data = [], decimalPlaces, tableConfig, setTableConfig }) => {
-
-    // Fungsi untuk mendapatkan semua key data mentah dari config
     const getDataKeys = (config) => {
         const keys = [];
-        (config || []).forEach(group => {
+        config.forEach(group => {
             group.columns.forEach(col => {
                 if (col.subColumns) {
                     col.subColumns.forEach(sc => {
@@ -583,13 +376,11 @@ const DynamicReportTable = ({ data = [], decimalPlaces, tableConfig, setTableCon
         return keys;
     };
 
-    // Kalkulasi Grand Total secara dinamis
     const totals = useMemo(() => {
-        if (!tableConfig) return {};
         const dataKeys = getDataKeys(tableConfig);
         const initialTotals = Object.fromEntries(dataKeys.map(key => [key, 0]));
 
-        (data || []).forEach(item => {
+        data.forEach(item => {
             dataKeys.forEach(key => {
                 initialTotals[key] += formatNumber(item[key]);
             });
@@ -597,34 +388,23 @@ const DynamicReportTable = ({ data = [], decimalPlaces, tableConfig, setTableCon
         return initialTotals;
     }, [data, tableConfig]);
 
-    // Fungsi helper untuk mencari definisi kolom
-    const findColumnDefinition = (keyToFind, config) => {
-        if (!config) return null;
-        for (const group of config) {
-            for (const col of group.columns) {
-                // Untuk kolom tanpa sub-kolom
-                if (col.key === keyToFind) return col;
-                // Untuk sub-kolom
-                if (col.subColumns) {
-                    for (const subCol of col.subColumns) {
-                        const combinedKey = col.key + subCol.key;
-                        if (combinedKey === keyToFind) return { ...subCol, key: combinedKey };
-                    }
-                }
-            }
+    function handleDragEnd(event) {
+        const { active, over } = event;
+        if (active.id !== over.id) {
+            setTableConfig((config) => {
+                const oldIndex = config.findIndex(g => g.groupTitle === active.id);
+                const newIndex = config.findIndex(g => g.groupTitle === over.id);
+                return arrayMove(config, oldIndex, newIndex);
+            });
         }
-        return null;
-    };
+    }
 
-    // Mesin Kalkulasi
+    // =======================================================
+    // MESIN KALKULASI UTAMA ADA DI FUNGSI INI
+    // =======================================================
     const getCellValue = (item, columnDef) => {
-        if (!columnDef || !item) return '-';
-
-        // Logika untuk kolom kalkulasi
         if (columnDef.type === 'calculation') {
-            const { operation, operands } = columnDef.calculation || {};
-            if (!operation || !operands) return 'Error';
-
+            const { operation, operands } = columnDef.calculation;
             const values = operands.map(opKey => {
                 const opDef = findColumnDefinition(opKey, tableConfig);
                 return opDef?.type === 'calculation' ? getCellValue(item, opDef) : formatNumber(item[opKey]);
@@ -632,75 +412,148 @@ const DynamicReportTable = ({ data = [], decimalPlaces, tableConfig, setTableCon
 
             switch (operation) {
                 case 'percentage':
+                    // operands: [pembilang, penyebut]
                     const [numerator, denominator] = values;
                     if (denominator === 0) return formatPercent(0);
                     return formatPercent((numerator / denominator) * 100);
+
                 case 'sum':
+                    // operands: [angka1, angka2, ...]
                     return formatNumber(values.reduce((a, b) => a + b, 0));
-                // ... case kalkulasi lainnya (average, count)
+
+                case 'average':
+                    if (values.length === 0) return 0;
+                    const sum = values.reduce((a, b) => a + b, 0);
+                    // Menghindari pembagian dengan nol
+                    return formatNumber(sum / values.length);
+
+                case 'count':
+                    // Menghitung berapa banyak operand yang nilainya bukan nol
+                    return values.filter(v => v !== 0).length;
+
+                default:
+                    return 'N/A'; // Operasi tidak dikenal
             }
         }
-
-        // Logika untuk data biasa
-        const value = item[columnDef.key];
-        if (value === undefined || value === null) return '-';
-        if (columnDef.key.includes('revenue') && (columnDef.key.includes('_target') || columnDef.key.includes('_ach'))) {
-            return formatRupiah(value, decimalPlaces);
-        }
-        if (columnDef.key.includes('_percent')) {
-            return formatPercent(value);
-        }
-        return formatNumber(value);
+        return item[columnDef.key];
     };
 
-    if (!tableConfig) {
-        return <div className="text-center p-4">Memuat konfigurasi tabel...</div>;
-    }
+    const findColumnDefinition = (keyToFind) => {
+        for (const group of tableConfig) {
+            for (const col of group.columns) {
+                if (col.key === keyToFind) return col;
+                if (col.subColumns) {
+                    for (const subCol of col.subColumns) {
+                        if ((col.key + subCol.key) === keyToFind) return subCol;
+                    }
+                }
+            }
+        }
+        return null;
+    };
+
+    // =======================================================
+    // JSX di bawah ini di-refactor agar lebih ringkas
+    // =======================================================
+    const renderCell = (item, col, subCol = null) => {
+        const columnDef = subCol || col;
+        return (
+            <td key={`${item.nama_witel || 'total'}-${columnDef.key}`} className="border p-2">
+                {getCellValue(item, columnDef)}
+            </td>
+        );
+    };
+
+    const renderTotalCell = (group, col, subCol = null) => {
+        const columnDef = subCol || col;
+        return (
+            <td key={`total-${columnDef.key}`} className={`border p-2 ${group.groupClass}`}>
+                {getCellValue(totals, columnDef)}
+            </td>
+        );
+    };
 
     return (
         <div className="overflow-x-auto text-xs">
             <table className="w-full border-collapse text-center">
                 <thead className="bg-gray-800 text-white">
+                    {/* Baris 1: Judul Grup Utama */}
                     <tr>
                         <th className="border p-2 align-middle" rowSpan={3}>WILAYAH TELKOM</th>
-                        {tableConfig.map(group => (<th key={group.groupTitle} className={`border p-2 ${group.groupClass}`} colSpan={group.columns.reduce((sum, col) => sum + (col.subColumns?.length || 1), 0)}>{group.groupTitle}</th>))}
+                        {tableConfig.map(group => (
+                            <th key={group.groupTitle} className={`border p-2 ${group.groupClass}`} colSpan={group.columns.reduce((sum, col) => sum + (col.subColumns?.length || 1), 0)}>
+                                {group.groupTitle}
+                            </th>
+                        ))}
                     </tr>
+
+                    {/* Baris 2: Judul Kolom Produk */}
                     <tr className="font-semibold">
-                        {tableConfig.map(group => group.columns.map(col => (<th key={col.key} className={`border p-2 ${group.columnClass || 'bg-gray-700'}`} colSpan={col.subColumns?.length || 1} rowSpan={col.subColumns ? 1 : 2}>{col.title}</th>)))}
+                        {tableConfig.map(group =>
+                            group.columns.map(col => (
+                                <th key={col.key} className={`border p-2 ${group.columnClass || 'bg-gray-700'}`} colSpan={col.subColumns?.length || 1} rowSpan={col.subColumns ? 1 : 2}>
+                                    {col.title}
+                                </th>
+                            ))
+                        )}
                     </tr>
+
+                    {/* Baris 3: Judul Sub-Kolom */}
                     <tr className="font-medium">
-                        {tableConfig.map(group => group.columns.map(col => col.subColumns?.map(subCol => (<th key={`${col.key}${subCol.key}`} className={`border p-1 ${group.subColumnClass || 'bg-gray-600'}`}>{subCol.title}</th>))))}
+                        {tableConfig.map(group =>
+                            group.columns.map(col =>
+                                col.subColumns?.map(subCol => (
+                                    <th key={`${col.key}${subCol.key}`} className={`border p-1 ${group.subColumnClass || 'bg-gray-600'}`}>
+                                        {subCol.title}
+                                    </th>
+                                ))
+                            )
+                        )}
                     </tr>
                 </thead>
                 <tbody>
-                    {(data || []).map(item => (
+                    {/* Baris Data */}
+                    {data.length > 0 ? data.map(item => (
                         <tr key={item.nama_witel} className="bg-white hover:bg-gray-50 text-black">
                             <td className="border p-2 font-semibold text-left">{item.nama_witel}</td>
                             {tableConfig.map(group =>
                                 group.columns.map(col =>
                                     col.subColumns ? (
-                                        col.subColumns.map(subCol => {
-                                            const finalDef = { ...subCol, key: col.key + subCol.key };
-                                            return (<td key={finalDef.key} className={`border p-2 ${subCol.cellClassName || ''}`}>{getCellValue(item, finalDef)}</td>);
-                                        })
+                                        col.subColumns.map(subCol => (
+                                            // Menggunakan `cellClassName` yang baru
+                                            <td key={`${item.nama_witel}-${col.key}-${subCol.key}`} className={`border p-2 ${subCol.cellClassName || ''}`}>
+                                                {getCellValue(item, subCol, col)}
+                                            </td>
+                                        ))
                                     ) : (
-                                        <td key={col.key} className={`border p-2 ${col.cellClassName || group.cellClassName || ''}`}>{getCellValue(item, col)}</td>
+                                        // Fallback untuk grup seperti "In Progress"
+                                        <td key={`${item.nama_witel}-${col.key}`} className="border p-2 bg-blue-100">
+                                            {getCellValue(item, col)}
+                                        </td>
                                     )
                                 )
                             )}
                         </tr>
-                    ))}
+                    )) : (
+                        <tr><td colSpan={100} className="text-center p-4 border text-gray-500">Tidak ada data.</td></tr>
+                    )}
+
+                    {/* Baris Grand Total */}
                     <tr className="font-bold text-white">
                         <td className="border p-2 text-left bg-gray-800">GRAND TOTAL</td>
                         {tableConfig.map(group =>
                             group.columns.map(col =>
                                 col.subColumns ? (
-                                    col.subColumns.map(subCol => {
-                                        const finalDef = { ...subCol, key: col.key + subCol.key };
-                                        return (<td key={`total-${finalDef.key}`} className={`border p-2 ${group.groupClass}`}>{getCellValue(totals, finalDef)}</td>);
-                                    })
+                                    col.subColumns.map(subCol => (
+                                        // Selalu gunakan warna grup utama
+                                        <td key={`total-${col.key}-${subCol.key}`} className={`border p-2 ${group.groupClass}`}>
+                                            {getCellValue(totals, subCol, col)}
+                                        </td>
+                                    ))
                                 ) : (
-                                    <td key={`total-${col.key}`} className={`border p-2 ${group.groupClass}`}>{getCellValue(totals, col)}</td>
+                                    <td key={`total-${col.key}`} className={`border p-2 ${group.groupClass}`}>
+                                        {getCellValue(totals, col)}
+                                    </td>
                                 )
                             )
                         )}
@@ -709,7 +562,6 @@ const DynamicReportTable = ({ data = [], decimalPlaces, tableConfig, setTableCon
             </table>
         </div>
     );
-
 };
 
 // ===================================================================
@@ -1413,7 +1265,7 @@ const TableConfigurator = ({ tableConfig, setTableConfig }) => {
 // ===================================================================
 // KOMPONEN UTAMA ANALYSISDigitalProduct
 // ===================================================================
-export default function AnalysisDigitalProduct({ auth, reportData = [], currentSegment = 'SME', period = '', inProgressData = [], newData = [], newStatusData, historyData = [], accountOfficers = [], kpiData = [], qcData = [], currentInProgressYear, flash = {}, errors: pageErrors = {}, initialTableConfig }) {
+export default function AnalysisDigitalProduct({ auth, reportData = [], currentSegment = 'SME', period = '', inProgressData = [], newData = [], newStatusData, historyData = [], accountOfficers = [], kpiData = [], qcData = [], currentInProgressYear, flash = {}, errors: pageErrors = {} }) {
 
     const [activeDetailView, setActiveDetailView] = useState('inprogress');
     const [witelFilter, setWitelFilter] = useState('ALL');
@@ -1422,61 +1274,61 @@ export default function AnalysisDigitalProduct({ auth, reportData = [], currentS
     const [tableConfig, setTableConfig] = useState([
         {
             groupTitle: 'In Progress',
-            groupClass: 'bg-blue-700',
-            columnClass: 'bg-blue-500',
+            groupClass: 'bg-blue-600',
+            columnClass: 'bg-blue-400 text-black',
             columns: [
-                { key: 'in_progress_n', title: 'N', className: 'bg-blue-100' },
-                { key: 'in_progress_o', title: 'O', className: 'bg-blue-100' },
-                { key: 'in_progress_ae', title: 'AE', className: 'bg-blue-100' },
-                { key: 'in_progress_ps', title: 'PS', className: 'bg-blue-100' },
+                { key: 'in_progress_n', title: 'N', className: 'bg-blue-100 text-black' },
+                { key: 'in_progress_o', title: 'O', className: 'bg-blue-100 text-black' },
+                { key: 'in_progress_ae', title: 'AE', className: 'bg-blue-100 text-black' },
+                { key: 'in_progress_ps', title: 'PS', className: 'bg-blue-100 text-black' },
             ],
         },
         {
             groupTitle: 'Prov Comp',
-            groupClass: 'bg-orange-700',
-            columnClass: 'bg-orange-600',
-            subColumnClass: 'bg-orange-400',
+            groupClass: 'bg-orange-600',
+            columnClass: 'bg-orange-400 text-black',
+            subColumnClass: 'bg-orange-300 text-black',
             columns: [
                 {
-                    key: 'prov_comp_n', title: 'N', className: 'bg-orange-500', subColumns: [
-                        { key: '_target', title: 'T', className: 'bg-orange-200' },
-                        { key: '_realisasi', title: 'R', className: 'bg-orange-200' },
-                        { key: '_percent', title: 'P', className: 'bg-orange-100', type: 'calculation', calculation: { operation: 'percentage', operands: ['prov_comp_n_realisasi', 'prov_comp_n_target'] } }
+                    key: 'prov_comp_n', title: 'N', className: 'bg-orange-500 text-black', subColumns: [
+                        { key: '_target', title: 'T', className: 'bg-orange-200 text-black' },
+                        { key: '_realisasi', title: 'R', className: 'bg-orange-200 text-black' },
+                        { key: '_percent', title: 'P', className: 'bg-orange-100 text-black', type: 'calculation', calculation: { operation: 'percentage', operands: ['prov_comp_n_realisasi', 'prov_comp_n_target'] } }
                     ]
                 },
                 {
                     key: 'prov_comp_o', title: 'O', subColumns: [
-                        { key: '_target', title: 'T', className: 'bg-orange-200' },
-                        { key: '_realisasi', title: 'R', className: 'bg-orange-200' },
-                        { key: '_percent', title: 'P', className: 'bg-orange-100', type: 'calculation', calculation: { operation: 'percentage', operands: ['prov_comp_o_realisasi', 'prov_comp_o_target'] } }
+                        { key: '_target', title: 'T', className: 'bg-orange-200 text-black' },
+                        { key: '_realisasi', title: 'R', className: 'bg-orange-200 text-black' },
+                        { key: '_percent', title: 'P', className: 'bg-orange-100 text-black', type: 'calculation', calculation: { operation: 'percentage', operands: ['prov_comp_o_realisasi', 'prov_comp_o_target'] } }
                     ]
                 },
                 {
                     key: 'prov_comp_ae', title: 'AE', subColumns: [
-                        { key: '_target', title: 'T', className: 'bg-orange-200' },
-                        { key: '_realisasi', title: 'R', className: 'bg-orange-200' },
-                        { key: '_percent', title: 'P', className: 'bg-orange-100', type: 'calculation', calculation: { operation: 'percentage', operands: ['prov_comp_ae_realisasi', 'prov_comp_ae_target'] } }
+                        { key: '_target', title: 'T', className: 'bg-orange-200 text-black' },
+                        { key: '_realisasi', title: 'R', className: 'bg-orange-200 text-black' },
+                        { key: '_percent', title: 'P', className: 'bg-orange-100 text-black', type: 'calculation', calculation: { operation: 'percentage', operands: ['prov_comp_ae_realisasi', 'prov_comp_ae_target'] } }
                     ]
                 },
                 {
                     key: 'prov_comp_ps', title: 'PS', subColumns: [
-                        { key: '_target', title: 'T', className: 'bg-orange-200' },
-                        { key: '_realisasi', title: 'R', className: 'bg-orange-200' },
-                        { key: '_percent', title: 'P', className: 'bg-orange-100', type: 'calculation', calculation: { operation: 'percentage', operands: ['prov_comp_ps_realisasi', 'prov_comp_ps_target'] } }
+                        { key: '_target', title: 'T', className: 'bg-orange-200 text-black' },
+                        { key: '_realisasi', title: 'R', className: 'bg-orange-200 text-black' },
+                        { key: '_percent', title: 'P', className: 'bg-orange-100 text-black', type: 'calculation', calculation: { operation: 'percentage', operands: ['prov_comp_ps_realisasi', 'prov_comp_ps_target'] } }
                     ]
                 },
             ],
         },
         {
             groupTitle: 'REVENUE (Rp Juta)',
-            groupClass: 'bg-green-800',
-            columnClass: 'bg-green-700',
-            subColumnClass: 'bg-green-400',
+            groupClass: 'bg-green-700',
+            columnClass: 'bg-green-600 text-black',
+            subColumnClass: 'bg-green-300 text-black',
             columns: [
-                { key: 'revenue_n', title: 'N', subColumns: [{ key: '_target', title: 'T', className: 'bg-green-200' }, { key: '_ach', title: 'ACH', className: 'bg-green-100' }] },
-                { key: 'revenue_o', title: 'O', subColumns: [{ key: '_target', title: 'T', className: 'bg-green-200' }, { key: '_ach', title: 'ACH', className: 'bg-green-100' }] },
-                { key: 'revenue_ae', title: 'AE', subColumns: [{ key: '_target', title: 'T', className: 'bg-green-200' }, { key: '_ach', title: 'ACH', className: 'bg-green-100' }] },
-                { key: 'revenue_ps', title: 'PS', subColumns: [{ key: '_target', title: 'T', className: 'bg-green-200' }, { key: '_ach', title: 'ACH', className: 'bg-green-100' }] },
+                { key: 'revenue_n', title: 'N', subColumns: [{ key: '_target', title: 'T', className: 'bg-green-200 text-black' }, { key: '_ach', title: 'ACH', className: 'bg-green-100 text-black' }] },
+                { key: 'revenue_o', title: 'O', subColumns: [{ key: '_target', title: 'T', className: 'bg-green-200 text-black' }, { key: '_ach', title: 'ACH', className: 'bg-green-100 text-black' }] },
+                { key: 'revenue_ae', title: 'AE', subColumns: [{ key: '_target', title: 'T', className: 'bg-green-200 text-black' }, { key: '_ach', title: 'ACH', className: 'bg-green-100 text-black' }] },
+                { key: 'revenue_ps', title: 'PS', subColumns: [{ key: '_target', title: 'T', className: 'bg-green-200 text-black' }, { key: '_ach', title: 'ACH', className: 'bg-green-100 text-black' }] },
             ],
         },
         {
@@ -1484,9 +1336,9 @@ export default function AnalysisDigitalProduct({ auth, reportData = [], currentS
             groupClass: 'bg-gray-600',
             columnClass: 'bg-gray-500',
             columns: [
-                { key: 'grand_total_target', title: 'T', className: 'bg-gray-200', type: 'calculation', calculation: { operation: 'sum', operands: ['prov_comp_n_target', 'prov_comp_o_target', 'prov_comp_ae_target', 'prov_comp_ps_target'] } },
-                { key: 'grand_total_realisasi', title: 'R', className: 'bg-gray-200', type: 'calculation', calculation: { operation: 'sum', operands: ['prov_comp_n_realisasi', 'prov_comp_o_realisasi', 'prov_comp_ae_realisasi', 'prov_comp_ps_realisasi'] } },
-                { key: 'grand_total_persentase', title: 'P', className: 'bg-gray-100', type: 'calculation', calculation: { operation: 'percentage', operands: ['grand_total_realisasi', 'grand_total_target'] } }
+                { key: 'grand_total_target', title: 'T', className: 'bg-gray-200 text-black', type: 'calculation', calculation: { operation: 'sum', operands: ['prov_comp_n_target', 'prov_comp_o_target', 'prov_comp_ae_target', 'prov_comp_ps_target'] } },
+                { key: 'grand_total_realisasi', title: 'R', className: 'bg-gray-200 text-black', type: 'calculation', calculation: { operation: 'sum', operands: ['prov_comp_n_realisasi', 'prov_comp_o_realisasi', 'prov_comp_ae_realisasi', 'prov_comp_ps_realisasi'] } },
+                { key: 'grand_total_persentase', title: 'P', className: 'bg-gray-100 text-black', type: 'calculation', calculation: { operation: 'percentage', operands: ['grand_total_realisasi', 'grand_total_target'] } }
             ],
         },
     ]);
@@ -1610,6 +1462,7 @@ export default function AnalysisDigitalProduct({ auth, reportData = [], currentS
     // Handler untuk mengubah segmen (LEGS/SME)
     function handleSegmentChange(e) {
         const newSegment = e.target.value;
+        // Gunakan router.get untuk memuat ulang data dari server dengan segmen baru
         router.get(route('analysisDigitalProduct.index'), { segment: newSegment, period: period }, {
             preserveState: true,
             preserveScroll: true,
@@ -1620,14 +1473,8 @@ export default function AnalysisDigitalProduct({ auth, reportData = [], currentS
     // Handler untuk mengubah periode (Bulan & Tahun)
     function handlePeriodChange(e) {
         const newPeriod = e.target.value;
-
-        router.get(route('analysisDigitalProduct.index'), { // Pastikan nama route Anda benar (seringkali diakhiri .index)
-            period: newPeriod, // Kirim periode baru
-            segment: currentSegment, // Kirim juga segmen saat ini agar tidak kembali ke default
-        }, {
-            preserveState: true,
-            preserveScroll: true,
-            replace: true,
+        router.get(route('analysisDigitalProduct'), { segment: currentSegment, period: newPeriod }, {
+            preserveState: true, replace: true, preserveScroll: true, in_progress_year: currentInProgressYear,
         });
     }
 
@@ -1832,10 +1679,11 @@ export default function AnalysisDigitalProduct({ auth, reportData = [], currentS
                                 </select>
                             </div>
                         </div>
-                        <DynamicReportTable
+                        <SmeReportTable
                             data={reportData}
                             decimalPlaces={decimalPlaces}
                             tableConfig={tableConfig}
+                            setTableConfig={setTableConfig} // setTableConfig diperlukan untuk fitur drag-and-drop
                         />
                     </div>
 

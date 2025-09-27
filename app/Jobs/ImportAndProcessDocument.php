@@ -16,10 +16,11 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Maatwebsite\Excel\Facades\Excel;
+use Illuminate\Bus\Batchable;
 
 class ImportAndProcessDocument implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, Batchable;
 
     public $timeout = 1200;
     protected $path;
@@ -31,25 +32,25 @@ class ImportAndProcessDocument implements ShouldQueue
 
     public function handle(): void
     {
-        $filePath = Storage::path($this->path);
-        $batchId = uniqid('import_', true);
+        Log::info("Batch [" . $this->batch()->id . "]: Job ImportAndProcessDocument DIMULAI.");
 
-        Log::info("Memulai proses unggah untuk file: {$this->path} dengan Batch ID: {$batchId}");
-
-        try {
-            Excel::import(new DocumentDataImport($batchId), $filePath);
-            Log::info("Proses unggah data mentah selesai untuk Batch ID: {$batchId}.");
-            Cache::put('last_successful_batch_id', $batchId, now()->addDays(30));
-
-            ProcessProductBundles::dispatch();
-            Log::info("Job untuk memproses produk bundling telah dijadwalkan.");
-
-        } catch (\Exception $e) {
-            Log::error("GAGAL memproses file {$this->path} (Batch ID: {$batchId}): " . $e->getMessage() . " di baris " . $e->getLine());
-            $this->fail($e);
-        } finally {
-            Storage::delete($this->path);
+        if ($this->batch()->cancelled()) {
+            Log::warning("Batch [" . $this->batch()->id . "]: Proses dibatalkan sebelum import.");
+            return;
         }
+        // Perintahkan Importer untuk memulai proses, kirimkan ID batch yang asli
+        Excel::import(new DocumentDataImport($this->batch()->id), $this->path);
+
+        // Simpan ID batch terakhir yang sukses untuk referensi di masa depan
+        \Illuminate\Support\Facades\Cache::put('last_successful_batch_id', $this->batch()->id, now()->addHours(24));
+
+        Log::info("Batch [" . $this->batch()->id . "]: Job ImportAndProcessDocument SELESAI.");
+    }
+
+    public function failed(\Throwable $exception): void
+    {
+        Log::error("Batch [" . ($this->batch() ? $this->batch()->id : 'N/A') . "]: Job ImportAndProcessDocument GAGAL.");
+        Log::error($exception->getMessage());
     }
 
     private function calculateProductPrice(string $productName, DocumentData $order): int

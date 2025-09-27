@@ -2,11 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\TableConfiguration;
 use App\Jobs\ImportAndProcessDocument;
 use App\Jobs\ProcessCompletedOrders;
+use App\Jobs\ProcessCanceledOrders;
 use App\Models\CompletedOrder;
 use App\Models\AccountOfficer;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Redirect;
 use Inertia\Inertia;
 use App\Models\DocumentData;
@@ -14,132 +18,200 @@ use App\Models\Target;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Exports\InProgressExport;
+use App\Models\CanceledOrder;
 use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Support\Facades\Cache;
+use App\Jobs\ProcessStatusFile;
+use App\Models\UpdateLog;
 
 class AnalysisDigitalProductController extends Controller
 {
-    protected $accountOfficers = [
-        ['name' => 'Alfonsus Jaconias', 'display_witel' => 'JATIM BARAT', 'filter_witel_lama' => 'madiun', 'special_filter' => null],
-        ['name' => 'Dwieka Septian', 'display_witel' => 'SURAMADU', 'filter_witel_lama' => 'suramadu', 'special_filter' => ['column' => 'segment', 'value' => 'LEGS']],
-        ['name' => 'Ferizka Paramita', 'display_witel' => 'SURAMADU', 'filter_witel_lama' => 'suramadu', 'special_filter' => ['column' => 'segment', 'value' => 'SME']],
-        ['name' => 'Ibrahim Muhammad', 'display_witel' => 'JATIM TIMUR', 'filter_witel_lama' => 'sidoarjo', 'special_filter' => null],
-        ['name' => 'Ilham Miftahul', 'display_witel' => 'JATIM TIMUR', 'filter_witel_lama' => 'jember', 'special_filter' => null],
-        ['name' => 'I Wayan Krisna', 'display_witel' => 'JATIM TIMUR', 'filter_witel_lama' => 'pasuruan', 'special_filter' => null],
-        ['name' => 'Luqman Kurniawan', 'display_witel' => 'JATIM BARAT', 'filter_witel_lama' => 'kediri', 'special_filter' => null],
-        ['name' => 'Maria Fransiska', 'display_witel' => 'NUSRA', 'filter_witel_lama' => 'ntt', 'special_filter' => null],
-        ['name' => 'Nurtria Iman Sari', 'display_witel' => 'JATIM BARAT', 'filter_witel_lama' => 'malang', 'special_filter' => null],
-        ['name' => 'Andre Yana Wijaya', 'display_witel' => 'NUSRA', 'filter_witel_lama' => 'ntb', 'special_filter' => null],
-        ['name' => 'Diastanto', 'display_witel' => 'BALI', 'filter_witel_lama' => 'bali', 'special_filter' => null],
-    ];
-
     public function uploadComplete(Request $request)
     {
-        $request->validate([
-            'complete_document' => 'required|file|mimes:xlsx,xls,csv'
-        ]);
-
+        $request->validate(['complete_document' => 'required|file|mimes:xlsx,xls,csv']);
         $path = $request->file('complete_document')->store('excel-imports-complete', 'local');
 
-        ProcessCompletedOrders::dispatch($path);
+        // Asumsikan ProcessCompletedOrders juga menggunakan Batchable trait
+        $batch = Bus::batch([
+            new ProcessCompletedOrders($path),
+        ])->name('Import Order Complete')->dispatch();
 
-        return Redirect::route('analysisDigitalProduct')->with('success', 'File Order Complete diterima. Status akan diperbarui di latar belakang.');
+        // UBAH INI: Kirim juga 'jobType'
+        return Redirect::back()->with([
+            'success' => 'File Order Complete diterima.',
+            'batchId' => $batch->id,
+            'jobType' => 'complete' // <-- Tambahkan ini
+        ]);
     }
 
     public function syncCompletedOrders()
     {
-        $pendingCount = CompletedOrder::count();
+        $orderIdsToUpdate = CompletedOrder::pluck('order_id');
 
-        if ($pendingCount === 0) {
-            return Redirect::route('analysisDigitalProduct')->with('error', 'Tidak ada data order complete yang perlu disinkronkan.');
+        if ($orderIdsToUpdate->isEmpty()) {
+            return Redirect::back()->with('error', 'Tidak ada data order complete yang perlu disinkronkan.');
         }
 
-        $updatedCount = DB::table('document_data')
-            ->join('completed_orders', 'document_data.order_id', '=', 'completed_orders.order_id')
-            ->where('document_data.status_wfm', 'in progress')
+        $ordersToLog = DocumentData::whereIn('order_id', $orderIdsToUpdate)
+            ->where('status_wfm', 'in progress')
+            ->get(['order_id', 'product as product_name', 'customer_name', 'nama_witel', 'status_wfm']);
+
+        $updatedCount = DocumentData::whereIn('order_id', $ordersToLog->pluck('order_id'))
             ->update([
-                'document_data.status_wfm' => 'done close bima',
-                'document_data.milestone' => 'Completed via Sync Process'
+                'status_wfm' => 'done close bima',
+                'milestone' => 'Completed via Sync Process',
+                'order_status_n' => 'COMPLETE'
             ]);
+
+        $logs = $ordersToLog->map(function ($order) {
+            return [
+                'order_id' => $order->order_id,
+                'product_name' => $order->product_name,
+                'customer_name' => $order->customer_name,
+                'nama_witel' => $order->nama_witel,
+                'status_lama' => $order->status_wfm,
+                'status_baru' => 'done close bima',
+                'sumber_update' => 'Upload Complete',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        })->all();
+
+        if (!empty($logs)) {
+            UpdateLog::insert($logs);
+        }
 
         CompletedOrder::truncate();
 
-        return Redirect::route('analysisDigitalProduct')->with('success', "Sinkronisasi selesai. Berhasil mengupdate {$updatedCount} dari {$pendingCount} order.");
+        return Redirect::back()->with('success', "Sinkronisasi selesai. Berhasil mengupdate {$updatedCount} order.");
     }
 
     public function index(Request $request)
     {
-        $lastBatchId = Cache::get('last_successful_batch_id');
-        $newStatusData = collect();
-
-        $lastBatchId = Cache::get('last_successful_batch_id');
-        if ($lastBatchId) {
-            // Ambil data dari batch terakhir yang milestone-nya berubah
-            $newStatusData = DocumentData::where('batch_id', $lastBatchId)
-                ->whereNotNull('previous_milestone')
-                ->orderBy('updated_at', 'desc')
-                ->get();
-        }
-
+        // ===================================================================
+        // LANGKAH 1: PERSIAPAN FILTER
+        // ===================================================================
         $periodInput = $request->input('period', now()->format('Y-m'));
         $selectedSegment = $request->input('segment', 'SME');
         $reportPeriod = \Carbon\Carbon::parse($periodInput)->startOfMonth();
-
         $inProgressYear = $request->input('in_progress_year', now()->year);
-
         $masterWitelList = ['BALI', 'JATIM BARAT', 'JATIM TIMUR', 'NUSA TENGGARA', 'SURAMADU'];
+        $productMap = [
+            'netmonk' => 'n', 'oca' => 'o',
+            'antares' => 'ae', 'antares eazy' => 'ae', // Menangani 'Antares' & 'Antares Eazy'
+            'pijar' => 'ps'  // Menggunakan 'Pijar'
+        ];
 
-        $documentData = DocumentData::whereIn('nama_witel', $masterWitelList)
-                            ->where('segment', $selectedSegment)
-                            ->whereYear('order_created_date', $reportPeriod->year)
-                            ->whereMonth('order_created_date', $reportPeriod->month)
-                            ->get();
+        // ===================================================================
+        // LANGKAH 2: INISIALISASI DATA REPORT
+        // ===================================================================
+        $reportDataMap = collect($masterWitelList)->mapWithKeys(function ($witel) use ($productMap) {
+            $data = ['nama_witel' => $witel];
+            $initials = array_unique(array_values($productMap));
+            foreach ($initials as $initial) {
+                $data["in_progress_{$initial}"] = 0;
+                $data["prov_comp_{$initial}_realisasi"] = 0;
+                $data["prov_comp_{$initial}_target"] = 0;
+                $data["revenue_{$initial}_ach"] = 0;
+                $data["revenue_{$initial}_target"] = 0;
+            }
+            return [$witel => $data];
+        });
 
-        $realisasiDataFromDb = collect();
-        foreach ($masterWitelList as $witel) { $realisasiDataFromDb->put($witel, [ 'nama_witel' => $witel, 'in_progress' => ['Netmonk'=>0,'OCA'=>0,'Antares Eazy'=>0,'Pijar Sekolah'=>0], 'prov_comp' => ['Netmonk'=>0,'OCA'=>0,'Antares Eazy'=>0,'Pijar Sekolah'=>0], 'revenue' => ['Netmonk'=>0,'OCA'=>0,'Antares Eazy'=>0,'Pijar Sekolah'=>0], ]); }
-        foreach ($documentData as $doc) { $witel = $doc->nama_witel; if (!$realisasiDataFromDb->has($witel)) continue; if ($doc->product && !str_contains($doc->product, '-')) { $pName = trim($doc->product); if (in_array($pName, ['Netmonk', 'OCA', 'Antares Eazy', 'Pijar Sekolah'])) { $current = $realisasiDataFromDb->get($witel); if ($doc->status_wfm === 'in progress') { $current['in_progress'][$pName]++; } if ($doc->status_wfm === 'done close bima') { $current['prov_comp'][$pName]++; $current['revenue'][$pName] += $doc->net_price; } $realisasiDataFromDb->put($witel, $current); } } elseif ($doc->product && str_contains($doc->product, '-')) { $orderProducts = \App\Models\OrderProduct::where('order_id', $doc->order_id)->get(); foreach ($orderProducts as $op) { $pName = trim($op->product_name); if (in_array($pName, ['Netmonk', 'OCA', 'Antares Eazy', 'Pijar Sekolah'])) { $current = $realisasiDataFromDb->get($witel); if ($doc->status_wfm === 'in progress') { $current['in_progress'][$pName]++; } if ($doc->status_wfm === 'done close bima') { $current['prov_comp'][$pName]++; $current['revenue'][$pName] += $op->net_price; } $realisasiDataFromDb->put($witel, $current); } } } }
+        // ===================================================================
+        // LANGKAH 3: PENGAMBILAN & PEMROSESAN DATA REPORT UTAMA
+        // ===================================================================
 
-        $targets = Target::where('segment', $selectedSegment)
-                    ->where('period', $reportPeriod
-                    ->format('Y-m-d'))
-                    ->get()
-                    ->keyBy(fn ($item) => $item->nama_witel . '_' . $item->metric_type . '_' . $item->product_name);
+        // Query untuk data Realisasi & Revenue (berdasarkan tanggal SELESAI)
+        $realizationDocuments = DocumentData::whereIn('nama_witel', $masterWitelList)
+            ->where('segment', $selectedSegment)->where('status_wfm', 'done close bima')
+            ->whereYear('order_created_date', $reportPeriod->year)->whereMonth('order_date', $reportPeriod->month)
+            ->get();
 
-        $reportData = collect($masterWitelList)->map(function ($witelName) use ($realisasiDataFromDb, $targets) { $realisasiItem = $realisasiDataFromDb->get($witelName); return (object) [ 'nama_witel' => $witelName, 'in_progress_n' => $realisasiItem['in_progress']['Netmonk'], 'in_progress_o' => $realisasiItem['in_progress']['OCA'], 'in_progress_ae' => $realisasiItem['in_progress']['Antares Eazy'], 'in_progress_ps' => $realisasiItem['in_progress']['Pijar Sekolah'], 'prov_comp_n_realisasi'=> $realisasiItem['prov_comp']['Netmonk'], 'prov_comp_o_realisasi'=> $realisasiItem['prov_comp']['OCA'], 'prov_comp_ae_realisasi'=> $realisasiItem['prov_comp']['Antares Eazy'], 'prov_comp_ps_realisasi'=> $realisasiItem['prov_comp']['Pijar Sekolah'], 'revenue_n_ach' => $realisasiItem['revenue']['Netmonk'] / 1000000, 'revenue_o_ach' => $realisasiItem['revenue']['OCA'] / 1000000, 'revenue_ae_ach' => $realisasiItem['revenue']['Antares Eazy'] / 1000000, 'revenue_ps_ach' => $realisasiItem['revenue']['Pijar Sekolah'] / 1000000, 'prov_comp_n_target' => $targets->get("{$witelName}_prov_comp_Netmonk")->target_value ?? 0, 'prov_comp_o_target' => $targets->get("{$witelName}_prov_comp_OCA")->target_value ?? 0, 'prov_comp_ae_target' => $targets->get("{$witelName}_prov_comp_Antares Eazy")->target_value ?? 0, 'prov_comp_ps_target' => $targets->get("{$witelName}_prov_comp_Pijar Sekolah")->target_value ?? 0, 'revenue_n_target' => $targets->get("{$witelName}_revenue_Netmonk")->target_value ?? 0, 'revenue_o_target' => $targets->get("{$witelName}_revenue_OCA")->target_value ?? 0, 'revenue_ae_target' => $targets->get("{$witelName}_revenue_Antares Eazy")->target_value ?? 0, 'revenue_ps_target' => $targets->get("{$witelName}_revenue_Pijar Sekolah")->target_value ?? 0, ]; });
+        $inProgressDocuments = DocumentData::whereIn('nama_witel', $masterWitelList)
+            ->where('segment', $selectedSegment)->where('status_wfm', 'in progress')
+            ->whereYear('order_created_date', $reportPeriod->year)->whereMonth('order_created_date', $reportPeriod->month)
+            ->get();
 
-        $inProgressData = DocumentData::where('status_wfm', 'in progress')
-            ->where('segment', $selectedSegment)
-            ->whereYear('order_created_date', $inProgressYear)
-            ->select('order_id', 'milestone', 'segment', 'order_status_n', 'product as product_name', 'nama_witel', 'customer_name', 'order_created_date')
-            ->orderBy('order_created_date', 'desc')->get();
+        // Proses data In Progress dengan pola "Ambil, Ubah, Simpan" yang BENAR
+        foreach ($inProgressDocuments as $doc) {
+            $witel = $doc->nama_witel;
+            $pName = strtolower(trim($doc->product)); // Standarisasi ke huruf kecil
+            if (isset($productMap[$pName]) && $reportDataMap->has($witel)) {
+                $currentData = $reportDataMap->get($witel);
+                $initial = $productMap[$pName];
+                $currentData["in_progress_{$initial}"]++;
+                $reportDataMap->put($witel, $currentData);
+            }
+        }
 
-        $historyData = DocumentData::whereIn('milestone', ['Completed Manually', 'Canceled Manually'])
-                                ->orderBy('updated_at', 'desc')
-                                ->take(10)
-                                ->get();
+        // Proses data Realisasi dan Revenue dengan pola yang BENAR
+        foreach ($realizationDocuments as $doc) {
+            $witel = $doc->nama_witel;
+            $pName = strtolower(trim($doc->product)); // Standarisasi ke huruf kecil
+            if (isset($productMap[$pName]) && $reportDataMap->has($witel)) {
+                $currentData = $reportDataMap->get($witel);
+                $initial = $productMap[$pName];
+                $currentData["prov_comp_{$initial}_realisasi"]++;
+                $currentData["revenue_{$initial}_ach"] += $doc->net_price;
+                $reportDataMap->put($witel, $currentData);
+            }
+        }
 
-        $qcData = DocumentData::where('status_wfm', '')
-                      ->orderBy('updated_at', 'desc')
-                      ->get();
+        // Ambil dan gabungkan data Target
+        $mapProductToKey = ['netmonk'=>'netmonk', 'oca'=>'oca', 'antares'=>'antareseazy', 'antares eazy'=>'antareseazy', 'pijar'=>'pijarsekolah'];
+        $targets = Target::where('segment', $selectedSegment)->where('period', $reportPeriod->format('Y-m-d'))->get();
+        foreach ($targets as $target) {
+            $witel = $target->nama_witel;
+            $pName = strtolower(trim($target->product_name)); // Standarisasi ke huruf kecil
+            if (isset($reportDataMap[$witel]) && isset($mapProductToKey[$pName])) {
+                $currentData = $reportDataMap->get($witel);
+                $initial = $productMap[$pName];
+                $metricKey = $target->metric_type;
+                $currentData["{$metricKey}_{$initial}_target"] = $target->target_value;
+                $reportDataMap->put($witel, $currentData);
+            }
+        }
+
+        // Konversi nilai revenue ke jutaan
+        foreach ($reportDataMap as $witel => $data) {
+            $currentData = $reportDataMap->get($witel);
+            foreach (array_unique(array_values($productMap)) as $initial) {
+                $currentData["revenue_{$initial}_ach"] /= 1000000;
+            }
+            $reportDataMap->put($witel, $currentData);
+        }
+
+        $reportData = $reportDataMap->values()->map(fn($item) => (object) $item);
+
+        // ===================================================================
+        // LANGKAH 4: AMBIL DATA PENDUKUNG LAINNYA
+        // ===================================================================
+        $pageName = 'analysis_digital_' . strtolower($selectedSegment);
+        $userConfig = TableConfiguration::where('user_id', Auth::id())->where('page_name', $pageName)->first();
+        if ($userConfig) {
+            $tableConfig = $userConfig->configuration;
+        } else {
+            $tableConfig = ($selectedSegment === 'SME') ? $this->getDefaultSmeConfig() : $this->getDefaultLegsConfig();
+        }
+
+        $inProgressData = DocumentData::where('status_wfm', 'in progress')->where('segment', $selectedSegment)->whereYear('order_created_date', $inProgressYear)->orderBy('order_created_date', 'desc')->get();
+        $historyData = UpdateLog::latest()->take(10)->get();
+        $qcData = DocumentData::where('status_wfm', '')->orderBy('updated_at', 'desc')->get();
+        $newStatusData = DocumentData::where('batch_id', Cache::get('last_successful_batch_id'))->whereNotNull('previous_milestone')->orderBy('updated_at', 'desc')->get();
 
         $officers = AccountOfficer::orderBy('name')->get();
-
         $kpiData = $officers->map(function ($officer) {
-        $witelFilter = $officer->filter_witel_lama;
-
-        $specialFilter = null;
+            $witelFilter = $officer->filter_witel_lama;
+            $specialFilter = null;
             if ($officer->special_filter_column && $officer->special_filter_value) {
-                $specialFilter = [
-                    'column' => $officer->special_filter_column,
-                    'value' => $officer->special_filter_value,
-                ];
+                $specialFilter = ['column' => $officer->special_filter_column, 'value' => $officer->special_filter_value];
             }
 
             $singleQuery = DocumentData::where('witel_lama', $witelFilter)
                 ->whereNotNull('product')
                 ->where('product', 'NOT LIKE', '%-%')
                 ->where('product', 'NOT LIKE', "%\n%");
-
             if ($specialFilter) {
                 $singleQuery->where($specialFilter['column'], $specialFilter['value']);
             }
@@ -152,7 +224,6 @@ class AnalysisDigitalProductController extends Controller
             $bundleQuery = DB::table('order_products')
                 ->join('document_data', 'order_products.order_id', '=', 'document_data.order_id')
                 ->where('document_data.witel_lama', $witelFilter);
-
             if ($specialFilter) {
                 $bundleQuery->where('document_data.' . $specialFilter['column'], $specialFilter['value']);
             }
@@ -181,8 +252,11 @@ class AnalysisDigitalProductController extends Controller
             ];
         });
 
+        // ===================================================================
+        // LANGKAH 5: RENDER
+        // ===================================================================
         return Inertia::render('AnalysisDigitalProduct', [
-            'reportData' => $reportData ? $reportData->values()->all() : [],
+            'reportData' => $reportData,
             'currentSegment' => $selectedSegment,
             'period' => $periodInput,
             'inProgressData' => $inProgressData,
@@ -191,7 +265,118 @@ class AnalysisDigitalProductController extends Controller
             'qcData' => $qcData,
             'accountOfficers' => $officers,
             'kpiData' => $kpiData,
-            'currentInProgressYear' => $inProgressYear, ]);
+            'currentInProgressYear' => $inProgressYear,
+            'initialTableConfig' => $tableConfig,
+        ]);
+    }
+
+    private function getDefaultSMeConfig(): array
+    {
+        // Isi dari metode ini adalah konversi langsung dari state React Anda ke array PHP
+        return [
+            [
+                'groupTitle' => 'In Progress',
+                'groupClass' => 'bg-blue-600',
+                'columns' => [
+                    ['key' => 'in_progress_n', 'title' => 'N'],
+                    ['key' => 'in_progress_o', 'title' => 'O'],
+                    ['key' => 'in_progress_ae', 'title' => 'AE'],
+                    ['key' => 'in_progress_ps', 'title' => 'PS'],
+                ],
+            ],
+            [
+                'groupTitle' => 'Prov Comp',
+                'groupClass' => 'bg-orange-600',
+                'columns' => [
+                    ['key' => 'prov_comp_n', 'title' => 'N', 'subColumns' => [['key' => '_target', 'title' => 'T'], ['key' => '_realisasi', 'title' => 'R'], ['key' => '_percent', 'title' => 'P']]],
+                    ['key' => 'prov_comp_o', 'title' => 'O', 'subColumns' => [['key' => '_target', 'title' => 'T'], ['key' => '_realisasi', 'title' => 'R'], ['key' => '_percent', 'title' => 'P']]],
+                    ['key' => 'prov_comp_ae', 'title' => 'AE', 'subColumns' => [['key' => '_target', 'title' => 'T'], ['key' => '_realisasi', 'title' => 'R'], ['key' => '_percent', 'title' => 'P']]],
+                    ['key' => 'prov_comp_ps', 'title' => 'PS', 'subColumns' => [['key' => '_target', 'title' => 'T'], ['key' => '_realisasi', 'title' => 'R'], ['key' => '_percent', 'title' => 'P']]],
+                ],
+            ],
+            [
+                'groupTitle' => 'REVENUE (Rp Juta)',
+                'groupClass' => 'bg-green-700',
+                'columns' => [
+                    ['key' => 'revenue_n', 'title' => 'N', 'subColumns' => [['key' => '_target', 'title' => 'T'], ['key' => '_ach', 'title' => 'ACH']]],
+                    ['key' => 'revenue_o', 'title' => 'O', 'subColumns' => [['key' => '_target', 'title' => 'T'], ['key' => '_ach', 'title' => 'ACH']]],
+                    ['key' => 'revenue_ae', 'title' => 'AE', 'subColumns' => [['key' => '_target', 'title' => 'T'], ['key' => '_ach', 'title' => 'ACH']]],
+                    ['key' => 'revenue_ps', 'title' => 'PS', 'subColumns' => [['key' => '_target', 'title' => 'T'], ['key' => '_ach', 'title' => 'ACH']]],
+                ],
+            ],
+            [
+                'groupTitle' => 'Total Keseluruhan',
+                'groupClass' => 'bg-gray-600',
+                'columns' => [
+                    ['key' => 'grand_total', 'title' => 'Realisasi']
+                ],
+            ],
+        ];
+    }
+
+    private function getDefaultLegsConfig(): array
+    {
+        // Ini adalah konfigurasi default untuk tabel LEGS yang lebih sederhana
+        return [
+            [
+                'groupTitle' => 'In Progress',
+                'groupClass' => 'bg-blue-600',
+                'columnClass' => 'bg-blue-500',
+                'columns' => [
+                    ['key' => 'in_progress_n', 'title' => 'N'],
+                    ['key' => 'in_progress_o', 'title' => 'O'],
+                    ['key' => 'in_progress_ae', 'title' => 'AE'],
+                    ['key' => 'in_progress_ps', 'title' => 'PS'],
+                ],
+            ],
+            [
+                'groupTitle' => 'Proving Complete', // Judul berbeda
+                'groupClass' => 'bg-orange-600',
+                'columnClass' => 'bg-orange-500',
+                'columns' => [
+                    // LEGS hanya punya realisasi, tanpa target & persen
+                    ['key' => 'prov_comp_n_realisasi', 'title' => 'N'],
+                    ['key' => 'prov_comp_o_realisasi', 'title' => 'O'],
+                    ['key' => 'prov_comp_ae_realisasi', 'title' => 'AE'],
+                    ['key' => 'prov_comp_ps_realisasi', 'title' => 'PS'],
+                ],
+            ],
+            [
+                'groupTitle' => 'REVENUE (Rp Juta)',
+                'groupClass' => 'bg-green-700',
+                'columnClass' => 'bg-green-600',
+                'columns' => [
+                    ['key' => 'revenue_n', 'title' => 'N', 'subColumns' => [['key' => '_target', 'title' => 'T'], ['key' => '_ach', 'title' => 'ACH']]],
+                    ['key' => 'revenue_o', 'title' => 'O', 'subColumns' => [['key' => '_target', 'title' => 'T'], ['key' => '_ach', 'title' => 'ACH']]],
+                    ['key' => 'revenue_ae', 'title' => 'AE', 'subColumns' => [['key' => '_target', 'title' => 'T'], ['key' => '_ach', 'title' => 'ACH']]],
+                    ['key' => 'revenue_ps', 'title' => 'PS', 'subColumns' => [['key' => '_target', 'title' => 'T'], ['key' => '_ach', 'title' => 'ACH']]],
+                ],
+            ],
+            [
+                'groupTitle' => 'Total Keseluruhan',
+                'groupClass' => 'bg-gray-600',
+                'columns' => [
+                    ['key' => 'grand_total', 'title' => 'Realisasi']
+                ],
+            ],
+        ];
+    }
+
+    public function saveTableConfig(Request $request)
+    {
+        $validated = $request->validate([
+            'configuration' => 'required|array',
+            'segment' => 'required|string|in:SME,LEGS' // Tambahkan validasi segmen
+        ]);
+
+        $pageName = 'analysis_digital_' . strtolower($validated['segment']);
+
+        TableConfiguration::updateOrCreate(
+            ['user_id' => Auth::id(), 'page_name' => $pageName],
+            ['configuration' => $validated['configuration']]
+        );
+
+        return Redirect::back()->with('success', 'Tampilan tabel berhasil disimpan!');
     }
 
     public function updateTargets(Request $request)
@@ -222,15 +407,35 @@ class AnalysisDigitalProductController extends Controller
         return $map[strtolower($initial)] ?? null;
     }
 
+    public function getImportProgress(string $batchId)
+    {
+        $batch = Bus::findBatch($batchId);
+
+        if (!$batch || $batch->finished()) {
+            return response()->json(['progress' => 100]);
+        }
+
+        // Cek progres dari Cache yang diisi oleh Importer
+        $progress = Cache::get('import_progress_' . $batchId, 0);
+
+        return response()->json(['progress' => $progress]);
+    }
+
     public function upload(Request $request)
     {
         $request->validate(['document' => 'required|file|mimes:xlsx,xls,csv']);
-
         $path = $request->file('document')->store('excel-imports', 'local');
 
-        ImportAndProcessDocument::dispatch($path);
+        $batch = Bus::batch([
+            new ImportAndProcessDocument($path),
+        ])->name('Import Data Mentah')->dispatch();
 
-        return Redirect::route('analysisDigitalProduct')->with('success', 'Dokumen berhasil diterima. Proses akan berjalan di latar belakang (± 2 menit).');
+        // UBAH INI: Kirim juga 'jobType'
+        return Redirect::back()->with([
+            'success' => 'Dokumen berhasil diterima.',
+            'batchId' => $batch->id,
+            'jobType' => 'mentah'
+        ]);
     }
 
     public function updateManualComplete(Request $request, $order_id)
@@ -295,5 +500,88 @@ class AnalysisDigitalProductController extends Controller
             return Redirect::back()->with('success', "Order ID {$order_id} diubah menjadi 'Complete'.");
         }
         return Redirect::back()->with('error', "Order ID {$order_id} tidak ditemukan.");
+    }
+
+    public function uploadCancel(Request $request)
+    {
+        $request->validate(['cancel_document' => 'required|file|mimes:xlsx,xls,csv']);
+        $path = $request->file('cancel_document')->store('excel-imports-cancel', 'local');
+
+        // Asumsikan ProcessCanceledOrders juga menggunakan Batchable trait
+        $batch = Bus::batch([
+            new ProcessCanceledOrders($path),
+        ])->name('Import Order Cancel')->dispatch();
+
+        // UBAH INI: Kirim juga 'jobType'
+        return Redirect::back()->with([
+            'success' => 'File Order Cancel diterima.',
+            'batchId' => $batch->id,
+            'jobType' => 'cancel' // <-- Tambahkan ini
+        ]);
+    }
+
+    public function syncCanceledOrders()
+    {
+        $orderIdsToUpdate = CanceledOrder::pluck('order_id');
+
+        if ($orderIdsToUpdate->isEmpty()) {
+            return Redirect::back()->with('error', 'Tidak ada data order cancel yang perlu disinkronkan.');
+        }
+
+        // 1. Ambil data LAMA untuk logging
+        $ordersToLog = DocumentData::whereIn('order_id', $orderIdsToUpdate)
+            ->where('status_wfm', 'in progress')
+            ->get(['order_id', 'product as product_name', 'customer_name', 'nama_witel', 'status_wfm']);
+
+        // 2. Lakukan mass update
+        $updatedCount = DocumentData::whereIn('order_id', $ordersToLog->pluck('order_id'))
+            ->update([
+                'status_wfm' => 'done close cancel',
+                'milestone' => 'Canceled via Sync Process',
+                'order_status_n' => 'CANCEL'
+            ]);
+
+        // 3. Siapkan dan masukkan data log
+        $logs = $ordersToLog->map(function ($order) {
+            return [
+                'order_id' => $order->order_id,
+                'product_name' => $order->product_name,
+                'customer_name' => $order->customer_name,
+                'nama_witel' => $order->nama_witel,
+                'status_lama' => $order->status_wfm,
+                'status_baru' => 'done close cancel',
+                'sumber_update' => 'Upload Cancel',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+        })->all();
+
+        // 4. Masukkan log ke database
+        if (!empty($logs)) {
+            UpdateLog::insert($logs);
+        }
+
+        // 5. Kosongkan tabel sementara
+        CanceledOrder::truncate();
+
+        return Redirect::back()->with('success', "Sinkronisasi selesai. Berhasil meng-cancel {$updatedCount} order.");
+    }
+
+     public function uploadStatusFile(Request $request)
+    {
+        $validated = $request->validate([
+            'document' => 'required|file|mimes:xlsx,xls,csv',
+            'type' => 'required|string|in:complete,cancel',
+        ]);
+
+        $file = $validated['document'];
+        $type = $validated['type'];
+
+        $statusToSet = ($type === 'complete') ? 'completed' : 'canceled';
+        $path = $file->store("excel-imports-status", 'local');
+
+        ProcessStatusFile::dispatch($path, $statusToSet, $file->getClientOriginalName());
+
+        return Redirect::back()->with('success', "File Order {$type} diterima. Proses akan berjalan di latar belakang.");
     }
 }

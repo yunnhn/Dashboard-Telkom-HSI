@@ -3,17 +3,17 @@
 namespace App\Jobs;
 
 use Illuminate\Bus\Batchable;
+use App\Imports\CanceledOrdersImport;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use App\Imports\CompletedOrdersImport;
-use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Maatwebsite\Excel\Facades\Excel;
 
-class ProcessCompletedOrders implements ShouldQueue
+class ProcessCanceledOrders implements ShouldQueue
 {
     use Batchable, Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -26,18 +26,18 @@ class ProcessCompletedOrders implements ShouldQueue
 
     public function handle(): void
     {
-        // PERBAIKAN: Gunakan Storage::path() untuk mendapatkan alamat file absolut
         $filePath = Storage::path($this->path);
+        Log::info("Memulai proses unggah file Cancel dari: {$this->path}");
 
-        Log::info("Memulai job untuk memproses order complete dari file: {$this->path}");
         try {
-            Excel::import(new CompletedOrdersImport, $filePath);
-            Log::info("Selesai memproses file order complete.");
+            // Panggil kelas import baru yang sudah menggunakan sintaks modern
+            Excel::import(new CanceledOrdersImport, $filePath);
+            Log::info("Selesai memproses file Cancel: {$this->path}");
+
         } catch (\Exception $e) {
-            Log::error("GAGAL memproses file order complete: " . $e->getMessage());
+            Log::error("Gagal memproses file Cancel {$this->path}: " . $e->getMessage());
             $this->fail($e);
         } finally {
-            // Hapus file setelah selesai
             Storage::delete($this->path);
         }
     }

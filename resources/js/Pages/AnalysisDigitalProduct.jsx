@@ -310,7 +310,6 @@ const SmeReportTable = ({ data = [], decimalPlaces, tableConfig, setTableConfig 
             const values = operands.map(opKey => {
                 const { colDef: opDef, parentColDef: opParentDef } = findColumnDefinition(opKey);
                 if (!opDef) return 0;
-
                 return opDef.type === 'calculation'
                     ? getCellValue(item, opDef, opParentDef)
                     : formatNumber(item[opKey]);
@@ -325,8 +324,7 @@ const SmeReportTable = ({ data = [], decimalPlaces, tableConfig, setTableConfig 
                     return formatNumber(values.reduce((a, b) => a + b, 0));
                 case 'average':
                     if (values.length === 0) return 0;
-                    const sum = values.reduce((a, b) => a + b, 0);
-                    return formatNumber(sum / values.length);
+                    return formatNumber(values.reduce((a, b) => a + b, 0) / values.length);
                 case 'count':
                     return values.filter(v => v !== 0).length;
                 default:
@@ -337,7 +335,6 @@ const SmeReportTable = ({ data = [], decimalPlaces, tableConfig, setTableConfig 
         if (fullKey.startsWith('revenue_')) {
             return formatRupiah(item[fullKey], decimalPlaces);
         }
-
         return formatNumber(item[fullKey]);
     };
 
@@ -361,32 +358,68 @@ const SmeReportTable = ({ data = [], decimalPlaces, tableConfig, setTableConfig 
         return initialTotals;
     }, [data, tableConfig]);
 
-    function handleDragEnd(event) {
+    const handleDragEnd = (event) => {
         const { active, over } = event;
-        if (active.id !== over.id) {
+        if (!over || active.id === over.id) return;
+
+        const activeType = active.data.current?.type;
+        const overType = over.data.current?.type;
+
+        if (activeType === 'group' && overType === 'group') {
             setTableConfig((config) => {
                 const oldIndex = config.findIndex(g => g.groupTitle === active.id);
                 const newIndex = config.findIndex(g => g.groupTitle === over.id);
                 return arrayMove(config, oldIndex, newIndex);
             });
+        } else if (activeType === 'column' && overType === 'column') {
+            const parentGroupTitle = active.data.current?.parentGroupTitle;
+            const overParentGroupTitle = over.data.current?.parentGroupTitle;
+            
+            if (parentGroupTitle !== overParentGroupTitle) return;
+
+            setTableConfig((config) => {
+                const newConfig = JSON.parse(JSON.stringify(config));
+                const group = newConfig.find(g => g.groupTitle === parentGroupTitle);
+                if (!group) return config;
+
+                const getColKey = (id) => id.toString().split('.').pop();
+                const activeColKey = getColKey(active.id);
+                const overColKey = getColKey(over.id);
+
+                const oldIndex = group.columns.findIndex(c => c.key === activeColKey);
+                const newIndex = group.columns.findIndex(c => c.key === overColKey);
+
+                if (oldIndex !== -1 && newIndex !== -1) {
+                    group.columns = arrayMove(group.columns, oldIndex, newIndex);
+                }
+                
+                return newConfig;
+            });
         }
-    }
+    };
 
     const DraggableHeaderCell = ({ group }) => {
-        const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: group.groupTitle });
+        const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: group.groupTitle, data: { type: 'group' } });
         const style = { transform: CSS.Transform.toString(transform), transition };
         const colSpan = group.columns.reduce((sum, col) => sum + (col.subColumns?.length || 1), 0);
 
         return (
-            <th
-                ref={setNodeRef}
-                style={style}
-                {...attributes}
-                {...listeners}
-                className={`border p-2 ${group.groupClass} cursor-grab`}
-                colSpan={colSpan}
-            >
+            <th ref={setNodeRef} style={style} {...attributes} {...listeners} className={`border p-2 ${group.groupClass} cursor-grab`} colSpan={colSpan}>
                 {group.groupTitle}
+            </th>
+        );
+    };
+    
+    const DraggableColumnHeader = ({ group, col }) => {
+        const uniqueId = `${group.groupTitle}.${col.key}`;
+        const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
+            id: uniqueId,
+            data: { type: 'column', parentGroupTitle: group.groupTitle }
+        });
+        const style = { transform: CSS.Transform.toString(transform), transition };
+        return (
+            <th ref={setNodeRef} style={style} {...attributes} {...listeners} key={col.key} className={`border p-2 ${group.columnClass || 'bg-gray-700'} cursor-grab`} colSpan={col.subColumns?.length || 1} rowSpan={col.subColumns ? 1 : 2}>
+                {col.title}
             </th>
         );
     };
@@ -403,13 +436,13 @@ const SmeReportTable = ({ data = [], decimalPlaces, tableConfig, setTableConfig 
                             </SortableContext>
                         </tr>
                         <tr className="font-semibold">
-                            {tableConfig.map(group =>
-                                group.columns.map(col => (
-                                    <th key={col.key} className={`border p-2 ${group.columnClass || 'bg-gray-700'}`} colSpan={col.subColumns?.length || 1} rowSpan={col.subColumns ? 1 : 2}>
-                                        {col.title}
-                                    </th>
-                                ))
-                            )}
+                            {tableConfig.map(group => (
+                                <SortableContext key={`${group.groupTitle}-cols`} items={group.columns.map(c => `${group.groupTitle}.${c.key}`)} strategy={horizontalListSortingStrategy}>
+                                    {group.columns.map(col => (
+                                        <DraggableColumnHeader key={col.key} group={group} col={col} />
+                                    ))}
+                                </SortableContext>
+                            ))}
                         </tr>
                         <tr className="font-medium">
                             {tableConfig.map(group =>
@@ -700,7 +733,7 @@ const TableConfigurator = ({ tableConfig, setTableConfig }) => {
             window.location.reload();
         }
     };
-
+    
     const handleDeleteColumn = () => {
         if (!columnToDelete) { alert("Silakan pilih kolom yang akan dihapus."); return; }
         const selectedColumnLabel = deletableColumns.find(c => c.value === columnToDelete)?.label;
@@ -724,7 +757,7 @@ const TableConfigurator = ({ tableConfig, setTableConfig }) => {
             }
         }
     };
-
+    
     const handleInputChange = (e) => {
         const { name, value, type } = e.target;
         if (type === 'radio' && name === 'mode') { setFormState(prev => ({ ...prev, mode: value, columnTitle: '', operands: [], columnType: 'calculation' })); }
@@ -825,7 +858,7 @@ const TableConfigurator = ({ tableConfig, setTableConfig }) => {
             default: return null;
         }
     };
-
+    
     return (
         <div className="bg-white rounded-lg shadow-md mb-6">
             <div className="flex justify-between items-center p-4 cursor-pointer hover:bg-gray-50" onClick={() => setIsExpanded(!isExpanded)}>
@@ -1004,7 +1037,7 @@ export default function AnalysisDigitalProduct({ auth, reportData = [], currentS
     const generatePeriodOptions = () => {
         const options = [];
         let date = new Date();
-        for (let i = 0; i < 12; i++) {
+        for (let i = 0; i < 24; i++) { // Increased to 24 months
             const year = date.getFullYear();
             const month = (date.getMonth() + 1).toString().padStart(2, '0');
             const value = `${year}-${month}`;
@@ -1081,7 +1114,7 @@ export default function AnalysisDigitalProduct({ auth, reportData = [], currentS
                                      <select value={witelFilter} onChange={e => setWitelFilter(e.target.value)} className="border border-gray-300 rounded-md text-sm p-2">
                                          {uniqueWitelList.map(witel => <option key={witel} value={witel}>{witel === 'ALL' ? 'Semua Witel' : witel}</option>)}
                                      </select>
-                                     <a href={route('analysisDigitalProduct.export.inprogress', { segment: currentSegment, in_progress_year: currentInProgressYear })} className="px-3 py-1 font-bold text-white bg-green-500 rounded-md hover:bg-green-600">Export Excel</a>
+                                     <a href={route('analysisDigitalProduct.export.inprogress', { segment: currentSegment, in_progress_year: currentInProgressYear })} className="px-3 py-2 text-sm font-bold text-white bg-green-600 rounded-md hover:bg-green-700">Export Excel</a>
                                  </div>
                              )}
                              {activeDetailView === 'kpi' && ( <PrimaryButton onClick={() => openModal()}>Tambah Agen</PrimaryButton> )}

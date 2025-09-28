@@ -201,7 +201,6 @@ class AnalysisDigitalProductController extends Controller
         // == PERUBAHAN UTAMA DI SINI ==
         $historyData = UpdateLog::latest()->paginate(10); // Menggunakan paginate(10)
         // =================================================================================================
-//coba
         $qcData = DocumentData::where('status_wfm', '')->orderBy('updated_at', 'desc')->get();
         $newStatusData = DocumentData::where('batch_id', Cache::get('last_successful_batch_id'))->whereNotNull('previous_milestone')->orderBy('updated_at', 'desc')->get();
 

@@ -3,11 +3,11 @@
 namespace App\Imports;
 
 use App\Models\DocumentData;
+use App\Models\OrderProduct;
 use App\Traits\CalculatesProductPrice;
 use Maatwebsite\Excel\Concerns\OnEachRow;
 use Maatwebsite\Excel\Concerns\WithStartRow;
 use Maatwebsite\Excel\Row;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
 use Maatwebsite\Excel\Concerns\WithChunkReading;
 use Maatwebsite\Excel\Concerns\WithEvents;
@@ -30,25 +30,19 @@ class DocumentDataImport implements OnEachRow, WithStartRow, WithChunkReading, W
             BeforeImport::class => function(BeforeImport $event) {
                 $totalRows = $event->getReader()->getTotalRows();
                 if (isset($totalRows[array_key_first($totalRows)])) {
-                    // Kurangi baris header dari total
                     $this->totalRows = $totalRows[array_key_first($totalRows)] - $this->startRow() + 1;
                 }
             },
             AfterChunk::class => function(AfterChunk $event) {
-                // LANGKAH 3: Gunakan properti $rowsProcessed yang sudah kita hitung
                 $percentage = ($this->totalRows > 0)
                     ? round(($this->rowsProcessed / $this->totalRows) * 100)
                     : 0;
-
-                // Pastikan persentase tidak lebih dari 100
                 $percentage = min($percentage, 100);
-
                 Cache::put('import_progress_' . $this->batchId, $percentage, 600);
             },
         ];
     }
 
-    // Tentukan ukuran chunk, misalnya 200 baris per proses
     public function chunkSize(): int
     {
         return 1000;
@@ -80,41 +74,64 @@ class DocumentDataImport implements OnEachRow, WithStartRow, WithChunkReading, W
         $orderId = is_string($orderIdRaw) && strtoupper(substr($orderIdRaw, 0, 2)) === 'SC' ? substr($orderIdRaw, 2) : $orderIdRaw;
         if (empty($orderId)) return;
 
-        // 1. Ambil semua data mentah dari baris Excel terlebih dahulu
-        $productValue = $rowData[0] ?? null;
-        $milestoneValue = $rowData[24] ?? null;
-        $segmenN = $rowData[36] ?? null;
-        $segment = (in_array($segmenN, ['RBS', 'SME'])) ? 'SME' : 'LEGS';
-        $witel = $rowData[7] ?? null;
-        $layanan = $rowData[23] ?? null;
+        // Ambil data mentah dan bersihkan dari spasi
+        $productValue = trim($rowData[0] ?? '');
+        $layanan = trim($rowData[23] ?? '');
 
-        if (in_array($productValue, ['kidi', 'bigbox'])) {
-            return; // Hentikan proses untuk baris ini dan lanjut ke baris berikutnya
+        // ======================== PERUBAHAN UTAMA DI SINI ========================
+        // Cek apakah ini adalah layanan 'Pijar Mahir'
+        $isPijarMahir = !empty($layanan) && stripos($layanan, 'mahir') !== false;
+
+        if ($isPijarMahir) {
+            // Jika ini adalah produk bundle (mengandung '-')
+            if (str_contains($productValue, '-')) {
+                // 1. Pecah produk menjadi array
+                $products = explode('-', $productValue);
+
+                // 2. Filter array, buang semua yang mengandung 'pijar'
+                $validProducts = array_filter($products, function($product) {
+                    return stripos(trim($product), 'pijar') === false;
+                });
+
+                // 3. Jika tidak ada produk valid yang tersisa, lewati baris ini
+                if (empty($validProducts)) {
+                    return;
+                }
+
+                // 4. Gabungkan kembali produk yang valid menjadi string
+                $productValue = implode('-', $validProducts);
+
+            } else {
+                // Jika ini produk tunggal dan merupakan 'Pijar Mahir', lewati
+                return;
+            }
         }
+        // =======================================================================
+
+        // Filter untuk produk 'kidi'
+        if (in_array(strtolower($productValue), ['kidi'])) {
+            return;
+        }
+
+        $milestoneValue = trim($rowData[24] ?? '');
+        $segmenN = trim($rowData[36] ?? '');
+        $segment = (in_array($segmenN, ['RBS', 'SME'])) ? 'SME' : 'LEGS';
+        $witel = trim($rowData[7] ?? '');
 
         // Filter untuk witel yang tidak diinginkan
         if (stripos($witel, 'JATENG') !== false) {
             return;
         }
 
-        // Filter untuk product pijar mahir yang tidak diinginkan
-        if (str_contains($layanan, 'mahir') && !str_contains($productValue, '-')) {
-            return; // Lewati baris ini dan jangan proses ke database
-        }
-
-        // 2. Cari data lama (jika ada) di database
         $existingRecord = DocumentData::where('order_id', $orderId)->first();
-
-        // 3. Logika final untuk menentukan net_price dengan prioritas
         $excelNetPrice = is_numeric($rowData[26] ?? null) ? (float) $rowData[26] : 0;
 
         if ($excelNetPrice > 0) {
             $netPrice = $excelNetPrice;
         } elseif ($existingRecord && $existingRecord->net_price > 0) {
             $netPrice = $existingRecord->net_price;
-        } elseif ($excelNetPrice = 0) {
-            $netPrice = $this->calculatePrice($productValue, $segment, $witel);
         } else {
+            // Hitung harga berdasarkan productValue yang mungkin sudah diubah
             $netPrice = $this->calculatePrice($productValue, $segment, $witel);
         }
 
@@ -124,14 +141,12 @@ class DocumentDataImport implements OnEachRow, WithStartRow, WithChunkReading, W
             try { return Carbon::parse($date)->format('Y-m-d H:i:s'); } catch (\Exception $e) { return null; }
         };
 
-        $milestoneValue = $rowData[24] ?? null;
-
         if ($milestoneValue && stripos($milestoneValue, 'QC') !== false) {
             $status_wfm = '';
         } else {
             $status_wfm = 'in progress';
             $doneMilestones = ['completed', 'complete', 'baso started', 'fulfill billing complete'];
-            if ($milestoneValue && in_array(strtolower(trim($milestoneValue)), $doneMilestones)) {
+            if ($milestoneValue && in_array(strtolower($milestoneValue), $doneMilestones)) {
                 $status_wfm = 'done close bima';
             }
         }
@@ -139,7 +154,7 @@ class DocumentDataImport implements OnEachRow, WithStartRow, WithChunkReading, W
         $newData = [
             'batch_id'           => $this->batchId,
             'order_id'           => $orderId,
-            'product'            => $productValue,
+            'product'            => $productValue, // Menggunakan productValue yang sudah bersih
             'net_price'          => $netPrice,
             'milestone'          => $milestoneValue,
             'previous_milestone' => null,
@@ -165,38 +180,33 @@ class DocumentDataImport implements OnEachRow, WithStartRow, WithChunkReading, W
         if ($existingRecord && $existingRecord->milestone !== $newData['milestone']) {
             $newData['previous_milestone'] = $existingRecord->milestone;
         } else if (!$existingRecord) {
-            $newData['previous_milestone'] = null; // Pastikan null untuk record baru
+            $newData['previous_milestone'] = null;
         }
 
         DocumentData::updateOrCreate(
-            ['order_id' => $orderId], // Kondisi pencarian
-            $newData                   // Data untuk di-update atau di-create
+            ['order_id' => $orderId],
+            $newData
         );
 
         if ($productValue && str_contains($productValue, '-')) {
-            // Hapus data bundle lama untuk order_id ini untuk memastikan data bersih
-            \App\Models\OrderProduct::where('order_id', $orderId)->delete();
-
-            // Pecah nama produk bundle berdasarkan tanda '-'
+            OrderProduct::where('order_id', $orderId)->delete();
             $individualProducts = explode('-', $productValue);
 
             foreach ($individualProducts as $pName) {
                 $pName = trim($pName);
                 if (empty($pName)) continue;
 
-                // Dapatkan harga template untuk setiap produk individual
                 $individualPrice = $this->calculatePrice($pName, $segment, $witel);
 
-                // Simpan setiap produk individual ke tabel order_products
-                \App\Models\OrderProduct::create([
-                    'order_id' => $orderId,
+                OrderProduct::create([
+                    'order_id'     => $orderId,
                     'product_name' => $pName,
-                    'net_price' => $individualPrice,
-                    // Isi kolom lain yang relevan dari data baris utama
-                    'status_wfm' => $status_wfm,
-                    'channel' => ($rowData[2] ?? null) === 'hsi' ? 'SC-One' : ($rowData[2] ?? null),
+                    'net_price'    => $individualPrice,
+                    'status_wfm'   => $status_wfm,
+                    'channel'      => ($rowData[2] ?? null) === 'hsi' ? 'SC-One' : ($rowData[2] ?? null),
                 ]);
             }
         }
     }
 }
+

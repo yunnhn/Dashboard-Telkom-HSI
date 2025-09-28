@@ -21,5 +21,11 @@ class DatabaseSeeder extends Seeder
             'email_verified_at' => now(),
             'password' => bcrypt('password'), // password
         ]);
+
+        $this->call([
+            AccountOfficerSeeder::class,
+            // Jika punya seeder lain, tambahkan di sini:
+            // AnotherTableSeeder::class,
+        ]);
     }
 }

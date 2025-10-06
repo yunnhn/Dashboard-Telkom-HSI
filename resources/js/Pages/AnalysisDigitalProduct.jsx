@@ -433,6 +433,39 @@ const SmeReportTable = ({ data = [], decimalPlaces, tableConfig, setTableConfig 
                 if (oldIndex !== -1 && newIndex !== -1) {
                     group.columns = arrayMove(group.columns, oldIndex, newIndex);
                 }
+                return newConfig;
+            });
+        }
+        // [NEW] Add this 'else if' block to handle sub-column dragging
+        else if (activeType === 'sub-column' && overType === 'sub-column') {
+            const parentGroupTitle = active.data.current?.parentGroupTitle;
+            const overParentGroupTitle = over.data.current?.parentGroupTitle;
+            const parentColumnKey = active.data.current?.parentColumnKey;
+            const overParentColumnKey = over.data.current?.parentColumnKey;
+
+            // Only allow reordering within the same parent column (e.g., within 'N' or 'O')
+            if (parentGroupTitle !== overParentGroupTitle || parentColumnKey !== overParentColumnKey) {
+                return;
+            }
+
+            setTableConfig((config) => {
+                const newConfig = JSON.parse(JSON.stringify(config));
+                const group = newConfig.find(g => g.groupTitle === parentGroupTitle);
+                if (!group) return config;
+
+                const parentCol = group.columns.find(c => c.key === parentColumnKey);
+                if (!parentCol || !parentCol.subColumns) return config;
+
+                const getSubColKey = (id) => id.toString().split('.').pop();
+                const activeSubColKey = getSubColKey(active.id);
+                const overSubColKey = getSubColKey(over.id);
+
+                const oldIndex = parentCol.subColumns.findIndex(sc => sc.key === activeSubColKey);
+                const newIndex = parentCol.subColumns.findIndex(sc => sc.key === overSubColKey);
+
+                if (oldIndex !== -1 && newIndex !== -1) {
+                    parentCol.subColumns = arrayMove(parentCol.subColumns, oldIndex, newIndex);
+                }
 
                 return newConfig;
             });
@@ -465,6 +498,32 @@ const SmeReportTable = ({ data = [], decimalPlaces, tableConfig, setTableConfig 
         );
     };
 
+    const DraggableSubColumnHeader = ({ group, col, subCol }) => {
+        const uniqueId = `${group.groupTitle}.${col.key}.${subCol.key}`;
+        const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
+            id: uniqueId,
+            data: {
+                type: 'sub-column', // A new type to identify these headers
+                parentGroupTitle: group.groupTitle,
+                parentColumnKey: col.key
+            }
+        });
+        const style = { transform: CSS.Transform.toString(transform), transition };
+
+        return (
+            <th
+                ref={setNodeRef}
+                style={style}
+                {...attributes}
+                {...listeners}
+                key={uniqueId}
+                className={`border p-1 ${group.subColumnClass || 'bg-gray-600'} cursor-grab`}
+            >
+                {subCol.title}
+            </th>
+        );
+    };
+
     return (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <div className="overflow-x-auto text-xs">
@@ -488,11 +547,23 @@ const SmeReportTable = ({ data = [], decimalPlaces, tableConfig, setTableConfig 
                         <tr className="font-medium">
                             {tableConfig.map(group =>
                                 group.columns.map(col =>
-                                    col.subColumns?.map(subCol => (
-                                        <th key={`${col.key}${subCol.key}`} className={`border p-1 ${group.subColumnClass || 'bg-gray-600'}`}>
-                                            {subCol.title}
-                                        </th>
-                                    ))
+                                    col.subColumns ? (
+                                        // Each set of sub-columns gets its own SortableContext
+                                        <SortableContext
+                                            key={`${group.groupTitle}-${col.key}-subcols`}
+                                            items={col.subColumns.map(sc => `${group.groupTitle}.${col.key}.${sc.key}`)}
+                                            strategy={horizontalListSortingStrategy}
+                                        >
+                                            {col.subColumns.map(subCol => (
+                                                <DraggableSubColumnHeader
+                                                    key={subCol.key}
+                                                    group={group}
+                                                    col={col}
+                                                    subCol={subCol}
+                                                />
+                                            ))}
+                                        </SortableContext>
+                                    ) : null
                                 )
                             )}
                         </tr>
@@ -781,6 +852,9 @@ const TableConfigurator = ({ tableConfig, setTableConfig, currentSegment }) => {
     });
     const [columnToDelete, setColumnToDelete] = useState('');
 
+    const [columnToEdit, setColumnToEdit] = useState('');
+    const [editFormState, setEditFormState] = useState(null);
+
     const availableColumns = useMemo(() => {
         const columns = [];
         tableConfig.forEach(group => {
@@ -800,7 +874,7 @@ const TableConfigurator = ({ tableConfig, setTableConfig, currentSegment }) => {
         return columns.sort((a, b) => a.label.localeCompare(b.label));
     }, [tableConfig]);
 
-    const deletableColumns = useMemo(() => {
+    const allColumnsList = useMemo(() => {
         const columns = [];
         tableConfig.forEach(group => {
             group.columns.forEach(col => {
@@ -825,23 +899,20 @@ const TableConfigurator = ({ tableConfig, setTableConfig, currentSegment }) => {
         if (!currentFormGroupExists && tableConfig.length > 0) {
             setFormState(prev => ({ ...prev, groupTitle: tableConfig[0].groupTitle }));
         }
-        if (deletableColumns.length > 0) {
-            const selectionExists = deletableColumns.some(c => c.value === columnToDelete);
+        if (allColumnsList.length > 0) {
+            const selectionExists = allColumnsList.some(c => c.value === columnToDelete);
             if (!selectionExists) {
-                setColumnToDelete(deletableColumns[0].value);
+                setColumnToDelete(allColumnsList[0].value);
             }
         } else {
             setColumnToDelete('');
         }
-    }, [tableConfig, deletableColumns, columnToDelete, editGroup.title, formState.groupTitle]);
+    }, [tableConfig, allColumnsList, columnToDelete, editGroup.title, formState.groupTitle]);
 
     const handleResetConfig = () => {
         if (confirm("Anda yakin ingin mengembalikan tampilan tabel ke pengaturan awal? Semua kolom tambahan, urutan, dan perubahan warna akan hilang.")) {
-            // Buat kunci dinamis berdasarkan segmen yang aktif
             const storageKey = `userTableConfig_${currentSegment}`;
-            // Hapus kunci yang benar dari localStorage
             localStorage.removeItem(storageKey);
-            // Muat ulang halaman
             window.location.reload();
         }
     };
@@ -851,7 +922,7 @@ const TableConfigurator = ({ tableConfig, setTableConfig, currentSegment }) => {
             alert("Silakan pilih kolom yang akan dihapus.");
             return;
         }
-        const selectedColumnLabel = deletableColumns.find(c => c.value === columnToDelete)?.label;
+        const selectedColumnLabel = allColumnsList.find(c => c.value === columnToDelete)?.label;
         if (confirm(`Anda yakin ingin menghapus kolom "${selectedColumnLabel}"? Aksi ini tidak dapat dibatalkan.`)) {
             const [groupTitle, colKey, subColKey] = columnToDelete.split('.');
             const newConfig = JSON.parse(JSON.stringify(tableConfig));
@@ -1004,8 +1075,86 @@ const TableConfigurator = ({ tableConfig, setTableConfig, currentSegment }) => {
         alert(`Warna untuk grup "${editGroup.title}" dan turunannya berhasil diubah.`);
     };
 
-    const renderOperandInputs = () => {
-        switch (formState.operation) {
+    const handleSelectColumnToEdit = (e) => {
+        const identifier = e.target.value;
+        setColumnToEdit(identifier);
+
+        if (!identifier) {
+            setEditFormState(null);
+            return;
+        }
+
+        const [groupTitle, colKey, subColKey] = identifier.split('.');
+        const group = tableConfig.find(g => g.groupTitle === groupTitle);
+        if (!group) return;
+
+        const parentCol = group.columns.find(c => c.key === colKey);
+        if (!parentCol) return;
+
+        const targetColumn = subColKey ? parentCol.subColumns.find(sc => sc.key === subColKey) : parentCol;
+        if (!targetColumn) return;
+
+        setEditFormState({
+            title: targetColumn.title,
+            type: targetColumn.type,
+            operation: targetColumn.calculation?.operation || 'sum',
+            operands: targetColumn.calculation?.operands || [],
+        });
+    };
+
+    // [NEW] Function to handle saving changes to a column
+    const handleSaveChanges = (e) => {
+        e.preventDefault();
+        if (!columnToEdit || !editFormState) {
+            alert("Tidak ada kolom yang dipilih atau form tidak valid.");
+            return;
+        }
+
+        const newConfig = JSON.parse(JSON.stringify(tableConfig));
+        const [groupTitle, colKey, subColKey] = columnToEdit.split('.');
+
+        const group = newConfig.find(g => g.groupTitle === groupTitle);
+        const parentCol = group?.columns.find(c => c.key === colKey);
+        const targetColumn = subColKey ? parentCol?.subColumns.find(sc => sc.key === subColKey) : parentCol;
+
+        if (targetColumn) {
+            targetColumn.title = editFormState.title;
+            if (targetColumn.type === 'calculation') {
+                targetColumn.calculation = {
+                    operation: editFormState.operation,
+                    operands: editFormState.operands,
+                };
+            }
+            setTableConfig(newConfig);
+            alert(`Kolom "${targetColumn.title}" berhasil diupdate.`);
+            setColumnToEdit('');
+            setEditFormState(null);
+        } else {
+            alert("Gagal menemukan kolom untuk diupdate.");
+        }
+    };
+
+    const renderOperandInputs = (form, setForm, availableCols) => {
+        const handleOpChange = (index, value) => {
+            setForm(prev => {
+                const newOperands = [...(prev.operands || [])];
+                newOperands[index] = value;
+                return { ...prev, operands: newOperands };
+            });
+        };
+
+        const handleCheckboxOpChange = (checked, value) => {
+            setForm(prev => {
+                const currentOperands = prev.operands || [];
+                if (checked) {
+                    return { ...prev, operands: [...currentOperands, value] };
+                } else {
+                    return { ...prev, operands: currentOperands.filter(op => op !== value) };
+                }
+            });
+        };
+
+        switch (form.operation) {
             case 'sum':
             case 'average':
             case 'count':
@@ -1013,9 +1162,9 @@ const TableConfigurator = ({ tableConfig, setTableConfig, currentSegment }) => {
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Pilih Kolom untuk Dihitung</label>
                         <div className="w-full border border-gray-300 rounded-md shadow-sm h-32 overflow-y-auto p-2 mt-1 space-y-1">
-                            {availableColumns.map(col => (
+                            {availableCols.map(col => (
                                 <label key={col.value} className="flex items-center w-full p-1 rounded hover:bg-gray-100">
-                                    <input type="checkbox" checked={(formState.operands || []).includes(col.value)} onChange={(e) => handleCheckboxOperandChange(e.target.checked, col.value)} className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
+                                    <input type="checkbox" checked={(form.operands || []).includes(col.value)} onChange={(e) => handleCheckboxOpChange(e.target.checked, col.value)} className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
                                     <span className="ml-2 text-sm text-gray-700">{col.label}</span>
                                 </label>
                             ))}
@@ -1027,16 +1176,16 @@ const TableConfigurator = ({ tableConfig, setTableConfig, currentSegment }) => {
                     <div className="space-y-2">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Kolom Pembilang (Numerator)</label>
-                            <select value={formState.operands[0] || ''} onChange={e => handleOperandChange(0, e.target.value)} className="w-full border-gray-300 rounded-md shadow-sm">
+                            <select value={form.operands[0] || ''} onChange={e => handleOpChange(0, e.target.value)} className="w-full border-gray-300 rounded-md shadow-sm">
                                 <option value="">Pilih Kolom</option>
-                                {availableColumns.map(col => <option key={col.value} value={col.value}>{col.label}</option>)}
+                                {availableCols.map(col => <option key={col.value} value={col.value}>{col.label}</option>)}
                             </select>
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Kolom Penyebut (Denominator)</label>
-                            <select value={formState.operands[1] || ''} onChange={e => handleOperandChange(1, e.target.value)} className="w-full border-gray-300 rounded-md shadow-sm">
+                            <select value={form.operands[1] || ''} onChange={e => handleOpChange(1, e.target.value)} className="w-full border-gray-300 rounded-md shadow-sm">
                                 <option value="">Pilih Kolom</option>
-                                {availableColumns.map(col => <option key={col.value} value={col.value}>{col.label}</option>)}
+                                {availableCols.map(col => <option key={col.value} value={col.value}>{col.label}</option>)}
                             </select>
                         </div>
                     </div>
@@ -1116,7 +1265,7 @@ const TableConfigurator = ({ tableConfig, setTableConfig, currentSegment }) => {
                                                         <option value="count">COUNT (Hitung Jumlah)</option>
                                                     </select>
                                                 </div>
-                                                {renderOperandInputs()}
+                                                {renderOperandInputs(formState, setFormState, availableColumns)}
                                             </div>
                                         )}
                                     </div>
@@ -1152,18 +1301,66 @@ const TableConfigurator = ({ tableConfig, setTableConfig, currentSegment }) => {
                                         <PrimaryButton type="button" onClick={handleSaveColor} className="w-full justify-center">Terapkan Warna</PrimaryButton>
                                     </div>
                                 </div>
+                                <div>
+                                    <h5 className="font-semibold text-sm text-gray-700 pt-4 border-t">Edit Kolom</h5>
+                                    <div className="space-y-4 mt-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700">Pilih Kolom untuk Diedit</label>
+                                            <select value={columnToEdit} onChange={handleSelectColumnToEdit} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm" disabled={allColumnsList.length === 0}>
+                                                <option value="">-- Pilih Kolom --</option>
+                                                {allColumnsList.map(col => <option key={col.value} value={col.value}>{col.label}</option>)}
+                                            </select>
+                                        </div>
+                                        {editFormState && (
+                                            <form onSubmit={handleSaveChanges} className="p-4 border rounded-md bg-gray-50 space-y-4">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700">Nama Kolom</label>
+                                                    <input
+                                                        type="text"
+                                                        value={editFormState.title}
+                                                        onChange={e => setEditFormState(prev => ({ ...prev, title: e.target.value }))}
+                                                        className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
+                                                        required
+                                                    />
+                                                </div>
+                                                {editFormState.type === 'calculation' && (
+                                                    <div className="pt-4 border-t space-y-4">
+                                                        <div>
+                                                            <label className="block text-sm font-medium text-gray-700">Operasi Kalkulasi</label>
+                                                            <select
+                                                                name="operation"
+                                                                value={editFormState.operation}
+                                                                onChange={e => setEditFormState(prev => ({ ...prev, operation: e.target.value, operands: [] }))}
+                                                                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
+                                                            >
+                                                                <option value="sum">SUM (Jumlahkan)</option>
+                                                                <option value="percentage">PERCENTAGE (Persentase)</option>
+                                                                <option value="average">AVERAGE (Rata-rata)</option>
+                                                                <option value="count">COUNT (Hitung Jumlah)</option>
+                                                            </select>
+                                                        </div>
+                                                        {renderOperandInputs(editFormState, setEditFormState, availableColumns)}
+                                                    </div>
+                                                )}
+                                                <div className="text-right">
+                                                    <PrimaryButton type="submit">Simpan Perubahan</PrimaryButton>
+                                                </div>
+                                            </form>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                             <div>
                                 <h5 className="font-semibold text-sm text-gray-700 pt-4 border-t">Hapus Kolom</h5>
                                 <div className="space-y-4 mt-4">
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700">Pilih Kolom untuk Dihapus</label>
-                                        <select value={columnToDelete} onChange={e => setColumnToDelete(e.target.value)} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm" disabled={deletableColumns.length === 0}>
-                                            {deletableColumns.length > 0 ? (deletableColumns.map(col => <option key={col.value} value={col.value}>{col.label}</option>)) : (<option>Tidak ada kolom untuk dihapus</option>)}
+                                        <select value={columnToDelete} onChange={e => setColumnToDelete(e.target.value)} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm" disabled={allColumnsList.length === 0}>
+                                            {allColumnsList.length > 0 ? (allColumnsList.map(col => <option key={col.value} value={col.value}>{col.label}</option>)) : (<option>Tidak ada kolom untuk dihapus</option>)}
                                         </select>
                                     </div>
                                     <div>
-                                        <button type="button" onClick={handleDeleteColumn} className="w-full justify-center px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:bg-red-300" disabled={deletableColumns.length === 0}>
+                                        <button type="button" onClick={handleDeleteColumn} className="w-full justify-center px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:bg-red-300" disabled={allColumnsList.length === 0}>
                                             Hapus Kolom Terpilih
                                         </button>
                                     </div>
@@ -1222,7 +1419,7 @@ const legsTableConfigTemplate = [
     { groupTitle: 'In Progress', groupClass: 'bg-blue-600', columnClass: 'bg-blue-400', columns: [{ key: 'in_progress_n', title: 'N' }, { key: 'in_progress_o', title: 'O' }, { key: 'in_progress_ae', title: 'AE' }, { key: 'in_progress_ps', title: 'PS' }] },
     { groupTitle: 'Prov Comp', groupClass: 'bg-orange-600', columnClass: 'bg-orange-400', columns: [{ key: 'prov_comp_n_realisasi', title: 'N' }, { key: 'prov_comp_o_realisasi', title: 'O' }, { key: 'prov_comp_ae_realisasi', title: 'AE' }, { key: 'prov_comp_ps_realisasi', title: 'PS' }] },
     { groupTitle: 'REVENUE (Rp Juta)', groupClass: 'bg-green-700', columnClass: 'bg-green-500', subColumnClass: 'bg-green-300', columns: [{ key: 'revenue_n', title: 'N', subColumns: [{ key: '_ach', title: 'ACH' }, { key: '_target', title: 'T' }] }, { key: 'revenue_o', title: 'O', subColumns: [{ key: '_ach', title: 'ACH' }, { key: '_target', title: 'T' }] }, { key: 'revenue_ae', title: 'AE', subColumns: [{ key: '_ach', title: 'ACH' }, { key: '_target', title: 'T' }] }, { key: 'revenue_ps', title: 'PS', subColumns: [{ key: '_ach', title: 'ACH' }, { key: '_target', title: 'T' }] }] },
-    { groupTitle: 'Grand Total', groupClass: 'bg-purple-600', columnClass: 'bg-purple-500', columns: [{ key: 'grand_total_realisasi_legs', title: 'Total', type: 'calculation', calculation: { operation: 'sum', operands: ['prov_comp_n_realisasi', 'prov_comp_o_realisasi', 'prov_comp_ae_realisasi', 'prov_comp_ps_realisasi'] } }] },
+    { groupTitle: 'Grand Total', groupClass: 'bg-gray-600', columnClass: 'bg-gray-500', columns: [{ key: 'grand_total_realisasi_legs', title: 'Total', type: 'calculation', calculation: { operation: 'sum', operands: ['prov_comp_n_realisasi', 'prov_comp_o_realisasi', 'prov_comp_ae_realisasi', 'prov_comp_ps_realisasi'] } }] },
 ];
 
 const CustomTargetForm = ({ tableConfig, witelList, initialData, period, segment }) => {

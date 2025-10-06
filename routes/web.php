@@ -2,9 +2,11 @@
 
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Redirect; // <-- Pastikan ini ada
 use Inertia\Inertia;
 use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\UserController; // Pastikan ini di-import
+use App\Http\Controllers\UserController;
+use App\Http\Controllers\GalaksiController;
 use App\Http\Controllers\DashboardDigitalProductController;
 use App\Http\Controllers\AnalysisDigitalProductController;
 use App\Http\Controllers\ActionBasedController;
@@ -17,15 +19,11 @@ use App\Http\Controllers\AccountOfficerController;
 */
 
 // --- RUTE PUBLIK ---
-// Halaman selamat datang untuk tamu
+// [DIUBAH] Rute utama sekarang langsung mengalihkan ke halaman login
 Route::get('/', function () {
-    return Inertia::render('Welcome', [
-        'canLogin' => Route::has('login'),
-        'canRegister' => Route::has('register'),
-        'laravelVersion' => Application::VERSION,
-        'phpVersion' => PHP_VERSION,
-    ]);
+    return Redirect::route('login');
 });
+
 
 // --- RUTE YANG MEMERLUKAN AUTENTIKASI ---
 // Semua rute di dalam grup ini hanya bisa diakses oleh pengguna yang sudah login
@@ -49,6 +47,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/import-progress/{batchId}', [AnalysisDigitalProductController::class, 'getImportProgress'])->name('import.progress');
 
     Route::get('/action-based', [ActionBasedController::class, 'index'])->name('action-based.index');
+
+    Route::get('/galaksi', [GalaksiController::class, 'index'])->name('galaksi.index');
 
     /*
     |--------------------------------------------------------------------------

@@ -32,9 +32,9 @@ class DataReportExport implements FromView, WithTitle, ShouldAutoSize
         return view('exports.datareport', [
             'reportDataLegs' => $this->reportDataLegs,
             'reportDataSme' => $this->reportDataSme,
-            'tableConfig' => $this->tableConfig,
+            'tableConfig' => $this->tableConfig, // Config dinamis untuk SME
             'detailsLegs' => $this->detailsLegs,
-            'detailsSme' => $this->detailsSme,
+            'detailsSme' => $this->detailsSme,   // Details yang benar untuk SME
             'period' => $this->period,
         ]);
     }

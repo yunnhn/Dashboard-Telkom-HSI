@@ -108,7 +108,7 @@ export default function Sidebar({ user }) {
     const reportsDropdownRef = useRef(null);
 
     // Logika untuk menandai menu Dashboard sebagai aktif
-    const isDashboardActive = route().current('dashboardDigitalProduct'); // Anda bisa menambahkan route dashboard conn di sini nanti dengan ||
+    const isDashboardActive = route().current('dashboardDigitalProduct'); // Anda bisa menambahkan route dashboard SOS di sini nanti dengan ||
 
     useEffect(() => {
         function handleClickOutside(event) {
@@ -169,7 +169,7 @@ export default function Sidebar({ user }) {
                                         className="block px-4 py-2 text-sm text-gray-400 cursor-not-allowed rounded-md"
                                         onClick={(e) => e.preventDefault()}
                                     >
-                                        Dashboard Conn
+                                        Dashboard SOS
                                     </Link>
                                 </div>
                             )}
@@ -202,7 +202,7 @@ export default function Sidebar({ user }) {
                                                 Report Digital Product
                                             </Link>
                                             <Link href="#" className="block px-4 py-2 text-sm text-gray-400 cursor-not-allowed rounded-md" onClick={(e) => e.preventDefault()}>
-                                                Report Conn
+                                                Report SOS
                                             </Link>
                                         </>
                                     )}

@@ -19,15 +19,15 @@ trait CalculatesProductPrice
         $lowerProductName = strtolower($productName);
 
         if (stripos($lowerProductName, 'netmonk') !== false) {
-
-            // Jika iya, selanjutnya cek segmennya untuk menentukan harga
-            if ($segment === 'LEGS') {
-                // Harga khusus untuk segmen LEGS
-                return 26100;
-            } else {
-                // Harga default untuk Netmonk di segmen lain (misal: SME)
-                return 21600;
-            }
+            return 26100;
+            // // Jika iya, selanjutnya cek segmennya untuk menentukan harga
+            // if ($segment === 'LEGS') {
+            //     // Harga khusus untuk segmen LEGS
+            //     return 26100;
+            // } else {
+            //     // Harga default untuk Netmonk di segmen lain (misal: SME)
+            //     return 21600;
+            // }
 
         }
 

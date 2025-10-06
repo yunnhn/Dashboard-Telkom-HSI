@@ -567,7 +567,7 @@ const InProgressTable = ({ dataPaginator = { data: [], links: [], from: 0 } }) =
                                 <td className="p-3">{dataPaginator.from + index}</td>
                                 <td className="p-3">{item.milestone}</td>
                                 <td className="p-3 whitespace-nowrap"><span className="px-2 py-1 font-semibold leading-tight text-blue-700 bg-blue-100 rounded-full">{item.order_status_n}</span></td>
-                                <td className="p-3">{item.product_name}</td><td className="p-3 font-mono">{item.order_id}</td><td className="p-3">{item.nama_witel}</td><td className="p-3">{item.customer_name}</td><td className="p-3">{formatDate(item.order_created_date)}</td>
+                                <td className="p-3">{item.product_name ?? item.product}</td><td className="p-3 font-mono">{item.order_id}</td><td className="p-3">{item.nama_witel}</td><td className="p-3">{item.customer_name}</td><td className="p-3">{formatDate(item.order_created_date)}</td>
                                 <td className="p-3 text-center">
                                     <div className="flex justify-center items-center gap-2">
                                         <button onClick={() => handleCompleteClick(item.order_id)} className="px-3 py-1 text-xs font-bold text-white bg-green-500 rounded-md hover:bg-green-600">COMPLETE</button>
@@ -608,7 +608,7 @@ const CompleteTable = ({ dataPaginator = { data: [], links: [] } }) => {
                     <tbody className="divide-y bg-white">
                         {dataPaginator.data.length > 0 ? dataPaginator.data.map((item, index) => (
                             <tr key={item.order_id} className="text-gray-700 hover:bg-gray-50">
-                                <td className="p-3">{dataPaginator.from + index}</td><td className="p-3">{item.milestone}</td><td className="p-3 font-mono">{item.order_id}</td><td className="p-3">{item.product_name}</td><td className="p-3">{item.nama_witel}</td><td className="p-3">{item.customer_name}</td><td className="p-3">{formatDate(item.updated_at)}</td>
+                                <td className="p-3">{dataPaginator.from + index}</td><td className="p-3">{item.milestone}</td><td className="p-3 font-mono">{item.order_id}</td><td className="p-3">{item.product_name ?? item.product}</td><td className="p-3">{item.nama_witel}</td><td className="p-3">{item.customer_name}</td><td className="p-3">{formatDate(item.updated_at)}</td>
                                 <td className="p-3 text-center">
                                     <div className="flex justify-center items-center gap-2">
                                         <button onClick={() => handleSetInProgress(item.order_id)} className="px-3 py-1 text-xs font-bold text-white bg-blue-500 rounded-md hover:bg-blue-600">Ke In Progress</button>
@@ -764,15 +764,7 @@ const KpiTable = ({ data = [], accountOfficers = [], openModal }) => {
 // Table Configurator Component
 // ===================================================================
 
-// ===================================================================
-// Table Configurator Component
-// ===================================================================
-
-// ===================================================================
-// Table Configurator Component (KODE LENGKAP PENGGANTI)
-// ===================================================================
-
-const TableConfigurator = ({ tableConfig, setTableConfig }) => {
+const TableConfigurator = ({ tableConfig, setTableConfig, currentSegment }) => {
     const [isExpanded, setIsExpanded] = useState(false);
     const [formState, setFormState] = useState({
         mode: 'sub-column',
@@ -845,7 +837,11 @@ const TableConfigurator = ({ tableConfig, setTableConfig }) => {
 
     const handleResetConfig = () => {
         if (confirm("Anda yakin ingin mengembalikan tampilan tabel ke pengaturan awal? Semua kolom tambahan, urutan, dan perubahan warna akan hilang.")) {
-            localStorage.removeItem('userTableConfig');
+            // Buat kunci dinamis berdasarkan segmen yang aktif
+            const storageKey = `userTableConfig_${currentSegment}`;
+            // Hapus kunci yang benar dari localStorage
+            localStorage.removeItem(storageKey);
+            // Muat ulang halaman
             window.location.reload();
         }
     };
@@ -1101,8 +1097,12 @@ const TableConfigurator = ({ tableConfig, setTableConfig }) => {
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700 mb-2">Tipe Kolom:</label>
                                             <div className="flex gap-4">
-                                                <label className="flex items-center"><input type="radio" name="columnType" value="calculation" checked={formState.columnType === 'calculation'} onChange={handleInputChange} className="mr-2" /> Kalkulasi</label>
-                                                <label className="flex items-center"><input type="radio" name="columnType" value="data" checked={formState.columnType === 'data'} onChange={handleInputChange} className="mr-2" /> Data Biasa (dari backend)</label>
+                                                <label className="flex items-center">
+                                                    <input type="radio" name="columnType" value="target" checked={formState.columnType === 'target'} onChange={handleInputChange} className="mr-2" /> Target Manual
+                                                </label>
+                                                <label className="flex items-center">
+                                                    <input type="radio" name="columnType" value="calculation" checked={formState.columnType === 'calculation'} onChange={handleInputChange} className="mr-2" /> Kalkulasi
+                                                </label>
                                             </div>
                                         </div>
                                         {formState.columnType === 'calculation' && (
@@ -1177,6 +1177,141 @@ const TableConfigurator = ({ tableConfig, setTableConfig }) => {
     );
 };
 
+const smeTableConfigTemplate = [
+    // In Progress (Tetap Sama)
+    {
+        groupTitle: 'In Progress', groupClass: 'bg-blue-600', columnClass: 'bg-blue-400',
+        columns: [
+            { key: 'in_progress_n', title: 'N' },
+            { key: 'in_progress_o', title: 'O' },
+            { key: 'in_progress_ae', title: 'AE' },
+            { key: 'in_progress_ps', title: 'PS' }
+        ]
+    },
+    // Prov Comp (Urutan diubah menjadi T, R, P)
+    {
+        groupTitle: 'Prov Comp', groupClass: 'bg-orange-600', columnClass: 'bg-orange-400', subColumnClass: 'bg-orange-300',
+        columns: [
+            { key: 'prov_comp_n', title: 'N', subColumns: [{ key: '_target', title: 'T' }, { key: '_realisasi', title: 'R' }, { key: '_percent', title: 'P', type: 'calculation', calculation: { operation: 'percentage', operands: ['prov_comp_n_realisasi', 'prov_comp_n_target'] } }] },
+            { key: 'prov_comp_o', title: 'O', subColumns: [{ key: '_target', title: 'T' }, { key: '_realisasi', title: 'R' }, { key: '_percent', title: 'P', type: 'calculation', calculation: { operation: 'percentage', operands: ['prov_comp_o_realisasi', 'prov_comp_o_target'] } }] },
+            { key: 'prov_comp_ae', title: 'AE', subColumns: [{ key: '_target', title: 'T' }, { key: '_realisasi', title: 'R' }, { key: '_percent', title: 'P', type: 'calculation', calculation: { operation: 'percentage', operands: ['prov_comp_ae_realisasi', 'prov_comp_ae_target'] } }] },
+            { key: 'prov_comp_ps', title: 'PS', subColumns: [{ key: '_target', title: 'T' }, { key: '_realisasi', title: 'R' }, { key: '_percent', title: 'P', type: 'calculation', calculation: { operation: 'percentage', operands: ['prov_comp_ps_realisasi', 'prov_comp_ps_target'] } }] }
+        ]
+    },
+    // REVENUE (Urutan diubah menjadi ACH, T)
+    {
+        groupTitle: 'REVENUE (Rp Juta)', groupClass: 'bg-green-700', columnClass: 'bg-green-500', subColumnClass: 'bg-green-300',
+        columns: [
+            { key: 'revenue_n', title: 'N', subColumns: [{ key: '_ach', title: 'ACH' }, { key: '_target', title: 'T' }] },
+            { key: 'revenue_o', title: 'O', subColumns: [{ key: '_ach', title: 'ACH' }, { key: '_target', title: 'T' }] },
+            { key: 'revenue_ae', title: 'AE', subColumns: [{ key: '_ach', title: 'ACH' }, { key: '_target', title: 'T' }] },
+            { key: 'revenue_ps', title: 'PS', subColumns: [{ key: '_ach', title: 'ACH' }, { key: '_target', title: 'T' }] }
+        ]
+    },
+    {
+        groupTitle: 'Grand Total', groupClass: 'bg-gray-600', columnClass: 'bg-gray-500',
+        columns: [
+            { key: 'grand_total_target', title: 'T', type: 'calculation', calculation: { operation: 'sum', operands: ['prov_comp_n_target', 'prov_comp_o_target', 'prov_comp_ae_target', 'prov_comp_ps_target'] } },
+            { key: 'grand_total_realisasi', title: 'R', type: 'calculation', calculation: { operation: 'sum', operands: ['prov_comp_n_realisasi', 'prov_comp_o_realisasi', 'prov_comp_ae_realisasi', 'prov_comp_ps_realisasi'] } },
+            { key: 'grand_total_persentase', title: 'P', type: 'calculation', calculation: { operation: 'percentage', operands: ['grand_total_realisasi', 'grand_total_target'] } }
+        ]
+    },
+];
+
+const legsTableConfigTemplate = [
+    { groupTitle: 'In Progress', groupClass: 'bg-blue-600', columnClass: 'bg-blue-400', columns: [{ key: 'in_progress_n', title: 'N' }, { key: 'in_progress_o', title: 'O' }, { key: 'in_progress_ae', title: 'AE' }, { key: 'in_progress_ps', title: 'PS' }] },
+    { groupTitle: 'Prov Comp', groupClass: 'bg-orange-600', columnClass: 'bg-orange-400', columns: [{ key: 'prov_comp_n_realisasi', title: 'N' }, { key: 'prov_comp_o_realisasi', title: 'O' }, { key: 'prov_comp_ae_realisasi', title: 'AE' }, { key: 'prov_comp_ps_realisasi', title: 'PS' }] },
+    { groupTitle: 'REVENUE (Rp Juta)', groupClass: 'bg-green-700', columnClass: 'bg-green-500', subColumnClass: 'bg-green-300', columns: [{ key: 'revenue_n', title: 'N', subColumns: [{ key: '_ach', title: 'ACH' }, { key: '_target', title: 'T' }] }, { key: 'revenue_o', title: 'O', subColumns: [{ key: '_ach', title: 'ACH' }, { key: '_target', title: 'T' }] }, { key: 'revenue_ae', title: 'AE', subColumns: [{ key: '_ach', title: 'ACH' }, { key: '_target', title: 'T' }] }, { key: 'revenue_ps', title: 'PS', subColumns: [{ key: '_ach', title: 'ACH' }, { key: '_target', title: 'T' }] }] },
+    { groupTitle: 'Grand Total', groupClass: 'bg-purple-600', columnClass: 'bg-purple-500', columns: [{ key: 'grand_total_realisasi_legs', title: 'Total', type: 'calculation', calculation: { operation: 'sum', operands: ['prov_comp_n_realisasi', 'prov_comp_o_realisasi', 'prov_comp_ae_realisasi', 'prov_comp_ps_realisasi'] } }] },
+];
+
+const CustomTargetForm = ({ tableConfig, witelList, initialData, period, segment }) => {
+    const [isExpanded, setIsExpanded] = useState(false);
+
+    const customTargetColumns = useMemo(() => {
+        const targets = [];
+        tableConfig.forEach(group => {
+            group.columns.forEach(col => {
+                if (col.type === 'target') {
+                    targets.push({ key: col.key, title: col.title });
+                }
+            });
+        });
+        return targets;
+    }, [tableConfig]);
+
+    const { data, setData, post, processing, errors } = useForm({
+        targets: {},
+        period: period,
+        segment: segment,
+    });
+
+    useEffect(() => {
+        setData('targets', initialData || {});
+    }, [initialData]);
+
+    const handleInputChange = (targetKey, witel, value) => {
+        setData('targets', {
+            ...data.targets,
+            [targetKey]: {
+                ...data.targets[targetKey],
+                [witel]: value,
+            }
+        });
+    };
+
+    function submit(e) {
+        e.preventDefault();
+        post(route('analysisDigitalProduct.saveCustomTargets'), {
+            preserveScroll: true,
+        });
+    }
+
+    if (customTargetColumns.length === 0) {
+        return null;
+    }
+
+    return (
+        <form onSubmit={submit} className="bg-white p-6 rounded-lg shadow-md text-sm">
+            <div className="flex justify-between items-center cursor-pointer mb-4" onClick={() => setIsExpanded(!isExpanded)}>
+                <h3 className="font-semibold text-lg text-gray-800">Edit Target Kustom</h3>
+                <button type="button" className="text-blue-600 text-sm font-bold hover:underline p-2">
+                    {isExpanded ? 'Minimize' : 'Expand'}
+                </button>
+            </div>
+
+            {isExpanded && (
+                <div className="mt-4 space-y-6">
+                    {customTargetColumns.map(col => (
+                        <fieldset key={col.key} className="border rounded-md p-3">
+                            <legend className="text-base font-semibold px-2">{col.title}</legend>
+                            {/* [FIX] Kelas grid diubah agar lebih rapi */}
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-2">
+                                {witelList.map(witel => (
+                                    <div key={witel}>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">{witel}</label>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            value={data.targets[col.key]?.[witel] ?? ''}
+                                            onChange={e => handleInputChange(col.key, witel, e.target.value)}
+                                            className="p-1 border rounded w-full"
+                                            placeholder="0"
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        </fieldset>
+                    ))}
+                    <button type="submit" disabled={processing} className="w-full mt-4 px-4 py-2 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700 disabled:bg-blue-400">
+                        {processing ? 'Menyimpan...' : 'Simpan Target Kustom'}
+                    </button>
+                </div>
+            )}
+        </form>
+    );
+};
+
 // ===================================================================
 // Main Page Component
 // ===================================================================
@@ -1194,7 +1329,8 @@ export default function AnalysisDigitalProduct({
     currentInProgressYear,
     filters = {},
     flash = {},
-    errors: pageErrors = {}
+    errors: pageErrors = {},
+    customTargets = {}
 }) {
 
     const [activeDetailView, setActiveDetailView] = useState('inprogress');
@@ -1253,30 +1389,32 @@ export default function AnalysisDigitalProduct({
         document.body.removeChild(form);
     };
 
-    const [tableConfig, setTableConfig] = useState(() => {
-        try {
-            const savedConfig = localStorage.getItem('userTableConfig');
-            if (savedConfig) {
-                return JSON.parse(savedConfig);
-            }
-        } catch (error) {
-            console.error("Gagal memuat konfigurasi dari localStorage:", error);
+    const tableConfigStorageKey = `userTableConfig_${currentSegment}`;
+
+    const [tableConfig, setTableConfig] = useState(
+        currentSegment === 'LEGS' ? legsTableConfigTemplate : smeTableConfigTemplate
+    );
+
+    useEffect(() => {
+        // Coba muat konfigurasi yang tersimpan untuk segmen saat ini
+        const savedConfig = localStorage.getItem(tableConfigStorageKey);
+
+        if (savedConfig) {
+            // Jika ada, gunakan konfigurasi yang tersimpan
+            setTableConfig(JSON.parse(savedConfig));
+        } else {
+            // Jika tidak ada, atur ke template default yang sesuai
+            setTableConfig(currentSegment === 'LEGS' ? legsTableConfigTemplate : smeTableConfigTemplate);
         }
-        return [
-            { groupTitle: 'In Progress', groupClass: 'bg-blue-600', columnClass: 'bg-blue-400', columns: [{ key: 'in_progress_n', title: 'N' }, { key: 'in_progress_o', title: 'O' }, { key: 'in_progress_ae', title: 'AE' }, { key: 'in_progress_ps', title: 'PS' }] },
-            { groupTitle: 'Prov Comp', groupClass: 'bg-orange-600', columnClass: 'bg-orange-400', subColumnClass: 'bg-orange-300', columns: [{ key: 'prov_comp_n', title: 'N', subColumns: [{ key: '_target', title: 'T' }, { key: '_realisasi', title: 'R' }, { key: '_percent', title: 'P', type: 'calculation', calculation: { operation: 'percentage', operands: ['prov_comp_n_realisasi', 'prov_comp_n_target'] } }] }, { key: 'prov_comp_o', title: 'O', subColumns: [{ key: '_target', title: 'T' }, { key: '_realisasi', title: 'R' }, { key: '_percent', title: 'P', type: 'calculation', calculation: { operation: 'percentage', operands: ['prov_comp_o_realisasi', 'prov_comp_o_target'] } }] }, { key: 'prov_comp_ae', title: 'AE', subColumns: [{ key: '_target', title: 'T' }, { key: '_realisasi', title: 'R' }, { key: '_percent', title: 'P', type: 'calculation', calculation: { operation: 'percentage', operands: ['prov_comp_ae_realisasi', 'prov_comp_ae_target'] } }] }, { key: 'prov_comp_ps', title: 'PS', subColumns: [{ key: '_target', title: 'T' }, { key: '_realisasi', title: 'R' }, { key: '_percent', title: 'P', type: 'calculation', calculation: { operation: 'percentage', operands: ['prov_comp_ps_realisasi', 'prov_comp_ps_target'] } }] }] },
-            { groupTitle: 'REVENUE (Rp Juta)', groupClass: 'bg-green-700', columnClass: 'bg-green-500', subColumnClass: 'bg-green-300', columns: [{ key: 'revenue_n', title: 'N', subColumns: [{ key: '_target', title: 'T' }, { key: '_ach', title: 'ACH' }] }, { key: 'revenue_o', title: 'O', subColumns: [{ key: '_target', title: 'T' }, { key: '_ach', title: 'ACH' }] }, { key: 'revenue_ae', title: 'AE', subColumns: [{ key: '_target', title: 'T' }, { key: '_ach', title: 'ACH' }] }, { key: 'revenue_ps', title: 'PS', subColumns: [{ key: '_target', title: 'T' }, { key: '_ach', title: 'ACH' }] }] },
-            { groupTitle: 'Grand Total', groupClass: 'bg-gray-600', columnClass: 'bg-gray-500', columns: [{ key: 'grand_total_target', title: 'T', type: 'calculation', calculation: { operation: 'sum', operands: ['prov_comp_n_target', 'prov_comp_o_target', 'prov_comp_ae_target', 'prov_comp_ps_target'] } }, { key: 'grand_total_realisasi', title: 'R', type: 'calculation', calculation: { operation: 'sum', operands: ['prov_comp_n_realisasi', 'prov_comp_o_realisasi', 'prov_comp_ae_realisasi', 'prov_comp_ps_realisasi'] } }, { key: 'grand_total_persentase', title: 'P', type: 'calculation', calculation: { operation: 'percentage', operands: ['grand_total_realisasi', 'grand_total_target'] } }] },
-        ];
-    });
+    }, [currentSegment]);
 
     useEffect(() => {
         try {
-            localStorage.setItem('userTableConfig', JSON.stringify(tableConfig));
+            localStorage.setItem(tableConfigStorageKey, JSON.stringify(tableConfig));
         } catch (error) {
             console.error("Gagal menyimpan konfigurasi ke localStorage:", error);
         }
-    }, [tableConfig]);
+    }, [tableConfig, tableConfigStorageKey]);
 
     const [progressStates, setProgressStates] = useState({ mentah: null, complete: null, cancel: null });
     const { props: pageProps } = usePage();
@@ -1494,7 +1632,11 @@ export default function AnalysisDigitalProduct({
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                 <div className="lg:col-span-3 space-y-6">
                     {/* [DIKEMBALIKAN] Komponen Konfigurator Tabel */}
-                    <TableConfigurator tableConfig={tableConfig} setTableConfig={setTableConfig} />
+                    <TableConfigurator
+                        tableConfig={tableConfig}
+                        setTableConfig={setTableConfig}
+                        currentSegment={currentSegment}
+                    />
 
                     {/* [DIKEMBALIKAN] Komponen Tabel Laporan Utama */}
                     <div className="bg-white p-6 rounded-lg shadow-md">
@@ -1599,6 +1741,16 @@ export default function AnalysisDigitalProduct({
                                     </button>
                                 </div>
                             )}
+                            {activeDetailView === 'kpi' && (
+                                <div className="w-full md:w-auto">
+                                    <a
+                                        href={route('analysisDigitalProduct.export.kpiPo')}
+                                        className="inline-block px-4 py-2 text-sm font-bold text-white bg-green-600 rounded-md hover:bg-green-700"
+                                    >
+                                        Ekspor Excel
+                                    </a>
+                                </div>
+                            )}
                         </div>
 
                         {activeDetailView === 'inprogress' && <InProgressTable dataPaginator={inProgressData} />}
@@ -1619,7 +1771,7 @@ export default function AnalysisDigitalProduct({
                                 <input type="file" className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" onChange={(e) => setUploadData('document', e.target.files[0])} disabled={processing} />
                                 {errors.document && <p className="text-red-500 text-xs mt-1">{errors.document}</p>}
                             </div>
-                            {/* {progressStates.mentah !== null && (<ProgressBar progress={progressStates.mentah} text="Memproses file..." />)} */}
+                            {progressStates.mentah !== null && (<ProgressBar progress={progressStates.mentah} text="Memproses file..." />)}
                             <div className="flex items-center gap-4">
                                 <button type="submit" disabled={processing} className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700 disabled:bg-blue-400">
                                     {processing ? 'Mengunggah...' : 'Unggah Dokumen'}
@@ -1628,6 +1780,13 @@ export default function AnalysisDigitalProduct({
                             </div>
                         </form>
                     </div>
+                    <CustomTargetForm
+                        tableConfig={tableConfig}
+                        witelList={witelList}
+                        initialData={customTargets}
+                        period={period}
+                        segment={currentSegment}
+                    />
                     <EditReportForm currentSegment={currentSegment} reportData={reportData} period={period} />
                     <CollapsibleCard title="Proses Order Complete" isExpanded={isCompleteSectionExpanded} onToggle={() => setIsCompleteSectionExpanded(!isCompleteSectionExpanded)}>
                         <div className="bg-gray-50 p-4 rounded-md">

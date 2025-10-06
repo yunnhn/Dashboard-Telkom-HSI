@@ -3,6 +3,66 @@
     $reportData, $tableConfig, $segment, $period, $details
 --}}
 @php
+    // [FIX] Tambahkan pengecekan 'function_exists' untuk setiap fungsi
+    if (!function_exists('tailwindToHex')) {
+        function tailwindToHex($class)
+        {
+            $colors = [
+                'bg-blue-600' => '#2563EB',
+                'bg-orange-600' => '#EA580C',
+                'bg-green-700' => '#15803D',
+                'bg-gray-600' => '#4B5563',
+                'bg-purple-600' => '#9333EA',
+                'bg-blue-400' => '#60A5FA',
+                'bg-orange-400' => '#FB923C',
+                'bg-green-500' => '#22C55E',
+                'bg-gray-500' => '#6B7280',
+                'bg-purple-500' => '#A855F7',
+                'bg-orange-300' => '#FDBA74',
+                'bg-green-300' => '#86EFAC',
+            ];
+            return $colors[$class] ?? '#808080';
+        }
+    }
+    if (!function_exists('getGroupColspan')) {
+        function getGroupColspan($group)
+        {
+            $span = 0;
+            foreach ($group['columns'] as $col) {
+                $span += count($col['subColumns'] ?? [1]);
+            }
+            return $span > 0 ? $span : 1;
+        }
+    }
+    if (!function_exists('getCellValue')) {
+        function getCellValue($item, $col, $parentCol = null)
+        {
+            if (isset($col['type']) && $col['type'] === 'calculation') {
+                if (empty($col['calculation']['operands'])) {
+                    return 0;
+                }
+                $operands = $col['calculation']['operands'];
+                $values = array_map(fn($opKey) => (float) ($item[$opKey] ?? 0), $operands);
+                switch ($col['calculation']['operation']) {
+                    case 'percentage':
+                        $num = $values[0] ?? 0;
+                        $den = $values[1] ?? 0;
+                        return $den != 0 ? round(($num / $den) * 100, 1) . '%' : '0.0%';
+                    case 'sum':
+                        return array_sum($values);
+                    default:
+                        return 0;
+                }
+            }
+            $fullKey = $parentCol ? $parentCol['key'] . $col['key'] : $col['key'];
+            $value = $item[$fullKey] ?? 0;
+            if (strpos($fullKey, 'revenue_') === 0 && is_numeric($value)) {
+                return number_format((float) $value, 4);
+            }
+            return is_numeric($value) ? $value : ($value ?: 0);
+        }
+    }
+
     // Pindahkan kalkulasi Grand Total ke dalam partial ini
     $grandTotals = [];
     foreach ($reportData as $item) {

@@ -70,6 +70,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::post('/clear-history', 'clearHistory')->name('clearHistory');
             Route::get('/export/history', 'exportHistory')->name('export.history');
             Route::post('/export-report', 'exportReport')->name('export.report');
+            Route::post('/custom-targets', 'saveCustomTargets')->name('saveCustomTargets');
+            Route::get('/export/kpi-po', 'exportKpiPo')->name('export.kpiPo');
         });
 
         // Account Officers (CRUD)

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Exports\HistoryExport;
 use App\Exports\DataReportExport;
 use App\Exports\InProgressExport;
+use App\Exports\KpiPoExport;
 use App\Models\CustomTarget;
 use App\Models\AccountOfficer;
 use App\Models\DocumentData;
@@ -238,6 +239,23 @@ class AnalysisDigitalProductController extends Controller
             }
             $reportDataMap->put($witel, $currentData);
         }
+
+        $pageName = 'analysis_digital_' . strtolower($selectedSegment);
+        $customTargets = CustomTarget::where('user_id', auth()->id())
+            ->where('page_name', $pageName)
+            ->where('period', $reportPeriod->format('Y-m-d'))
+            ->get();
+
+        // Gabungkan nilai target ke dalam data report utama
+        foreach ($customTargets as $target) {
+            if ($reportDataMap->has($target->witel)) {
+                $witelData = $reportDataMap->get($target->witel);
+                // Tambahkan properti baru ke data witel
+                $witelData[$target->target_key] = $target->value;
+                $reportDataMap->put($target->witel, $witelData);
+            }
+        }
+
         $reportData = $reportDataMap->values()->map(fn ($item) => (object) $item);
 
         // ===================================================================
@@ -285,7 +303,39 @@ class AnalysisDigitalProductController extends Controller
             'qcData' => $qcData, 'accountOfficers' => $officers, 'kpiData' => $kpiData,
             'currentInProgressYear' => $inProgressYear,
             'filters' => $request->only(['search', 'period', 'segment', 'in_progress_year', 'witel']),
+            'customTargets' => $customTargets->groupBy('target_key')->map(fn($group) => $group->pluck('value', 'witel')),
         ]);
+    }
+
+    public function saveCustomTargets(Request $request)
+    {
+        $validated = $request->validate([
+            'targets' => 'required|array',
+            'period' => 'required|date_format:Y-m',
+            'segment' => 'required|string',
+        ]);
+
+        $period = \Carbon\Carbon::parse($validated['period'])->startOfMonth()->format('Y-m-d');
+        $pageName = 'analysis_digital_' . strtolower($validated['segment']);
+
+        foreach ($validated['targets'] as $targetKey => $witelValues) {
+            foreach ($witelValues as $witel => $value) {
+                CustomTarget::updateOrCreate(
+                    [
+                        'user_id' => auth()->id(),
+                        'page_name' => $pageName,
+                        'period' => $period,
+                        'target_key' => $targetKey,
+                        'witel' => $witel,
+                    ],
+                    [
+                        'value' => $value ?? 0,
+                    ]
+                );
+            }
+        }
+
+        return Redirect::back()->with('success', 'Target kustom berhasil disimpan.');
     }
 
     public function updateTargets(Request $request)
@@ -534,11 +584,11 @@ class AnalysisDigitalProductController extends Controller
         $detailsSme = json_decode($validated['details'], true);
         $periodInput = $validated['period'];
         $reportPeriod = \Carbon\Carbon::parse($periodInput)->startOfMonth();
+
         $reportDataLegs = $this->getReportDataForSegment('LEGS', $reportPeriod);
         $reportDataSme = $this->getReportDataForSegment('SME', $reportPeriod);
 
-        $ogpLegs = 0;
-        $closedLegs = 0;
+        $ogpLegs = 0; $closedLegs = 0;
         foreach($reportDataLegs as $item) {
             $ogpLegs += ($item['in_progress_n'] ?? 0) + ($item['in_progress_o'] ?? 0) + ($item['in_progress_ae'] ?? 0) + ($item['in_progress_ps'] ?? 0);
             $closedLegs += ($item['prov_comp_n_realisasi'] ?? 0) + ($item['prov_comp_o_realisasi'] ?? 0) + ($item['prov_comp_ae_realisasi'] ?? 0) + ($item['prov_comp_ps_realisasi'] ?? 0);
@@ -546,6 +596,7 @@ class AnalysisDigitalProductController extends Controller
         $detailsLegs = ['total' => $ogpLegs + $closedLegs, 'ogp' => $ogpLegs, 'closed' => $closedLegs];
 
         $fileName = 'Data_Report_All_Segments_' . $reportPeriod->format('F_Y') . '.xlsx';
+
         return Excel::download(new DataReportExport($reportDataLegs, $reportDataSme, $tableConfig, $detailsLegs, $detailsSme, $periodInput), $fileName);
     }
 
@@ -554,5 +605,37 @@ class AnalysisDigitalProductController extends Controller
         $fileName = 'update_history_' . now()->format('Y-m-d_H-i') . '.xlsx';
 
         return Excel::download(new HistoryExport(), $fileName);
+    }
+
+    public function exportKpiPo(Request $request)
+    {
+        // Logika ini adalah salinan dari perhitungan kpiData di method index()
+        $officers = AccountOfficer::orderBy('name')->get();
+        $kpiData = $officers->map(function ($officer) {
+            $witelFilter = $officer->filter_witel_lama;
+            $specialFilter = $officer->special_filter_column && $officer->special_filter_value ? ['column' => $officer->special_filter_column, 'value' => $officer->special_filter_value] : null;
+            $singleQuery = DocumentData::where('witel_lama', $witelFilter)->whereNotNull('product')->where('product', 'NOT LIKE', '%-%')->where('product', 'NOT LIKE', "%\n%")->when($specialFilter, fn($q) => $q->where($specialFilter['column'], $specialFilter['value']));
+            $bundleQuery = DB::table('order_products')->join('document_data', 'order_products.order_id', '=', 'document_data.order_id')->where('document_data.witel_lama', $witelFilter)->when($specialFilter, fn($q) => $q->where('document_data.' . $specialFilter['column'], $specialFilter['value']));
+            $done_ncx = $singleQuery->clone()->where('status_wfm', 'done close bima')->where('channel', '!=', 'SC-One')->count() + $bundleQuery->clone()->where('order_products.status_wfm', 'done close bima')->where('order_products.channel', '!=', 'SC-One')->count();
+            $done_scone = $singleQuery->clone()->where('status_wfm', 'done close bima')->where('channel', 'SC-One')->count() + $bundleQuery->clone()->where('order_products.status_wfm', 'done close bima')->where('order_products.channel', 'SC-One')->count();
+            $ogp_ncx = $singleQuery->clone()->where('status_wfm', 'in progress')->where('channel', '!=', 'SC-One')->count() + $bundleQuery->clone()->where('order_products.status_wfm', 'in progress')->where('order_products.channel', '!=', 'SC-One')->count();
+            $ogp_scone = $singleQuery->clone()->where('status_wfm', 'in progress')->where('channel', 'SC-One')->count() + $bundleQuery->clone()->where('order_products.status_wfm', 'in progress')->where('order_products.channel', 'SC-One')->count();
+            $total_ytd  = $done_ncx + $done_scone + $ogp_ncx + $ogp_scone;
+            $q3Months = [7, 8, 9]; $q3Year = 2025;
+            $singleQueryQ3 = $singleQuery->clone()->whereYear('order_created_date', $q3Year)->whereIn(DB::raw('MONTH(order_created_date)'), $q3Months);
+            $bundleQueryQ3 = $bundleQuery->clone()->whereYear('document_data.order_created_date', $q3Year)->whereIn(DB::raw('MONTH(document_data.order_created_date)'), $q3Months);
+            $done_scone_q3 = $singleQueryQ3->clone()->where('status_wfm', 'done close bima')->where('channel', 'SC-One')->count() + $bundleQueryQ3->clone()->where('order_products.status_wfm', 'done close bima')->where('order_products.channel', 'SC-One')->count();
+            $done_ncx_q3 = $singleQueryQ3->clone()->where('status_wfm', 'done close bima')->where('channel', '!=', 'SC-One')->count() + $bundleQueryQ3->clone()->where('order_products.status_wfm', 'done close bima')->where('order_products.channel', '!=', 'SC-One')->count();
+            $total_q3 = $done_ncx_q3 + $done_scone_q3 + $singleQueryQ3->clone()->where('status_wfm', 'in progress')->where('channel', 'SC-One')->count() + $bundleQueryQ3->clone()->where('order_products.status_wfm', 'in progress')->where('order_products.channel', 'SC-One')->count() + $singleQueryQ3->clone()->where('status_wfm', 'in progress')->where('channel', '!=', 'SC-One')->count() + $bundleQueryQ3->clone()->where('order_products.status_wfm', 'in progress')->where('order_products.channel', '!=', 'SC-One')->count();
+            return [
+                'id' => $officer->id, 'nama_po' => $officer->name, 'witel' => $officer->display_witel,
+                'done_ncx' => $done_ncx, 'done_scone' => $done_scone, 'ogp_ncx' => $ogp_ncx, 'ogp_scone' => $ogp_scone,
+                'total' => $total_ytd,
+                'ach_ytd' => $total_ytd > 0 ? number_format((($done_ncx + $done_scone) / $total_ytd) * 100, 1) . '%' : '0.0%',
+                'ach_q3' => $total_q3 > 0 ? number_format((($done_ncx_q3 + $done_scone_q3) / $total_q3) * 100, 1) . '%' : '0.0%',
+            ];
+        });
+
+        return Excel::download(new KpiPoExport($kpiData), 'kpi_po_report_'.now()->format('Y-m-d').'.xlsx');
     }
 }

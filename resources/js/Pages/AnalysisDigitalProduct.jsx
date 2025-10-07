@@ -1294,54 +1294,6 @@ const TableConfigurator = ({ tableConfig, setTableConfig, currentSegment }) => {
                                         </select>
                                     </div>
                                     <div>
-                                        <h5 className="font-semibold text-sm text-gray-700 pt-4 border-t">Edit Kolom</h5>
-                                        <div className="space-y-4 mt-4">
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700">Pilih Kolom untuk Diedit</label>
-                                                <select value={columnToEdit} onChange={handleSelectColumnToEdit} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm" disabled={allColumnsList.length === 0}>
-                                                    <option value="">-- Pilih Kolom --</option>
-                                                    {allColumnsList.map(col => <option key={col.value} value={col.value}>{col.label}</option>)}
-                                                </select>
-                                            </div>
-                                            {editFormState && (
-                                                <form onSubmit={handleSaveChanges} className="p-4 border rounded-md bg-gray-50 space-y-4">
-                                                    <div>
-                                                        <label className="block text-sm font-medium text-gray-700">Nama Kolom</label>
-                                                        <input
-                                                            type="text"
-                                                            value={editFormState.title}
-                                                            onChange={e => setEditFormState(prev => ({ ...prev, title: e.target.value }))}
-                                                            className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
-                                                            required
-                                                        />
-                                                    </div>
-                                                    {editFormState.type === 'calculation' && (
-                                                        <div className="pt-4 border-t space-y-4">
-                                                            <div>
-                                                                <label className="block text-sm font-medium text-gray-700">Operasi Kalkulasi</label>
-                                                                <select
-                                                                    name="operation"
-                                                                    value={editFormState.operation}
-                                                                    onChange={e => setEditFormState(prev => ({ ...prev, operation: e.target.value, operands: [] }))}
-                                                                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
-                                                                >
-                                                                    <option value="sum">SUM (Jumlahkan)</option>
-                                                                    <option value="percentage">PERCENTAGE (Persentase)</option>
-                                                                    <option value="average">AVERAGE (Rata-rata)</option>
-                                                                    <option value="count">COUNT (Hitung Jumlah)</option>
-                                                                </select>
-                                                            </div>
-                                                            {renderOperandInputs(editFormState, setEditFormState, availableColumns)}
-                                                        </div>
-                                                    )}
-                                                    <div className="text-right">
-                                                        <PrimaryButton type="submit">Simpan Perubahan</PrimaryButton>
-                                                    </div>
-                                                </form>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <div>
                                         <label className="block text-sm font-medium text-gray-700">Kelas Warna Dasar Tailwind CSS</label>
                                         <input type="text" value={editGroup.className} onChange={e => setEditGroup({ ...editGroup, className: e.target.value })} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm" placeholder="Contoh: bg-red-600" />
                                         <p className="mt-1 text-xs text-gray-500">
@@ -1350,6 +1302,54 @@ const TableConfigurator = ({ tableConfig, setTableConfig, currentSegment }) => {
                                     </div>
                                     <div className="text-right">
                                         <PrimaryButton type="button" onClick={handleSaveColor} className="w-full justify-center">Terapkan Warna</PrimaryButton>
+                                    </div>
+                                </div>
+                                <div>
+                                    <h5 className="font-semibold text-sm text-gray-700 pt-4 border-t">Edit Kolom</h5>
+                                    <div className="space-y-4 mt-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700">Pilih Kolom untuk Diedit</label>
+                                            <select value={columnToEdit} onChange={handleSelectColumnToEdit} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm" disabled={allColumnsList.length === 0}>
+                                                <option value="">-- Pilih Kolom --</option>
+                                                {allColumnsList.map(col => <option key={col.value} value={col.value}>{col.label}</option>)}
+                                            </select>
+                                        </div>
+                                        {editFormState && (
+                                            <form onSubmit={handleSaveChanges} className="p-4 border rounded-md bg-gray-50 space-y-4">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700">Nama Kolom</label>
+                                                    <input
+                                                        type="text"
+                                                        value={editFormState.title}
+                                                        onChange={e => setEditFormState(prev => ({ ...prev, title: e.target.value }))}
+                                                        className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
+                                                        required
+                                                    />
+                                                </div>
+                                                {editFormState.type === 'calculation' && (
+                                                    <div className="pt-4 border-t space-y-4">
+                                                        <div>
+                                                            <label className="block text-sm font-medium text-gray-700">Operasi Kalkulasi</label>
+                                                            <select
+                                                                name="operation"
+                                                                value={editFormState.operation}
+                                                                onChange={e => setEditFormState(prev => ({ ...prev, operation: e.target.value, operands: [] }))}
+                                                                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
+                                                            >
+                                                                <option value="sum">SUM (Jumlahkan)</option>
+                                                                <option value="percentage">PERCENTAGE (Persentase)</option>
+                                                                <option value="average">AVERAGE (Rata-rata)</option>
+                                                                <option value="count">COUNT (Hitung Jumlah)</option>
+                                                            </select>
+                                                        </div>
+                                                        {renderOperandInputs(editFormState, setEditFormState, availableColumns)}
+                                                    </div>
+                                                )}
+                                                <div className="text-right">
+                                                    <PrimaryButton type="submit">Simpan Perubahan</PrimaryButton>
+                                                </div>
+                                            </form>
+                                        )}
                                     </div>
                                 </div>
                             </div>

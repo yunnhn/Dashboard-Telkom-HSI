@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react'; // [FIX] useRef digabung di sini
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, useForm, usePage, router, Link } from '@inertiajs/react';
 import InputLabel from '@/Components/InputLabel';
@@ -10,7 +10,6 @@ import { arrayMove, SortableContext, sortableKeyboardCoordinates, horizontalList
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { debounce } from 'lodash';
-// import toast from 'react-hot-toast'; // [FIX] Menambahkan impor untuk notifikasi toast
 
 // ===================================================================
 // Helper & Utility Components
@@ -179,11 +178,14 @@ const EditReportForm = ({ currentSegment, reportData, period }) => {
                             {witelList.map(witel => (
                                 <div key={`${witel}-prov`} className="mb-3">
                                     <h4 className="font-bold text-gray-600">{witel}</h4>
+
+                                    {/* TAMBAHKAN LABEL DI SINI */}
                                     <div className="grid grid-cols-4 gap-2 mt-2 mb-1 px-1">
                                         {products.map(p => (
                                             <label key={p.key} className="text-xs font-semibold text-gray-500">{p.label}</label>
                                         ))}
                                     </div>
+
                                     <div className="grid grid-cols-4 gap-2">
                                         {products.map(p => (
                                             <input
@@ -206,6 +208,8 @@ const EditReportForm = ({ currentSegment, reportData, period }) => {
                         {witelList.map(witel => (
                             <div key={`${witel}-rev`} className="mb-3">
                                 <h4 className="font-bold text-gray-600">{witel}</h4>
+
+                                {/* TAMBAHKAN LABEL DI SINI JUGA */}
                                 <div className="grid grid-cols-4 gap-2 mt-2 mb-1 px-1">
                                     {products.map(p => (
                                         <label key={p.key} className="text-xs font-semibold text-gray-500">{p.label}</label>
@@ -324,7 +328,6 @@ const AgentFormModal = ({ isOpen, onClose, agent }) => {
 const SmeReportTable = ({ data = [], decimalPlaces, tableConfig, setTableConfig }) => {
     const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
 
-    // Fungsi untuk mencari definisi kolom, dibutuhkan untuk kalkulasi
     const findColumnDefinition = (keyToFind) => {
         for (const group of tableConfig) {
             for (const col of group.columns) {
@@ -341,7 +344,6 @@ const SmeReportTable = ({ data = [], decimalPlaces, tableConfig, setTableConfig 
         return { colDef: null, parentColDef: null };
     };
 
-    // Fungsi untuk mendapatkan dan memformat nilai sel
     const getCellValue = (item, columnDef, parentColumnDef = null) => {
         const fullKey = parentColumnDef ? parentColumnDef.key + columnDef.key : columnDef.key;
 
@@ -378,11 +380,8 @@ const SmeReportTable = ({ data = [], decimalPlaces, tableConfig, setTableConfig 
         return formatNumber(item[fullKey]);
     };
 
-    // Kalkulasi total untuk baris footer, menggunakan useMemo agar tidak dihitung ulang setiap render
     const totals = useMemo(() => {
         const initialTotals = {};
-        if (!data || !tableConfig) return initialTotals;
-
         tableConfig.forEach(group => {
             group.columns.forEach(col => {
                 if (col.subColumns) {
@@ -399,9 +398,8 @@ const SmeReportTable = ({ data = [], decimalPlaces, tableConfig, setTableConfig 
             });
         });
         return initialTotals;
-    }, [data, tableConfig]); // Bergantung pada data dan konfigurasi tabel
+    }, [data, tableConfig]);
 
-    // Fungsi utama untuk menangani akhir dari proses drag-and-drop
     const handleDragEnd = (event) => {
         const { active, over } = event;
         if (!over || active.id === over.id) return;
@@ -409,18 +407,16 @@ const SmeReportTable = ({ data = [], decimalPlaces, tableConfig, setTableConfig 
         const activeType = active.data.current?.type;
         const overType = over.data.current?.type;
 
-        // Logika untuk memindahkan Grup Utama
         if (activeType === 'group' && overType === 'group') {
             setTableConfig((config) => {
                 const oldIndex = config.findIndex(g => g.groupTitle === active.id);
                 const newIndex = config.findIndex(g => g.groupTitle === over.id);
                 return arrayMove(config, oldIndex, newIndex);
             });
-        }
-        // Logika untuk memindahkan Kolom di dalam Grup yang sama
-        else if (activeType === 'column' && overType === 'column') {
+        } else if (activeType === 'column' && overType === 'column') {
             const parentGroupTitle = active.data.current?.parentGroupTitle;
             const overParentGroupTitle = over.data.current?.parentGroupTitle;
+
             if (parentGroupTitle !== overParentGroupTitle) return;
 
             setTableConfig((config) => {
@@ -441,12 +437,17 @@ const SmeReportTable = ({ data = [], decimalPlaces, tableConfig, setTableConfig 
                 return newConfig;
             });
         }
-        // Logika untuk memindahkan Sub-Kolom di dalam Kolom yang sama
+        // [NEW] Add this 'else if' block to handle sub-column dragging
         else if (activeType === 'sub-column' && overType === 'sub-column') {
-            const { parentGroupTitle, parentColumnKey } = active.data.current;
-            const { parentGroupTitle: overParentGroupTitle, parentColumnKey: overParentColumnKey } = over.data.current;
+            const parentGroupTitle = active.data.current?.parentGroupTitle;
+            const overParentGroupTitle = over.data.current?.parentGroupTitle;
+            const parentColumnKey = active.data.current?.parentColumnKey;
+            const overParentColumnKey = over.data.current?.parentColumnKey;
 
-            if (parentGroupTitle !== overParentGroupTitle || parentColumnKey !== overParentColumnKey) return;
+            // Only allow reordering within the same parent column (e.g., within 'N' or 'O')
+            if (parentGroupTitle !== overParentGroupTitle || parentColumnKey !== overParentColumnKey) {
+                return;
+            }
 
             setTableConfig((config) => {
                 const newConfig = JSON.parse(JSON.stringify(config));
@@ -466,12 +467,12 @@ const SmeReportTable = ({ data = [], decimalPlaces, tableConfig, setTableConfig 
                 if (oldIndex !== -1 && newIndex !== -1) {
                     parentCol.subColumns = arrayMove(parentCol.subColumns, oldIndex, newIndex);
                 }
+
                 return newConfig;
             });
         }
     };
 
-    // Komponen internal untuk membuat header bisa di-drag
     const DraggableHeaderCell = ({ group }) => {
         const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: group.groupTitle, data: { type: 'group' } });
         const style = { transform: CSS.Transform.toString(transform), transition };
@@ -503,7 +504,7 @@ const SmeReportTable = ({ data = [], decimalPlaces, tableConfig, setTableConfig 
         const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
             id: uniqueId,
             data: {
-                type: 'sub-column',
+                type: 'sub-column', // A new type to identify these headers
                 parentGroupTitle: group.groupTitle,
                 parentColumnKey: col.key
             }
@@ -511,30 +512,30 @@ const SmeReportTable = ({ data = [], decimalPlaces, tableConfig, setTableConfig 
         const style = { transform: CSS.Transform.toString(transform), transition };
 
         return (
-            <th ref={setNodeRef} style={style} {...attributes} {...listeners} key={uniqueId} className={`border p-1 ${group.subColumnClass || 'bg-gray-600'} cursor-grab`}>
+            <th
+                ref={setNodeRef}
+                style={style}
+                {...attributes}
+                {...listeners}
+                key={uniqueId}
+                className={`border p-1 ${group.subColumnClass || 'bg-gray-600'} cursor-grab`}
+            >
                 {subCol.title}
             </th>
         );
     };
-
-    // Tampilan jika konfigurasi belum siap
-    if (!tableConfig || tableConfig.length === 0) {
-        return <div>Memuat konfigurasi tabel...</div>;
-    }
 
     return (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <div className="overflow-x-auto text-xs">
                 <table className="w-full border-collapse text-center">
                     <thead className="bg-gray-800 text-white">
-                        {/* Baris 1: Grup Utama */}
                         <tr>
                             <th className="border p-2 align-middle" rowSpan={3}>WILAYAH TELKOM</th>
                             <SortableContext items={tableConfig.map(g => g.groupTitle)} strategy={horizontalListSortingStrategy}>
                                 {tableConfig.map(group => <DraggableHeaderCell key={group.groupTitle} group={group} />)}
                             </SortableContext>
                         </tr>
-                        {/* Baris 2: Kolom Induk */}
                         <tr className="font-semibold">
                             {tableConfig.map(group => (
                                 <SortableContext key={`${group.groupTitle}-cols`} items={group.columns.map(c => `${group.groupTitle}.${c.key}`)} strategy={horizontalListSortingStrategy}>
@@ -544,14 +545,23 @@ const SmeReportTable = ({ data = [], decimalPlaces, tableConfig, setTableConfig 
                                 </SortableContext>
                             ))}
                         </tr>
-                        {/* Baris 3: Sub-Kolom */}
                         <tr className="font-medium">
                             {tableConfig.map(group =>
                                 group.columns.map(col =>
                                     col.subColumns ? (
-                                        <SortableContext key={`${group.groupTitle}-${col.key}-subcols`} items={col.subColumns.map(sc => `${group.groupTitle}.${col.key}.${sc.key}`)} strategy={horizontalListSortingStrategy}>
+                                        // Each set of sub-columns gets its own SortableContext
+                                        <SortableContext
+                                            key={`${group.groupTitle}-${col.key}-subcols`}
+                                            items={col.subColumns.map(sc => `${group.groupTitle}.${col.key}.${sc.key}`)}
+                                            strategy={horizontalListSortingStrategy}
+                                        >
                                             {col.subColumns.map(subCol => (
-                                                <DraggableSubColumnHeader key={subCol.key} group={group} col={col} subCol={subCol} />
+                                                <DraggableSubColumnHeader
+                                                    key={subCol.key}
+                                                    group={group}
+                                                    col={col}
+                                                    subCol={subCol}
+                                                />
                                             ))}
                                         </SortableContext>
                                     ) : null
@@ -560,7 +570,6 @@ const SmeReportTable = ({ data = [], decimalPlaces, tableConfig, setTableConfig 
                         </tr>
                     </thead>
                     <tbody>
-                        {/* Baris Data */}
                         {data.length > 0 ? data.map(item => (
                             <tr key={item.nama_witel} className="bg-white hover:bg-gray-50 text-black">
                                 <td className="border p-2 font-semibold text-left">{item.nama_witel}</td>
@@ -583,7 +592,6 @@ const SmeReportTable = ({ data = [], decimalPlaces, tableConfig, setTableConfig 
                         )) : (
                             <tr><td colSpan={100} className="text-center p-4 border text-gray-500">Tidak ada data.</td></tr>
                         )}
-                        {/* Baris Grand Total */}
                         <tr className="font-bold text-white">
                             <td className="border p-2 text-left bg-gray-800">GRAND TOTAL</td>
                             {tableConfig.map(group =>
@@ -651,6 +659,8 @@ const InProgressTable = ({ dataPaginator = { data: [], links: [], from: 0 } }) =
 const CompleteTable = ({ dataPaginator = { data: [], links: [] } }) => {
     const handleSetInProgress = (orderId) => { if (confirm(`Anda yakin ingin mengembalikan Order ID ${orderId} ke status "In Progress"?`)) { router.put(route('complete.update.progress', { documentData: orderId }), {}, { preserveScroll: true, onSuccess: () => router.reload({ preserveState: false }) }); } };
     const handleSetCancel = (orderId) => { if (confirm(`Anda yakin ingin mengubah status Order ID ${orderId} menjadi "Cancel"?`)) { router.put(route('complete.update.cancel', { documentData: orderId }), {}, { preserveScroll: true, onSuccess: () => router.reload({ preserveState: false }) }); } };
+
+    // [TAMBAHKAN] Fungsi baru untuk mengirim order ke QC
     const handleSetQc = (orderId) => {
         if (confirm(`Anda yakin ingin mengirim Order ID ${orderId} kembali ke proses QC? Status WFM akan dikosongkan.`)) {
             router.put(route('complete.update.qc', { documentData: orderId }), {}, { preserveScroll: true, onSuccess: () => router.reload({ preserveState: false }) });
@@ -674,7 +684,10 @@ const CompleteTable = ({ dataPaginator = { data: [], links: [] } }) => {
                                 <td className="p-3 text-center">
                                     <div className="flex justify-center items-center gap-2">
                                         <button onClick={() => handleSetInProgress(item.order_id)} className="px-3 py-1 text-xs font-bold text-white bg-blue-500 rounded-md hover:bg-blue-600">Ke In Progress</button>
+
+                                        {/* [TAMBAHKAN] Tombol baru "Kirim ke QC" */}
                                         <button onClick={() => handleSetQc(item.order_id)} className="px-3 py-1 text-xs font-bold text-white bg-yellow-500 rounded-md hover:bg-yellow-600">Kirim ke QC</button>
+
                                         <button onClick={() => handleSetCancel(item.order_id)} className="px-3 py-1 text-xs font-bold text-white bg-red-500 rounded-md hover:bg-red-600">Ke Cancel</button>
                                     </div>
                                 </td>
@@ -688,7 +701,9 @@ const CompleteTable = ({ dataPaginator = { data: [], links: [] } }) => {
     );
 };
 
+// GANTI SELURUH KOMPONEN QcTable ANDA DENGAN INI
 const QcTable = ({ dataPaginator = { data: [], links: [], from: 0 } }) => {
+    // ... (fungsi-fungsi handler Anda biarkan sama)
     const handleSetInProgress = (orderId) => { if (confirm(`Kembalikan Order ID ${orderId} ke "In Progress"?`)) { router.put(route('qc.update.progress', { order_id: orderId }), {}, { preserveScroll: true, onSuccess: () => router.reload({ preserveState: false }) }); } };
     const handleSetDone = (orderId) => { if (confirm(`Ubah status Order ID ${orderId} menjadi "Done Close Bima"?`)) { router.put(route('qc.update.done', { order_id: orderId }), {}, { preserveScroll: true, onSuccess: () => router.reload({ preserveState: false }) }); } };
     const handleSetCancel = (orderId) => { if (confirm(`Ubah status Order ID ${orderId} menjadi "Done Close Cancel"?`)) { router.put(route('qc.update.cancel', { order_id: orderId }), {}, { preserveScroll: true, onSuccess: () => router.reload({ preserveState: false }) }); } };
@@ -699,20 +714,12 @@ const QcTable = ({ dataPaginator = { data: [], links: [], from: 0 } }) => {
                 <p className="text-gray-500 mb-2">Menampilkan data order yang sedang dalam proses Quality Control (QC).</p>
                 <table className="w-full">
                     <thead className="bg-gray-50">
-                        <tr className="text-left font-semibold text-gray-600">
-                            <th className="p-3">No.</th>
-                            <th className="p-3">Milestone</th>
-                            <th className="p-3">Order ID</th>
-                            <th className="p-3">Product</th>
-                            <th className="p-3">Witel</th>
-                            <th className="p-3">Customer Name</th>
-                            <th className="p-3">Updated At</th>
-                            <th className="p-3 text-center">Actions</th>
-                        </tr>
+                        {/* ... (kode thead Anda) ... */}
                     </thead>
                     <tbody className="divide-y bg-white">
                         {dataPaginator.data.length > 0 ? dataPaginator.data.map((item, index) => (
-                            <tr key={item.id} className="text-gray-700 hover:bg-gray-50"> {/* [FIX] Menambahkan key yang unik */}
+                            // [FIX] Tambahkan key={item.id} yang unik pada elemen <tr>
+                            <tr key={item.id} className="text-gray-700 hover:bg-gray-50">
                                 <td className="p-3">{dataPaginator.from + index}</td>
                                 <td className="p-3">{item.milestone}</td>
                                 <td className="p-3 font-mono">{item.order_id}</td>
@@ -737,7 +744,8 @@ const QcTable = ({ dataPaginator = { data: [], links: [], from: 0 } }) => {
     );
 };
 
-const HistoryTable = ({ historyData = { data: [], links: [] } }) => {
+// GANTI SELURUH KOMPONEN HistoryTable ANDA DENGAN INI
+const HistoryTable = ({ historyData = { data: [], links: [] } }) => { // <-- Menerima objek historyData
     const formatDateFull = (dateString) => {
         if (!dateString) return '-';
         return new Date(dateString).toLocaleString('id-ID', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -762,6 +770,7 @@ const HistoryTable = ({ historyData = { data: [], links: [] } }) => {
                     </tr>
                 </thead>
                 <tbody className="divide-y bg-white">
+                    {/* Mengakses array .data dari historyData */}
                     {historyData.data.length > 0 ? historyData.data.map((item) => (
                         <tr key={item.id} className="text-gray-700 hover:bg-gray-50">
                             <td className="p-3 font-semibold">{formatDateFull(item.created_at)}</td><td className="p-3 font-mono">{item.order_id}</td><td className="p-3">{item.customer_name}</td><td className="p-3">{item.nama_witel}</td><td className="p-3"><StatusChip text={item.status_lama} /></td><td className="p-3"><StatusChip text={item.status_baru} /></td><td className="p-3 font-medium text-gray-600">{item.sumber_update}</td>
@@ -800,7 +809,8 @@ const KpiTable = ({ data = [], accountOfficers = [], openModal }) => {
                     </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                    {data && data.filter(Boolean).map((po) => (
+                    {/* [FIX] Tambahkan .filter(Boolean) untuk membuang data null sebelum mapping */}
+                    {data.filter(Boolean).map((po) => (
                         <tr key={po.nama_po} className="hover:bg-gray-50">
                             <td className="px-4 py-2 whitespace-nowrap border font-medium">{po.nama_po}</td>
                             <td className="px-4 py-2 whitespace-nowrap border">{po.witel}</td>
@@ -881,22 +891,15 @@ const TableConfigurator = ({ tableConfig, setTableConfig, currentSegment }) => {
         return columns;
     }, [tableConfig]);
 
-    // Effect 1: Hanya untuk menyinkronkan state internal saat tableConfig dari parent berubah.
     useEffect(() => {
-        if (tableConfig.length > 0) {
-            const currentGroupExists = tableConfig.some(g => g.groupTitle === editGroup.title);
-            if (!currentGroupExists) {
-                setEditGroup({ title: tableConfig[0].groupTitle, className: tableConfig[0].groupClass || '' });
-            }
-            const currentFormGroupExists = tableConfig.some(g => g.groupTitle === formState.groupTitle);
-            if (!currentFormGroupExists) {
-                setFormState(prev => ({ ...prev, groupTitle: tableConfig[0].groupTitle }));
-            }
+        const currentGroupExists = tableConfig.some(g => g.groupTitle === editGroup.title);
+        if (!currentGroupExists && tableConfig.length > 0) {
+            setEditGroup({ title: tableConfig[0].groupTitle, className: tableConfig[0].groupClass || '' });
         }
-    }, [tableConfig]); // Hanya bergantung pada tableConfig
-
-    // Effect 2: Hanya untuk mengatur nilai default dropdown "hapus kolom".
-    useEffect(() => {
+        const currentFormGroupExists = tableConfig.some(g => g.groupTitle === formState.groupTitle);
+        if (!currentFormGroupExists && tableConfig.length > 0) {
+            setFormState(prev => ({ ...prev, groupTitle: tableConfig[0].groupTitle }));
+        }
         if (allColumnsList.length > 0) {
             const selectionExists = allColumnsList.some(c => c.value === columnToDelete);
             if (!selectionExists) {
@@ -905,28 +908,16 @@ const TableConfigurator = ({ tableConfig, setTableConfig, currentSegment }) => {
         } else {
             setColumnToDelete('');
         }
-    }, [allColumnsList]); // Hanya bergantung pada allColumnsList
-
-    // Effect 3: Membersihkan form edit jika kolom yang dipilih dihapus
-    useEffect(() => {
-        if (columnToEdit) {
-            const selectionExists = allColumnsList.some(c => c.value === columnToEdit);
-            if (!selectionExists) {
-                setColumnToEdit('');
-                setEditFormState(null);
-            }
-        }
-    }, [allColumnsList, columnToEdit]);
+    }, [tableConfig, allColumnsList, columnToDelete, editGroup.title, formState.groupTitle]);
 
     const handleResetConfig = () => {
         if (confirm("Anda yakin ingin mengembalikan tampilan tabel ke pengaturan awal? Semua kolom tambahan, urutan, dan perubahan warna akan hilang.")) {
-            const pageName = `analysis_digital_${currentSegment.toLowerCase()}`;
-            router.post(route('analysisDigitalProduct.resetConfig'), {
-                page_name: pageName
-            }, {
-                preserveScroll: true,
-                onSuccess: () => window.location.reload()
-            });
+            // Buat kunci dinamis berdasarkan segmen yang aktif
+            const storageKey = `userTableConfig_${currentSegment}`;
+            // Hapus kunci yang benar dari localStorage
+            localStorage.removeItem(storageKey);
+            // Muat ulang halaman
+            window.location.reload();
         }
     };
 
@@ -973,14 +964,33 @@ const TableConfigurator = ({ tableConfig, setTableConfig, currentSegment }) => {
         }
     };
 
+    const handleOperandChange = (index, value) => {
+        setFormState(prev => {
+            const newOperands = [...(prev.operands || [])];
+            newOperands[index] = value;
+            return { ...prev, operands: newOperands };
+        });
+    };
+
+    const handleCheckboxOperandChange = (checked, value) => {
+        setFormState(prev => {
+            const currentOperands = prev.operands || [];
+            if (checked) {
+                return { ...prev, operands: [...currentOperands, value] };
+            } else {
+                return { ...prev, operands: currentOperands.filter(op => op !== value) };
+            }
+        });
+    };
+
     const handleSubmit = (e) => {
         e.preventDefault();
         if (formState.mode === 'group-column') {
             const newGroupObject = {
                 groupTitle: formState.columnTitle,
                 groupClass: 'bg-purple-600',
-                columnClass: 'bg-purple-500',
-                subColumnClass: 'bg-purple-400',
+                columnClass: 'bg-purple-500', // Warna turunan default
+                subColumnClass: 'bg-purple-400', // Warna turunan default
                 columns: [{
                     key: `_${formState.initialSubColumnTitle.toLowerCase().replace(/\s+/g, '_')}`,
                     title: formState.initialSubColumnTitle,
@@ -1025,17 +1035,27 @@ const TableConfigurator = ({ tableConfig, setTableConfig, currentSegment }) => {
         }
     };
 
+    /**
+     * Menyesuaikan tingkat kecerahan dari kelas warna Tailwind.
+     * @param {string} className - Kelas CSS input, e.g., 'bg-blue-600'.
+     * @param {number} amount - Jumlah yang akan ditambah/dikurangi, e.g., -100.
+     * @returns {string} Kelas CSS baru atau kelas asli jika tidak valid.
+     */
     const adjustTailwindColor = (className, amount) => {
         if (typeof className !== 'string') return className;
+
         const match = className.match(/(bg|text|border)-(\w+)-(\d{2,3})/);
         if (match) {
             const [, prefix, color, brightnessStr] = match;
             const brightness = parseInt(brightnessStr, 10);
             let newBrightness = brightness + amount;
+
+            // Pastikan nilai tetap dalam rentang valid Tailwind (50-950)
             newBrightness = Math.max(50, Math.min(950, newBrightness));
+
             return `${prefix}-${color}-${newBrightness}`;
         }
-        return className;
+        return className; // Kembalikan kelas asli jika format tidak cocok
     };
 
     const handleSaveColor = () => {
@@ -1086,6 +1106,7 @@ const TableConfigurator = ({ tableConfig, setTableConfig, currentSegment }) => {
         });
     };
 
+    // [NEW] Function to handle saving changes to a column
     const handleSaveChanges = (e) => {
         e.preventDefault();
         if (!columnToEdit || !editFormState) {
@@ -1115,6 +1136,17 @@ const TableConfigurator = ({ tableConfig, setTableConfig, currentSegment }) => {
         } else {
             alert("Gagal menemukan kolom untuk diupdate.");
         }
+    };
+
+    const handleSaveChangesToServer = () => {
+        const pageName = `analysis_digital_${currentSegment.toLowerCase()}`;
+        router.post(route('analysisDigitalProduct.saveConfig'), {
+            configuration: tableConfig,
+            page_name: pageName,
+        }, {
+            preserveScroll: true,
+            onSuccess: () => alert('Tampilan tabel berhasil disimpan ke server!')
+        });
     };
 
     const renderOperandInputs = (form, setForm, availableCols) => {
@@ -1263,6 +1295,9 @@ const TableConfigurator = ({ tableConfig, setTableConfig, currentSegment }) => {
                             <div>
                                 <div className="flex justify-between items-center border-b pb-2 mb-4">
                                     <h4 className="font-semibold text-md text-gray-800">Opsi Tampilan</h4>
+                                    <button onClick={handleSaveChangesToServer} className="text-xs text-blue-600 hover:underline font-semibold">
+                                        Simpan Tampilan
+                                    </button>
                                     <button onClick={handleResetConfig} className="text-xs text-red-600 hover:underline font-semibold">Reset Tampilan</button>
                                 </div>
                                 <div className="space-y-4">
@@ -1357,15 +1392,18 @@ const TableConfigurator = ({ tableConfig, setTableConfig, currentSegment }) => {
     );
 };
 
-// [FIX] Memindahkan definisi template ke atas
 const smeTableConfigTemplate = [
+    // In Progress (Tetap Sama)
     {
         groupTitle: 'In Progress', groupClass: 'bg-blue-600', columnClass: 'bg-blue-400',
         columns: [
-            { key: 'in_progress_n', title: 'N' }, { key: 'in_progress_o', title: 'O' },
-            { key: 'in_progress_ae', title: 'AE' }, { key: 'in_progress_ps', title: 'PS' }
+            { key: 'in_progress_n', title: 'N' },
+            { key: 'in_progress_o', title: 'O' },
+            { key: 'in_progress_ae', title: 'AE' },
+            { key: 'in_progress_ps', title: 'PS' }
         ]
     },
+    // Prov Comp (Urutan diubah menjadi T, R, P)
     {
         groupTitle: 'Prov Comp', groupClass: 'bg-orange-600', columnClass: 'bg-orange-400', subColumnClass: 'bg-orange-300',
         columns: [
@@ -1375,6 +1413,7 @@ const smeTableConfigTemplate = [
             { key: 'prov_comp_ps', title: 'PS', subColumns: [{ key: '_target', title: 'T' }, { key: '_realisasi', title: 'R' }, { key: '_percent', title: 'P', type: 'calculation', calculation: { operation: 'percentage', operands: ['prov_comp_ps_realisasi', 'prov_comp_ps_target'] } }] }
         ]
     },
+    // REVENUE (Urutan diubah menjadi ACH, T)
     {
         groupTitle: 'REVENUE (Rp Juta)', groupClass: 'bg-green-700', columnClass: 'bg-green-500', subColumnClass: 'bg-green-300',
         columns: [
@@ -1461,6 +1500,7 @@ const CustomTargetForm = ({ tableConfig, witelList, initialData, period, segment
                     {customTargetColumns.map(col => (
                         <fieldset key={col.key} className="border rounded-md p-3">
                             <legend className="text-base font-semibold px-2">{col.title}</legend>
+                            {/* [FIX] Kelas grid diubah agar lebih rapi */}
                             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-2">
                                 {witelList.map(witel => (
                                     <div key={witel}>
@@ -1490,6 +1530,9 @@ const CustomTargetForm = ({ tableConfig, witelList, initialData, period, segment
 // ===================================================================
 // Main Page Component
 // ===================================================================
+// ===================================================================
+// Main Page Component
+// ===================================================================
 // GANTI SELURUH FUNGSI KOMPONEN UTAMA ANDA DENGAN INI
 export default function AnalysisDigitalProduct({
     auth,
@@ -1509,40 +1552,54 @@ export default function AnalysisDigitalProduct({
     errors: pageErrors = {},
     customTargets = {}
 }) {
-    const [isExporting, setIsExporting] = useState(false);
-    const { props } = usePage();
-    console.log("1. Prop dari Server (savedTableConfig):", savedTableConfig);
 
-    const [tableConfig, setTableConfig] = useState(() => {
-        const storageKey = `analysis_digital_config_${currentSegment}`;
-        try {
-            const savedConfig = localStorage.getItem(storageKey);
-            if (savedConfig && savedConfig !== 'undefined') {
-                console.log("SUCCESS: Memuat konfigurasi dari localStorage.");
-                return JSON.parse(savedConfig);
-            }
-        } catch (e) {
-            console.error("ERROR: Gagal membaca config dari localStorage, akan dihapus.", e);
-            localStorage.removeItem(storageKey);
-        }
+    // [FIX 1: PENYEDERHANAAN INISIALISASI STATE]
+    // Inisialisasi state dengan template default. Ini hanya sebagai nilai awal
+    // untuk mencegah error pada render pertama. Nilai sebenarnya akan diatur oleh useEffect di bawah.
+    const [tableConfig, setTableConfig] = useState(smeTableConfigTemplate);
 
-        // Jika tidak ada di localStorage, gunakan template default.
-        console.log("INFO: Tidak ada di localStorage, memuat dari template default.");
-        return currentSegment === 'SME' ? smeTableConfigTemplate : legsTableConfigTemplate;
-    });
-
-    // Langkah 2: useEffect ini HANYA untuk MENYIMPAN ke localStorage.
+    // [FIX 2: LOGIKA MEMUAT SAAT SEGMENT BERUBAH (Kode Anda sudah benar)]
+    // Efek ini akan berjalan setiap kali `currentSegment` berubah (misal dari SME ke LEGS).
+    // Tujuannya adalah memuat konfigurasi yang benar dari localStorage atau template.
     useEffect(() => {
-        const storageKey = `analysis_digital_config_${currentSegment}`;
-        try {
-            if (tableConfig && tableConfig.length > 0) {
-                localStorage.setItem(storageKey, JSON.stringify(tableConfig));
-                console.log("SUCCESS: Konfigurasi disimpan ke localStorage.");
+        const storageKey = `userTableConfig_${currentSegment}`;
+        const savedConfigString = localStorage.getItem(storageKey);
+
+        if (savedConfigString) {
+            try {
+                const savedConfig = JSON.parse(savedConfigString);
+                setTableConfig(savedConfig);
+                console.log(`Config loaded from localStorage for segment: ${currentSegment}`);
+            } catch (e) {
+                console.error("Failed to parse saved config, using default.", e);
+                setTableConfig(currentSegment === 'LEGS' ? legsTableConfigTemplate : smeTableConfigTemplate);
             }
-        } catch (e) {
-            console.error("ERROR: Gagal menyimpan config ke localStorage", e);
+        } else {
+            // Jika tidak ada di localStorage, gunakan template default yang sesuai.
+            // Ini juga menangani kasus jika ada konfigurasi dari server, tapi user belum pernah mengubahnya.
+            const serverConfig = (typeof savedTableConfig === 'string') ? JSON.parse(savedTableConfig || 'null') : savedTableConfig;
+            if (serverConfig) {
+                setTableConfig(serverConfig);
+                console.log(`Config loaded from server props for segment: ${currentSegment}`);
+            } else {
+                setTableConfig(currentSegment === 'LEGS' ? legsTableConfigTemplate : smeTableConfigTemplate);
+                console.log(`Using default template for segment: ${currentSegment}`);
+            }
         }
-    }, [tableConfig, currentSegment]);
+    }, [currentSegment, savedTableConfig]); // Dijalankan saat segmen berubah atau data dari server berubah
+
+    // [FIX 3: LOGIKA MENYIMPAN PERUBAHAN (BAGIAN YANG HILANG)]
+    // Efek ini akan berjalan setiap kali `tableConfig` berubah (misalnya setelah drag-and-drop).
+    // Tujuannya adalah menyimpan konfigurasi terbaru ke localStorage.
+    useEffect(() => {
+        // Pastikan tableConfig tidak kosong untuk menghindari penyimpanan state yang tidak valid.
+        if (tableConfig && tableConfig.length > 0) {
+            const storageKey = `userTableConfig_${currentSegment}`;
+            localStorage.setItem(storageKey, JSON.stringify(tableConfig));
+            console.log(`Config saved to localStorage for segment: ${currentSegment}`);
+        }
+    }, [tableConfig]); // Hanya dijalankan saat `tableConfig` itu sendiri berubah.
+
 
     const [activeDetailView, setActiveDetailView] = useState('inprogress');
     const [search, setSearch] = useState(filters.search || '');
@@ -1551,69 +1608,46 @@ export default function AnalysisDigitalProduct({
 
     const witelList = ['BALI', 'JATIM BARAT', 'JATIM TIMUR', 'NUSA TENGGARA', 'SURAMADU'];
 
-    // [FIX UTAMA] useEffect menjadi SATU-SATUNYA sumber kebenaran
-    // untuk data dari server (props).
-    // useEffect(() => {
-    //     const defaultConfig = currentSegment === 'SME' ? smeTableConfigTemplate : legsTableConfigTemplate;
-    //     if (savedTableConfig) {
-    //         try {
-    //             const parsedConfig = typeof savedTableConfig === 'string'
-    //                 ? JSON.parse(savedTableConfig)
-    //                 : savedTableConfig;
+    const handleExportReport = () => {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = route('analysisDigitalProduct.export.report');
+        form.style.display = 'none';
 
-    //             if (Array.isArray(parsedConfig) && parsedConfig.length > 0) {
-    //                 // Hanya update jika konfigurasi dari server berbeda dengan yang sedang ditampilkan
-    //                 if (JSON.stringify(parsedConfig) !== JSON.stringify(tableConfig)) {
-    //                     setTableConfig(parsedConfig);
-    //                 }
-    //             }
-    //         } catch (e) {
-    //             console.error("Gagal parse savedTableConfig:", e);
-    //             setTableConfig(defaultConfig);
-    //         }
-    //     } else {
-    //         setTableConfig(defaultConfig);
-    //     }
-    // }, [savedTableConfig, currentSegment]);
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        const csrfInput = document.createElement('input');
+        csrfInput.type = 'hidden';
+        csrfInput.name = '_token';
+        csrfInput.value = csrfToken;
+        form.appendChild(csrfInput);
 
-    const handleExportReport = async () => {
-        setIsExporting(true);
-        try {
-            const response = await axios.post(route('analysisDigitalProduct.export.report'), {
-                segment: currentSegment,
-                period: period,
-                details: JSON.stringify(detailsTotals),
-                table_config: JSON.stringify(tableConfig),
-            }, {
-                responseType: 'blob',
-            });
+        const segmentInput = document.createElement('input');
+        segmentInput.type = 'hidden';
+        segmentInput.name = 'segment';
+        segmentInput.value = currentSegment;
+        form.appendChild(segmentInput);
 
-            const url = window.URL.createObjectURL(new Blob([response.data]));
-            const link = document.createElement('a');
-            link.href = url;
+        const periodInput = document.createElement('input');
+        periodInput.type = 'hidden';
+        periodInput.name = 'period';
+        periodInput.value = period;
+        form.appendChild(periodInput);
 
-            const contentDisposition = response.headers['content-disposition'];
-            let fileName = 'data-report.xlsx';
-            if (contentDisposition) {
-                const fileNameMatch = contentDisposition.match(/filename="(.+)"/);
-                if (fileNameMatch && fileNameMatch.length === 2) {
-                    fileName = fileNameMatch[1];
-                }
-            }
+        const detailsInput = document.createElement('input');
+        detailsInput.type = 'hidden';
+        detailsInput.name = 'details';
+        detailsInput.value = JSON.stringify(detailsTotals);
+        form.appendChild(detailsInput);
 
-            link.setAttribute('download', fileName);
-            document.body.appendChild(link);
-            link.click();
+        const configInput = document.createElement('input');
+        configInput.type = 'hidden';
+        configInput.name = 'table_config';
+        configInput.value = JSON.stringify(tableConfig);
+        form.appendChild(configInput);
 
-            link.parentNode.removeChild(link);
-            window.URL.revokeObjectURL(url);
-
-        } catch (error) {
-            console.error('Gagal mengekspor file:', error);
-            alert('Terjadi kesalahan saat mencoba mengekspor file. Silakan coba lagi.');
-        } finally {
-            setIsExporting(false);
-        }
+        document.body.appendChild(form);
+        form.submit();
+        document.body.removeChild(form);
     };
 
     const [progressStates, setProgressStates] = useState({ mentah: null, complete: null, cancel: null });
@@ -1632,13 +1666,11 @@ export default function AnalysisDigitalProduct({
 
         if (batchId && jobType && progressStates[jobType] === null) {
             setProgressStates(prev => ({ ...prev, [jobType]: 0 }));
-
             const interval = setInterval(() => {
                 axios.get(route('import.progress', { batchId }))
                     .then(response => {
                         const progress = response.data.progress;
                         setProgressStates(prev => ({ ...prev, [jobType]: progress }));
-
                         if (progress >= 100) {
                             clearInterval(interval);
                             setTimeout(() => {
@@ -1655,7 +1687,6 @@ export default function AnalysisDigitalProduct({
                         cleanUrl();
                     });
             }, 2000);
-
             return () => clearInterval(interval);
         }
     }, []);
@@ -1667,14 +1698,16 @@ export default function AnalysisDigitalProduct({
     const submitCompleteFile = (e) => {
         e.preventDefault();
         postComplete(route('analysisDigitalProduct.uploadComplete'), {
-            onSuccess: () => completeReset('complete_document'),
+            onSuccess: () => {
+                completeReset('complete_document');
+            },
         });
     };
 
     const submitCancelFile = (e) => {
         e.preventDefault();
         postCancel(route('analysisDigitalProduct.uploadCancel'), {
-            onSuccess: () => cancelReset('cancel_document'),
+            onSuccess: () => cancelReset('cancel_document')
         });
     };
 
@@ -1682,22 +1715,14 @@ export default function AnalysisDigitalProduct({
         if (confirm('Anda yakin ingin menjalankan sinkronisasi data order complete?')) {
             router.post(route('analysisDigitalProduct.syncCompletedOrders'), {}, {
                 preserveScroll: true,
-                onStart: () => toast.loading('Memulai sinkronisasi complete...'),
-                onSuccess: (page) => {
-                    toast.dismiss();
-                    const { success, error, info } = page.props.flash;
-                    if (success) toast.success(success);
-                    if (error) toast.error(error);
-                    if (info) toast.info(info);
-                },
-                onError: () => {
-                    toast.dismiss();
-                    toast.error('Terjadi kesalahan saat menghubungi server.');
-                }
             });
         }
     };
-    const handleSyncCancelClick = () => { if (confirm('Anda yakin ingin menjalankan proses sinkronisasi untuk mengubah status order menjadi CANCEL?')) { router.post(route('analysisDigitalProduct.syncCancel'), {}, { preserveScroll: true }); } };
+    const handleSyncCancelClick = () => {
+        if (confirm('Anda yakin ingin menjalankan proses sinkronisasi untuk mengubah status order menjadi CANCEL?')) {
+            router.post(route('analysisDigitalProduct.syncCancel'), {}, { preserveScroll: true });
+        }
+    };
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingAgent, setEditingAgent] = useState(null);
@@ -1779,7 +1804,6 @@ export default function AnalysisDigitalProduct({
         const options = [];
         let date = new Date();
         date.setDate(1);
-
         for (let i = 0; i < 24; i++) {
             const year = date.getFullYear();
             const month = (date.getMonth() + 1).toString().padStart(2, '0');
@@ -1813,7 +1837,7 @@ export default function AnalysisDigitalProduct({
         }
     };
 
-    console.log("3. State tableConfig saat render:", tableConfig);
+    // ... sisa dari komponen Anda (return statement) tidak perlu diubah ...
     return (
         <AuthenticatedLayout auth={auth} header="Analysis Digital Product">
             <Head title="Analysis Digital Product" />
@@ -1852,12 +1876,7 @@ export default function AnalysisDigitalProduct({
                                 </select>
                             </div>
                         </div>
-                        <SmeReportTable
-                            data={reportData}
-                            decimalPlaces={decimalPlaces}
-                            tableConfig={tableConfig}
-                            setTableConfig={setTableConfig}
-                        />
+                        <SmeReportTable data={reportData} decimalPlaces={decimalPlaces} tableConfig={tableConfig} setTableConfig={setTableConfig} />
                     </div>
 
                     <div className="bg-white p-6 rounded-lg shadow-md">
@@ -1894,7 +1913,6 @@ export default function AnalysisDigitalProduct({
                                         <option value="">Semua Witel</option>
                                         {witelList.map(w => <option key={w} value={w}>{w}</option>)}
                                     </select>
-
                                     <select
                                         value={currentInProgressYear}
                                         onChange={handleInProgressYearChange}
@@ -1902,7 +1920,6 @@ export default function AnalysisDigitalProduct({
                                     >
                                         {generateYearOptions()}
                                     </select>
-
                                     <a
                                         href={exportUrl}
                                         className="px-3 py-2 text-sm font-bold text-white bg-green-600 rounded-md hover:bg-green-700"

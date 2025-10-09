@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react'; // [FIX] useRef digabung di sini
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, useForm, usePage, router, Link } from '@inertiajs/react';
 import InputLabel from '@/Components/InputLabel';
@@ -9,6 +9,8 @@ import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, us
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, horizontalListSortingStrategy } from '@dnd-kit/sortable';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { debounce } from 'lodash';
+// import toast from 'react-hot-toast'; // [FIX] Menambahkan impor untuk notifikasi toast
 
 // ===================================================================
 // Helper & Utility Components
@@ -177,14 +179,11 @@ const EditReportForm = ({ currentSegment, reportData, period }) => {
                             {witelList.map(witel => (
                                 <div key={`${witel}-prov`} className="mb-3">
                                     <h4 className="font-bold text-gray-600">{witel}</h4>
-
-                                    {/* TAMBAHKAN LABEL DI SINI */}
                                     <div className="grid grid-cols-4 gap-2 mt-2 mb-1 px-1">
                                         {products.map(p => (
                                             <label key={p.key} className="text-xs font-semibold text-gray-500">{p.label}</label>
                                         ))}
                                     </div>
-
                                     <div className="grid grid-cols-4 gap-2">
                                         {products.map(p => (
                                             <input
@@ -207,8 +206,6 @@ const EditReportForm = ({ currentSegment, reportData, period }) => {
                         {witelList.map(witel => (
                             <div key={`${witel}-rev`} className="mb-3">
                                 <h4 className="font-bold text-gray-600">{witel}</h4>
-
-                                {/* TAMBAHKAN LABEL DI SINI JUGA */}
                                 <div className="grid grid-cols-4 gap-2 mt-2 mb-1 px-1">
                                     {products.map(p => (
                                         <label key={p.key} className="text-xs font-semibold text-gray-500">{p.label}</label>
@@ -327,6 +324,7 @@ const AgentFormModal = ({ isOpen, onClose, agent }) => {
 const SmeReportTable = ({ data = [], decimalPlaces, tableConfig, setTableConfig }) => {
     const sensors = useSensors(useSensor(PointerSensor), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
 
+    // Fungsi untuk mencari definisi kolom, dibutuhkan untuk kalkulasi
     const findColumnDefinition = (keyToFind) => {
         for (const group of tableConfig) {
             for (const col of group.columns) {
@@ -343,6 +341,7 @@ const SmeReportTable = ({ data = [], decimalPlaces, tableConfig, setTableConfig 
         return { colDef: null, parentColDef: null };
     };
 
+    // Fungsi untuk mendapatkan dan memformat nilai sel
     const getCellValue = (item, columnDef, parentColumnDef = null) => {
         const fullKey = parentColumnDef ? parentColumnDef.key + columnDef.key : columnDef.key;
 
@@ -379,8 +378,11 @@ const SmeReportTable = ({ data = [], decimalPlaces, tableConfig, setTableConfig 
         return formatNumber(item[fullKey]);
     };
 
+    // Kalkulasi total untuk baris footer, menggunakan useMemo agar tidak dihitung ulang setiap render
     const totals = useMemo(() => {
         const initialTotals = {};
+        if (!data || !tableConfig) return initialTotals;
+
         tableConfig.forEach(group => {
             group.columns.forEach(col => {
                 if (col.subColumns) {
@@ -397,8 +399,9 @@ const SmeReportTable = ({ data = [], decimalPlaces, tableConfig, setTableConfig 
             });
         });
         return initialTotals;
-    }, [data, tableConfig]);
+    }, [data, tableConfig]); // Bergantung pada data dan konfigurasi tabel
 
+    // Fungsi utama untuk menangani akhir dari proses drag-and-drop
     const handleDragEnd = (event) => {
         const { active, over } = event;
         if (!over || active.id === over.id) return;
@@ -406,16 +409,18 @@ const SmeReportTable = ({ data = [], decimalPlaces, tableConfig, setTableConfig 
         const activeType = active.data.current?.type;
         const overType = over.data.current?.type;
 
+        // Logika untuk memindahkan Grup Utama
         if (activeType === 'group' && overType === 'group') {
             setTableConfig((config) => {
                 const oldIndex = config.findIndex(g => g.groupTitle === active.id);
                 const newIndex = config.findIndex(g => g.groupTitle === over.id);
                 return arrayMove(config, oldIndex, newIndex);
             });
-        } else if (activeType === 'column' && overType === 'column') {
+        }
+        // Logika untuk memindahkan Kolom di dalam Grup yang sama
+        else if (activeType === 'column' && overType === 'column') {
             const parentGroupTitle = active.data.current?.parentGroupTitle;
             const overParentGroupTitle = over.data.current?.parentGroupTitle;
-
             if (parentGroupTitle !== overParentGroupTitle) return;
 
             setTableConfig((config) => {
@@ -436,17 +441,12 @@ const SmeReportTable = ({ data = [], decimalPlaces, tableConfig, setTableConfig 
                 return newConfig;
             });
         }
-        // [NEW] Add this 'else if' block to handle sub-column dragging
+        // Logika untuk memindahkan Sub-Kolom di dalam Kolom yang sama
         else if (activeType === 'sub-column' && overType === 'sub-column') {
-            const parentGroupTitle = active.data.current?.parentGroupTitle;
-            const overParentGroupTitle = over.data.current?.parentGroupTitle;
-            const parentColumnKey = active.data.current?.parentColumnKey;
-            const overParentColumnKey = over.data.current?.parentColumnKey;
+            const { parentGroupTitle, parentColumnKey } = active.data.current;
+            const { parentGroupTitle: overParentGroupTitle, parentColumnKey: overParentColumnKey } = over.data.current;
 
-            // Only allow reordering within the same parent column (e.g., within 'N' or 'O')
-            if (parentGroupTitle !== overParentGroupTitle || parentColumnKey !== overParentColumnKey) {
-                return;
-            }
+            if (parentGroupTitle !== overParentGroupTitle || parentColumnKey !== overParentColumnKey) return;
 
             setTableConfig((config) => {
                 const newConfig = JSON.parse(JSON.stringify(config));
@@ -466,12 +466,12 @@ const SmeReportTable = ({ data = [], decimalPlaces, tableConfig, setTableConfig 
                 if (oldIndex !== -1 && newIndex !== -1) {
                     parentCol.subColumns = arrayMove(parentCol.subColumns, oldIndex, newIndex);
                 }
-
                 return newConfig;
             });
         }
     };
 
+    // Komponen internal untuk membuat header bisa di-drag
     const DraggableHeaderCell = ({ group }) => {
         const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: group.groupTitle, data: { type: 'group' } });
         const style = { transform: CSS.Transform.toString(transform), transition };
@@ -503,7 +503,7 @@ const SmeReportTable = ({ data = [], decimalPlaces, tableConfig, setTableConfig 
         const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
             id: uniqueId,
             data: {
-                type: 'sub-column', // A new type to identify these headers
+                type: 'sub-column',
                 parentGroupTitle: group.groupTitle,
                 parentColumnKey: col.key
             }
@@ -511,30 +511,30 @@ const SmeReportTable = ({ data = [], decimalPlaces, tableConfig, setTableConfig 
         const style = { transform: CSS.Transform.toString(transform), transition };
 
         return (
-            <th
-                ref={setNodeRef}
-                style={style}
-                {...attributes}
-                {...listeners}
-                key={uniqueId}
-                className={`border p-1 ${group.subColumnClass || 'bg-gray-600'} cursor-grab`}
-            >
+            <th ref={setNodeRef} style={style} {...attributes} {...listeners} key={uniqueId} className={`border p-1 ${group.subColumnClass || 'bg-gray-600'} cursor-grab`}>
                 {subCol.title}
             </th>
         );
     };
+
+    // Tampilan jika konfigurasi belum siap
+    if (!tableConfig || tableConfig.length === 0) {
+        return <div>Memuat konfigurasi tabel...</div>;
+    }
 
     return (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <div className="overflow-x-auto text-xs">
                 <table className="w-full border-collapse text-center">
                     <thead className="bg-gray-800 text-white">
+                        {/* Baris 1: Grup Utama */}
                         <tr>
                             <th className="border p-2 align-middle" rowSpan={3}>WILAYAH TELKOM</th>
                             <SortableContext items={tableConfig.map(g => g.groupTitle)} strategy={horizontalListSortingStrategy}>
                                 {tableConfig.map(group => <DraggableHeaderCell key={group.groupTitle} group={group} />)}
                             </SortableContext>
                         </tr>
+                        {/* Baris 2: Kolom Induk */}
                         <tr className="font-semibold">
                             {tableConfig.map(group => (
                                 <SortableContext key={`${group.groupTitle}-cols`} items={group.columns.map(c => `${group.groupTitle}.${c.key}`)} strategy={horizontalListSortingStrategy}>
@@ -544,23 +544,14 @@ const SmeReportTable = ({ data = [], decimalPlaces, tableConfig, setTableConfig 
                                 </SortableContext>
                             ))}
                         </tr>
+                        {/* Baris 3: Sub-Kolom */}
                         <tr className="font-medium">
                             {tableConfig.map(group =>
                                 group.columns.map(col =>
                                     col.subColumns ? (
-                                        // Each set of sub-columns gets its own SortableContext
-                                        <SortableContext
-                                            key={`${group.groupTitle}-${col.key}-subcols`}
-                                            items={col.subColumns.map(sc => `${group.groupTitle}.${col.key}.${sc.key}`)}
-                                            strategy={horizontalListSortingStrategy}
-                                        >
+                                        <SortableContext key={`${group.groupTitle}-${col.key}-subcols`} items={col.subColumns.map(sc => `${group.groupTitle}.${col.key}.${sc.key}`)} strategy={horizontalListSortingStrategy}>
                                             {col.subColumns.map(subCol => (
-                                                <DraggableSubColumnHeader
-                                                    key={subCol.key}
-                                                    group={group}
-                                                    col={col}
-                                                    subCol={subCol}
-                                                />
+                                                <DraggableSubColumnHeader key={subCol.key} group={group} col={col} subCol={subCol} />
                                             ))}
                                         </SortableContext>
                                     ) : null
@@ -569,6 +560,7 @@ const SmeReportTable = ({ data = [], decimalPlaces, tableConfig, setTableConfig 
                         </tr>
                     </thead>
                     <tbody>
+                        {/* Baris Data */}
                         {data.length > 0 ? data.map(item => (
                             <tr key={item.nama_witel} className="bg-white hover:bg-gray-50 text-black">
                                 <td className="border p-2 font-semibold text-left">{item.nama_witel}</td>
@@ -591,6 +583,7 @@ const SmeReportTable = ({ data = [], decimalPlaces, tableConfig, setTableConfig 
                         )) : (
                             <tr><td colSpan={100} className="text-center p-4 border text-gray-500">Tidak ada data.</td></tr>
                         )}
+                        {/* Baris Grand Total */}
                         <tr className="font-bold text-white">
                             <td className="border p-2 text-left bg-gray-800">GRAND TOTAL</td>
                             {tableConfig.map(group =>
@@ -658,8 +651,6 @@ const InProgressTable = ({ dataPaginator = { data: [], links: [], from: 0 } }) =
 const CompleteTable = ({ dataPaginator = { data: [], links: [] } }) => {
     const handleSetInProgress = (orderId) => { if (confirm(`Anda yakin ingin mengembalikan Order ID ${orderId} ke status "In Progress"?`)) { router.put(route('complete.update.progress', { documentData: orderId }), {}, { preserveScroll: true, onSuccess: () => router.reload({ preserveState: false }) }); } };
     const handleSetCancel = (orderId) => { if (confirm(`Anda yakin ingin mengubah status Order ID ${orderId} menjadi "Cancel"?`)) { router.put(route('complete.update.cancel', { documentData: orderId }), {}, { preserveScroll: true, onSuccess: () => router.reload({ preserveState: false }) }); } };
-
-    // [TAMBAHKAN] Fungsi baru untuk mengirim order ke QC
     const handleSetQc = (orderId) => {
         if (confirm(`Anda yakin ingin mengirim Order ID ${orderId} kembali ke proses QC? Status WFM akan dikosongkan.`)) {
             router.put(route('complete.update.qc', { documentData: orderId }), {}, { preserveScroll: true, onSuccess: () => router.reload({ preserveState: false }) });
@@ -683,10 +674,7 @@ const CompleteTable = ({ dataPaginator = { data: [], links: [] } }) => {
                                 <td className="p-3 text-center">
                                     <div className="flex justify-center items-center gap-2">
                                         <button onClick={() => handleSetInProgress(item.order_id)} className="px-3 py-1 text-xs font-bold text-white bg-blue-500 rounded-md hover:bg-blue-600">Ke In Progress</button>
-
-                                        {/* [TAMBAHKAN] Tombol baru "Kirim ke QC" */}
                                         <button onClick={() => handleSetQc(item.order_id)} className="px-3 py-1 text-xs font-bold text-white bg-yellow-500 rounded-md hover:bg-yellow-600">Kirim ke QC</button>
-
                                         <button onClick={() => handleSetCancel(item.order_id)} className="px-3 py-1 text-xs font-bold text-white bg-red-500 rounded-md hover:bg-red-600">Ke Cancel</button>
                                     </div>
                                 </td>
@@ -700,12 +688,10 @@ const CompleteTable = ({ dataPaginator = { data: [], links: [] } }) => {
     );
 };
 
-// GANTI SELURUH KOMPONEN QcTable ANDA DENGAN INI
 const QcTable = ({ dataPaginator = { data: [], links: [], from: 0 } }) => {
-    // ... (fungsi-fungsi handler Anda biarkan sama)
-    const handleSetInProgress = (orderId) => { /* ... */ };
-    const handleSetDone = (orderId) => { /* ... */ };
-    const handleSetCancel = (orderId) => { /* ... */ };
+    const handleSetInProgress = (orderId) => { if (confirm(`Kembalikan Order ID ${orderId} ke "In Progress"?`)) { router.put(route('qc.update.progress', { order_id: orderId }), {}, { preserveScroll: true, onSuccess: () => router.reload({ preserveState: false }) }); } };
+    const handleSetDone = (orderId) => { if (confirm(`Ubah status Order ID ${orderId} menjadi "Done Close Bima"?`)) { router.put(route('qc.update.done', { order_id: orderId }), {}, { preserveScroll: true, onSuccess: () => router.reload({ preserveState: false }) }); } };
+    const handleSetCancel = (orderId) => { if (confirm(`Ubah status Order ID ${orderId} menjadi "Done Close Cancel"?`)) { router.put(route('qc.update.cancel', { order_id: orderId }), {}, { preserveScroll: true, onSuccess: () => router.reload({ preserveState: false }) }); } };
 
     return (
         <>
@@ -713,12 +699,20 @@ const QcTable = ({ dataPaginator = { data: [], links: [], from: 0 } }) => {
                 <p className="text-gray-500 mb-2">Menampilkan data order yang sedang dalam proses Quality Control (QC).</p>
                 <table className="w-full">
                     <thead className="bg-gray-50">
-                        {/* ... (kode thead Anda) ... */}
+                        <tr className="text-left font-semibold text-gray-600">
+                            <th className="p-3">No.</th>
+                            <th className="p-3">Milestone</th>
+                            <th className="p-3">Order ID</th>
+                            <th className="p-3">Product</th>
+                            <th className="p-3">Witel</th>
+                            <th className="p-3">Customer Name</th>
+                            <th className="p-3">Updated At</th>
+                            <th className="p-3 text-center">Actions</th>
+                        </tr>
                     </thead>
                     <tbody className="divide-y bg-white">
                         {dataPaginator.data.length > 0 ? dataPaginator.data.map((item, index) => (
-                            // [FIX] Tambahkan key={item.id} yang unik pada elemen <tr>
-                            <tr key={item.id} className="text-gray-700 hover:bg-gray-50">
+                            <tr key={item.id} className="text-gray-700 hover:bg-gray-50"> {/* [FIX] Menambahkan key yang unik */}
                                 <td className="p-3">{dataPaginator.from + index}</td>
                                 <td className="p-3">{item.milestone}</td>
                                 <td className="p-3 font-mono">{item.order_id}</td>
@@ -743,8 +737,7 @@ const QcTable = ({ dataPaginator = { data: [], links: [], from: 0 } }) => {
     );
 };
 
-// GANTI SELURUH KOMPONEN HistoryTable ANDA DENGAN INI
-const HistoryTable = ({ historyData = { data: [], links: [] } }) => { // <-- Menerima objek historyData
+const HistoryTable = ({ historyData = { data: [], links: [] } }) => {
     const formatDateFull = (dateString) => {
         if (!dateString) return '-';
         return new Date(dateString).toLocaleString('id-ID', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -769,7 +762,6 @@ const HistoryTable = ({ historyData = { data: [], links: [] } }) => { // <-- Men
                     </tr>
                 </thead>
                 <tbody className="divide-y bg-white">
-                    {/* Mengakses array .data dari historyData */}
                     {historyData.data.length > 0 ? historyData.data.map((item) => (
                         <tr key={item.id} className="text-gray-700 hover:bg-gray-50">
                             <td className="p-3 font-semibold">{formatDateFull(item.created_at)}</td><td className="p-3 font-mono">{item.order_id}</td><td className="p-3">{item.customer_name}</td><td className="p-3">{item.nama_witel}</td><td className="p-3"><StatusChip text={item.status_lama} /></td><td className="p-3"><StatusChip text={item.status_baru} /></td><td className="p-3 font-medium text-gray-600">{item.sumber_update}</td>
@@ -808,8 +800,7 @@ const KpiTable = ({ data = [], accountOfficers = [], openModal }) => {
                     </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                    {/* [FIX] Tambahkan .filter(Boolean) untuk membuang data null sebelum mapping */}
-                    {data.filter(Boolean).map((po) => (
+                    {data && data.filter(Boolean).map((po) => (
                         <tr key={po.nama_po} className="hover:bg-gray-50">
                             <td className="px-4 py-2 whitespace-nowrap border font-medium">{po.nama_po}</td>
                             <td className="px-4 py-2 whitespace-nowrap border">{po.witel}</td>
@@ -890,15 +881,22 @@ const TableConfigurator = ({ tableConfig, setTableConfig, currentSegment }) => {
         return columns;
     }, [tableConfig]);
 
+    // Effect 1: Hanya untuk menyinkronkan state internal saat tableConfig dari parent berubah.
     useEffect(() => {
-        const currentGroupExists = tableConfig.some(g => g.groupTitle === editGroup.title);
-        if (!currentGroupExists && tableConfig.length > 0) {
-            setEditGroup({ title: tableConfig[0].groupTitle, className: tableConfig[0].groupClass || '' });
+        if (tableConfig.length > 0) {
+            const currentGroupExists = tableConfig.some(g => g.groupTitle === editGroup.title);
+            if (!currentGroupExists) {
+                setEditGroup({ title: tableConfig[0].groupTitle, className: tableConfig[0].groupClass || '' });
+            }
+            const currentFormGroupExists = tableConfig.some(g => g.groupTitle === formState.groupTitle);
+            if (!currentFormGroupExists) {
+                setFormState(prev => ({ ...prev, groupTitle: tableConfig[0].groupTitle }));
+            }
         }
-        const currentFormGroupExists = tableConfig.some(g => g.groupTitle === formState.groupTitle);
-        if (!currentFormGroupExists && tableConfig.length > 0) {
-            setFormState(prev => ({ ...prev, groupTitle: tableConfig[0].groupTitle }));
-        }
+    }, [tableConfig]); // Hanya bergantung pada tableConfig
+
+    // Effect 2: Hanya untuk mengatur nilai default dropdown "hapus kolom".
+    useEffect(() => {
         if (allColumnsList.length > 0) {
             const selectionExists = allColumnsList.some(c => c.value === columnToDelete);
             if (!selectionExists) {
@@ -907,16 +905,28 @@ const TableConfigurator = ({ tableConfig, setTableConfig, currentSegment }) => {
         } else {
             setColumnToDelete('');
         }
-    }, [tableConfig, allColumnsList, columnToDelete, editGroup.title, formState.groupTitle]);
+    }, [allColumnsList]); // Hanya bergantung pada allColumnsList
+
+    // Effect 3: Membersihkan form edit jika kolom yang dipilih dihapus
+    useEffect(() => {
+        if (columnToEdit) {
+            const selectionExists = allColumnsList.some(c => c.value === columnToEdit);
+            if (!selectionExists) {
+                setColumnToEdit('');
+                setEditFormState(null);
+            }
+        }
+    }, [allColumnsList, columnToEdit]);
 
     const handleResetConfig = () => {
         if (confirm("Anda yakin ingin mengembalikan tampilan tabel ke pengaturan awal? Semua kolom tambahan, urutan, dan perubahan warna akan hilang.")) {
-            // Buat kunci dinamis berdasarkan segmen yang aktif
-            const storageKey = `userTableConfig_${currentSegment}`;
-            // Hapus kunci yang benar dari localStorage
-            localStorage.removeItem(storageKey);
-            // Muat ulang halaman
-            window.location.reload();
+            const pageName = `analysis_digital_${currentSegment.toLowerCase()}`;
+            router.post(route('analysisDigitalProduct.resetConfig'), {
+                page_name: pageName
+            }, {
+                preserveScroll: true,
+                onSuccess: () => window.location.reload()
+            });
         }
     };
 
@@ -963,33 +973,14 @@ const TableConfigurator = ({ tableConfig, setTableConfig, currentSegment }) => {
         }
     };
 
-    const handleOperandChange = (index, value) => {
-        setFormState(prev => {
-            const newOperands = [...(prev.operands || [])];
-            newOperands[index] = value;
-            return { ...prev, operands: newOperands };
-        });
-    };
-
-    const handleCheckboxOperandChange = (checked, value) => {
-        setFormState(prev => {
-            const currentOperands = prev.operands || [];
-            if (checked) {
-                return { ...prev, operands: [...currentOperands, value] };
-            } else {
-                return { ...prev, operands: currentOperands.filter(op => op !== value) };
-            }
-        });
-    };
-
     const handleSubmit = (e) => {
         e.preventDefault();
         if (formState.mode === 'group-column') {
             const newGroupObject = {
                 groupTitle: formState.columnTitle,
                 groupClass: 'bg-purple-600',
-                columnClass: 'bg-purple-500', // Warna turunan default
-                subColumnClass: 'bg-purple-400', // Warna turunan default
+                columnClass: 'bg-purple-500',
+                subColumnClass: 'bg-purple-400',
                 columns: [{
                     key: `_${formState.initialSubColumnTitle.toLowerCase().replace(/\s+/g, '_')}`,
                     title: formState.initialSubColumnTitle,
@@ -1034,27 +1025,17 @@ const TableConfigurator = ({ tableConfig, setTableConfig, currentSegment }) => {
         }
     };
 
-    /**
-     * Menyesuaikan tingkat kecerahan dari kelas warna Tailwind.
-     * @param {string} className - Kelas CSS input, e.g., 'bg-blue-600'.
-     * @param {number} amount - Jumlah yang akan ditambah/dikurangi, e.g., -100.
-     * @returns {string} Kelas CSS baru atau kelas asli jika tidak valid.
-     */
     const adjustTailwindColor = (className, amount) => {
         if (typeof className !== 'string') return className;
-
         const match = className.match(/(bg|text|border)-(\w+)-(\d{2,3})/);
         if (match) {
             const [, prefix, color, brightnessStr] = match;
             const brightness = parseInt(brightnessStr, 10);
             let newBrightness = brightness + amount;
-
-            // Pastikan nilai tetap dalam rentang valid Tailwind (50-950)
             newBrightness = Math.max(50, Math.min(950, newBrightness));
-
             return `${prefix}-${color}-${newBrightness}`;
         }
-        return className; // Kembalikan kelas asli jika format tidak cocok
+        return className;
     };
 
     const handleSaveColor = () => {
@@ -1105,7 +1086,6 @@ const TableConfigurator = ({ tableConfig, setTableConfig, currentSegment }) => {
         });
     };
 
-    // [NEW] Function to handle saving changes to a column
     const handleSaveChanges = (e) => {
         e.preventDefault();
         if (!columnToEdit || !editFormState) {
@@ -1305,53 +1285,53 @@ const TableConfigurator = ({ tableConfig, setTableConfig, currentSegment }) => {
                                     </div>
                                 </div>
                                 <div>
-                                        <h5 className="font-semibold text-sm text-gray-700 pt-4 border-t">Edit Kolom</h5>
-                                        <div className="space-y-4 mt-4">
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700">Pilih Kolom untuk Diedit</label>
-                                                <select value={columnToEdit} onChange={handleSelectColumnToEdit} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm" disabled={allColumnsList.length === 0}>
-                                                    <option value="">-- Pilih Kolom --</option>
-                                                    {allColumnsList.map(col => <option key={col.value} value={col.value}>{col.label}</option>)}
-                                                </select>
-                                            </div>
-                                            {editFormState && (
-                                                <form onSubmit={handleSaveChanges} className="p-4 border rounded-md bg-gray-50 space-y-4">
-                                                    <div>
-                                                        <label className="block text-sm font-medium text-gray-700">Nama Kolom</label>
-                                                        <input
-                                                            type="text"
-                                                            value={editFormState.title}
-                                                            onChange={e => setEditFormState(prev => ({ ...prev, title: e.target.value }))}
-                                                            className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
-                                                            required
-                                                        />
-                                                    </div>
-                                                    {editFormState.type === 'calculation' && (
-                                                        <div className="pt-4 border-t space-y-4">
-                                                            <div>
-                                                                <label className="block text-sm font-medium text-gray-700">Operasi Kalkulasi</label>
-                                                                <select
-                                                                    name="operation"
-                                                                    value={editFormState.operation}
-                                                                    onChange={e => setEditFormState(prev => ({ ...prev, operation: e.target.value, operands: [] }))}
-                                                                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
-                                                                >
-                                                                    <option value="sum">SUM (Jumlahkan)</option>
-                                                                    <option value="percentage">PERCENTAGE (Persentase)</option>
-                                                                    <option value="average">AVERAGE (Rata-rata)</option>
-                                                                    <option value="count">COUNT (Hitung Jumlah)</option>
-                                                                </select>
-                                                            </div>
-                                                            {renderOperandInputs(editFormState, setEditFormState, availableColumns)}
-                                                        </div>
-                                                    )}
-                                                    <div className="text-right">
-                                                        <PrimaryButton type="submit">Simpan Perubahan</PrimaryButton>
-                                                    </div>
-                                                </form>
-                                            )}
+                                    <h5 className="font-semibold text-sm text-gray-700 pt-4 border-t">Edit Kolom</h5>
+                                    <div className="space-y-4 mt-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700">Pilih Kolom untuk Diedit</label>
+                                            <select value={columnToEdit} onChange={handleSelectColumnToEdit} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm" disabled={allColumnsList.length === 0}>
+                                                <option value="">-- Pilih Kolom --</option>
+                                                {allColumnsList.map(col => <option key={col.value} value={col.value}>{col.label}</option>)}
+                                            </select>
                                         </div>
+                                        {editFormState && (
+                                            <form onSubmit={handleSaveChanges} className="p-4 border rounded-md bg-gray-50 space-y-4">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700">Nama Kolom</label>
+                                                    <input
+                                                        type="text"
+                                                        value={editFormState.title}
+                                                        onChange={e => setEditFormState(prev => ({ ...prev, title: e.target.value }))}
+                                                        className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
+                                                        required
+                                                    />
+                                                </div>
+                                                {editFormState.type === 'calculation' && (
+                                                    <div className="pt-4 border-t space-y-4">
+                                                        <div>
+                                                            <label className="block text-sm font-medium text-gray-700">Operasi Kalkulasi</label>
+                                                            <select
+                                                                name="operation"
+                                                                value={editFormState.operation}
+                                                                onChange={e => setEditFormState(prev => ({ ...prev, operation: e.target.value, operands: [] }))}
+                                                                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm"
+                                                            >
+                                                                <option value="sum">SUM (Jumlahkan)</option>
+                                                                <option value="percentage">PERCENTAGE (Persentase)</option>
+                                                                <option value="average">AVERAGE (Rata-rata)</option>
+                                                                <option value="count">COUNT (Hitung Jumlah)</option>
+                                                            </select>
+                                                        </div>
+                                                        {renderOperandInputs(editFormState, setEditFormState, availableColumns)}
+                                                    </div>
+                                                )}
+                                                <div className="text-right">
+                                                    <PrimaryButton type="submit">Simpan Perubahan</PrimaryButton>
+                                                </div>
+                                            </form>
+                                        )}
                                     </div>
+                                </div>
                             </div>
                             <div>
                                 <h5 className="font-semibold text-sm text-gray-700 pt-4 border-t">Hapus Kolom</h5>
@@ -1377,18 +1357,15 @@ const TableConfigurator = ({ tableConfig, setTableConfig, currentSegment }) => {
     );
 };
 
+// [FIX] Memindahkan definisi template ke atas
 const smeTableConfigTemplate = [
-    // In Progress (Tetap Sama)
     {
         groupTitle: 'In Progress', groupClass: 'bg-blue-600', columnClass: 'bg-blue-400',
         columns: [
-            { key: 'in_progress_n', title: 'N' },
-            { key: 'in_progress_o', title: 'O' },
-            { key: 'in_progress_ae', title: 'AE' },
-            { key: 'in_progress_ps', title: 'PS' }
+            { key: 'in_progress_n', title: 'N' }, { key: 'in_progress_o', title: 'O' },
+            { key: 'in_progress_ae', title: 'AE' }, { key: 'in_progress_ps', title: 'PS' }
         ]
     },
-    // Prov Comp (Urutan diubah menjadi T, R, P)
     {
         groupTitle: 'Prov Comp', groupClass: 'bg-orange-600', columnClass: 'bg-orange-400', subColumnClass: 'bg-orange-300',
         columns: [
@@ -1398,7 +1375,6 @@ const smeTableConfigTemplate = [
             { key: 'prov_comp_ps', title: 'PS', subColumns: [{ key: '_target', title: 'T' }, { key: '_realisasi', title: 'R' }, { key: '_percent', title: 'P', type: 'calculation', calculation: { operation: 'percentage', operands: ['prov_comp_ps_realisasi', 'prov_comp_ps_target'] } }] }
         ]
     },
-    // REVENUE (Urutan diubah menjadi ACH, T)
     {
         groupTitle: 'REVENUE (Rp Juta)', groupClass: 'bg-green-700', columnClass: 'bg-green-500', subColumnClass: 'bg-green-300',
         columns: [
@@ -1485,7 +1461,6 @@ const CustomTargetForm = ({ tableConfig, witelList, initialData, period, segment
                     {customTargetColumns.map(col => (
                         <fieldset key={col.key} className="border rounded-md p-3">
                             <legend className="text-base font-semibold px-2">{col.title}</legend>
-                            {/* [FIX] Kelas grid diubah agar lebih rapi */}
                             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-2">
                                 {witelList.map(witel => (
                                     <div key={witel}>
@@ -1515,8 +1490,10 @@ const CustomTargetForm = ({ tableConfig, witelList, initialData, period, segment
 // ===================================================================
 // Main Page Component
 // ===================================================================
+// GANTI SELURUH FUNGSI KOMPONEN UTAMA ANDA DENGAN INI
 export default function AnalysisDigitalProduct({
     auth,
+    savedTableConfig,
     reportData = [],
     currentSegment = 'SME',
     period = '',
@@ -1532,6 +1509,40 @@ export default function AnalysisDigitalProduct({
     errors: pageErrors = {},
     customTargets = {}
 }) {
+    const [isExporting, setIsExporting] = useState(false);
+    const { props } = usePage();
+    console.log("1. Prop dari Server (savedTableConfig):", savedTableConfig);
+
+    const [tableConfig, setTableConfig] = useState(() => {
+        const storageKey = `analysis_digital_config_${currentSegment}`;
+        try {
+            const savedConfig = localStorage.getItem(storageKey);
+            if (savedConfig && savedConfig !== 'undefined') {
+                console.log("SUCCESS: Memuat konfigurasi dari localStorage.");
+                return JSON.parse(savedConfig);
+            }
+        } catch (e) {
+            console.error("ERROR: Gagal membaca config dari localStorage, akan dihapus.", e);
+            localStorage.removeItem(storageKey);
+        }
+
+        // Jika tidak ada di localStorage, gunakan template default.
+        console.log("INFO: Tidak ada di localStorage, memuat dari template default.");
+        return currentSegment === 'SME' ? smeTableConfigTemplate : legsTableConfigTemplate;
+    });
+
+    // Langkah 2: useEffect ini HANYA untuk MENYIMPAN ke localStorage.
+    useEffect(() => {
+        const storageKey = `analysis_digital_config_${currentSegment}`;
+        try {
+            if (tableConfig && tableConfig.length > 0) {
+                localStorage.setItem(storageKey, JSON.stringify(tableConfig));
+                console.log("SUCCESS: Konfigurasi disimpan ke localStorage.");
+            }
+        } catch (e) {
+            console.error("ERROR: Gagal menyimpan config ke localStorage", e);
+        }
+    }, [tableConfig, currentSegment]);
 
     const [activeDetailView, setActiveDetailView] = useState('inprogress');
     const [search, setSearch] = useState(filters.search || '');
@@ -1540,100 +1551,85 @@ export default function AnalysisDigitalProduct({
 
     const witelList = ['BALI', 'JATIM BARAT', 'JATIM TIMUR', 'NUSA TENGGARA', 'SURAMADU'];
 
-    const handleExportReport = () => {
-        // 1. Buat elemen form secara dinamis
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = route('analysisDigitalProduct.export.report');
-        form.style.display = 'none'; // Sembunyikan form
+    // [FIX UTAMA] useEffect menjadi SATU-SATUNYA sumber kebenaran
+    // untuk data dari server (props).
+    // useEffect(() => {
+    //     const defaultConfig = currentSegment === 'SME' ? smeTableConfigTemplate : legsTableConfigTemplate;
+    //     if (savedTableConfig) {
+    //         try {
+    //             const parsedConfig = typeof savedTableConfig === 'string'
+    //                 ? JSON.parse(savedTableConfig)
+    //                 : savedTableConfig;
 
-        // 2. Buat input untuk CSRF token
-        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-        const csrfInput = document.createElement('input');
-        csrfInput.type = 'hidden';
-        csrfInput.name = '_token';
-        csrfInput.value = csrfToken;
-        form.appendChild(csrfInput);
+    //             if (Array.isArray(parsedConfig) && parsedConfig.length > 0) {
+    //                 // Hanya update jika konfigurasi dari server berbeda dengan yang sedang ditampilkan
+    //                 if (JSON.stringify(parsedConfig) !== JSON.stringify(tableConfig)) {
+    //                     setTableConfig(parsedConfig);
+    //                 }
+    //             }
+    //         } catch (e) {
+    //             console.error("Gagal parse savedTableConfig:", e);
+    //             setTableConfig(defaultConfig);
+    //         }
+    //     } else {
+    //         setTableConfig(defaultConfig);
+    //     }
+    // }, [savedTableConfig, currentSegment]);
 
-        // 3. Buat input untuk filter (segment & period)
-        const segmentInput = document.createElement('input');
-        segmentInput.type = 'hidden';
-        segmentInput.name = 'segment';
-        segmentInput.value = currentSegment;
-        form.appendChild(segmentInput);
+    const handleExportReport = async () => {
+        setIsExporting(true);
+        try {
+            const response = await axios.post(route('analysisDigitalProduct.export.report'), {
+                segment: currentSegment,
+                period: period,
+                details: JSON.stringify(detailsTotals),
+                table_config: JSON.stringify(tableConfig),
+            }, {
+                responseType: 'blob',
+            });
 
-        const periodInput = document.createElement('input');
-        periodInput.type = 'hidden';
-        periodInput.name = 'period';
-        periodInput.value = period;
-        form.appendChild(periodInput);
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
 
-        // 4. Buat input untuk data Details (Total, OGP, Closed)
-        const detailsInput = document.createElement('input');
-        detailsInput.type = 'hidden';
-        detailsInput.name = 'details';
-        // Ambil data dari 'detailsTotals' yang sudah Anda hitung
-        detailsInput.value = JSON.stringify(detailsTotals);
-        form.appendChild(detailsInput);
+            const contentDisposition = response.headers['content-disposition'];
+            let fileName = 'data-report.xlsx';
+            if (contentDisposition) {
+                const fileNameMatch = contentDisposition.match(/filename="(.+)"/);
+                if (fileNameMatch && fileNameMatch.length === 2) {
+                    fileName = fileNameMatch[1];
+                }
+            }
 
-        // 4.5 Buat input untuk konfigurasi tabel (kode ini sudah ada)
-        const configInput = document.createElement('input');
-        configInput.type = 'hidden';
-        configInput.name = 'table_config';
-        configInput.value = JSON.stringify(tableConfig); // Ubah state tableConfig menjadi string JSON
-        form.appendChild(configInput);
+            link.setAttribute('download', fileName);
+            document.body.appendChild(link);
+            link.click();
 
-        // 5. Tambahkan form ke body, submit, lalu hapus
-        document.body.appendChild(form);
-        form.submit();
-        document.body.removeChild(form);
+            link.parentNode.removeChild(link);
+            window.URL.revokeObjectURL(url);
+
+        } catch (error) {
+            console.error('Gagal mengekspor file:', error);
+            alert('Terjadi kesalahan saat mencoba mengekspor file. Silakan coba lagi.');
+        } finally {
+            setIsExporting(false);
+        }
     };
 
-    const tableConfigStorageKey = `userTableConfig_${currentSegment}`;
-
-    const [tableConfig, setTableConfig] = useState(
-        currentSegment === 'LEGS' ? legsTableConfigTemplate : smeTableConfigTemplate
-    );
-
-    useEffect(() => {
-        // Coba muat konfigurasi yang tersimpan untuk segmen saat ini
-        const savedConfig = localStorage.getItem(tableConfigStorageKey);
-
-        if (savedConfig) {
-            // Jika ada, gunakan konfigurasi yang tersimpan
-            setTableConfig(JSON.parse(savedConfig));
-        } else {
-            // Jika tidak ada, atur ke template default yang sesuai
-            setTableConfig(currentSegment === 'LEGS' ? legsTableConfigTemplate : smeTableConfigTemplate);
-        }
-    }, [currentSegment]);
-
-    useEffect(() => {
-        try {
-            localStorage.setItem(tableConfigStorageKey, JSON.stringify(tableConfig));
-        } catch (error) {
-            console.error("Gagal menyimpan konfigurasi ke localStorage:", error);
-        }
-    }, [tableConfig, tableConfigStorageKey]);
-
     const [progressStates, setProgressStates] = useState({ mentah: null, complete: null, cancel: null });
-    const { props: pageProps } = usePage();
+
     useEffect(() => {
-        // 1. Baca batch_id dan job_type dari parameter URL
         const urlParams = new URLSearchParams(window.location.search);
         const batchId = urlParams.get('batch_id');
         const jobType = urlParams.get('job_type');
 
-        // Fungsi untuk membersihkan URL setelah proses selesai
         const cleanUrl = () => {
             const currentUrl = new URL(window.location.href);
             currentUrl.searchParams.delete('batch_id');
             currentUrl.searchParams.delete('job_type');
-            // Ganti URL di history browser tanpa me-reload halaman
             window.history.replaceState({}, document.title, currentUrl.toString());
         };
 
-        // 2. Jalankan polling jika parameter ditemukan dan job belum berjalan
         if (batchId && jobType && progressStates[jobType] === null) {
             setProgressStates(prev => ({ ...prev, [jobType]: 0 }));
 
@@ -1647,7 +1643,7 @@ export default function AnalysisDigitalProduct({
                             clearInterval(interval);
                             setTimeout(() => {
                                 setProgressStates(prev => ({ ...prev, [jobType]: null }));
-                                cleanUrl(); // Bersihkan URL sebelum reload
+                                cleanUrl();
                                 router.reload({ preserveState: false, preserveScroll: true });
                             }, 2000);
                         }
@@ -1656,11 +1652,10 @@ export default function AnalysisDigitalProduct({
                         console.error("Gagal mengambil progres job:", error);
                         clearInterval(interval);
                         setProgressStates(prev => ({ ...prev, [jobType]: null }));
-                        cleanUrl(); // Bersihkan URL jika terjadi error
+                        cleanUrl();
                     });
             }, 2000);
 
-            // Cleanup function jika komponen di-unmount sebelum job selesai
             return () => clearInterval(interval);
         }
     }, []);
@@ -1672,18 +1667,18 @@ export default function AnalysisDigitalProduct({
     const submitCompleteFile = (e) => {
         e.preventDefault();
         postComplete(route('analysisDigitalProduct.uploadComplete'), {
-            // forceFormData: true, // Opsi ini biasanya tidak perlu karena Inertia otomatis mendeteksi file
-            onSuccess: () => {
-                toast.success('File berhasil diunggah! Proses impor berjalan di latar belakang.');
-                completeReset('complete_document'); // Reset field input file saja
-            },
-            onError: () => {
-                toast.error('Gagal mengunggah file. Pastikan format sudah benar.');
-            }
+            onSuccess: () => completeReset('complete_document'),
         });
     };
 
-    const handleSyncCompleteClick = () => { // <-- NAMA DIGANTI
+    const submitCancelFile = (e) => {
+        e.preventDefault();
+        postCancel(route('analysisDigitalProduct.uploadCancel'), {
+            onSuccess: () => cancelReset('cancel_document'),
+        });
+    };
+
+    const handleSyncCompleteClick = () => {
         if (confirm('Anda yakin ingin menjalankan sinkronisasi data order complete?')) {
             router.post(route('analysisDigitalProduct.syncCompletedOrders'), {}, {
                 preserveScroll: true,
@@ -1702,7 +1697,6 @@ export default function AnalysisDigitalProduct({
             });
         }
     };
-    const submitCancelFile = (e) => { e.preventDefault(); postCancel(route('analysisDigitalProduct.uploadCancel'), { forceFormData: true, onSuccess: () => cancelReset() }); };
     const handleSyncCancelClick = () => { if (confirm('Anda yakin ingin menjalankan proses sinkronisasi untuk mengubah status order menjadi CANCEL?')) { router.post(route('analysisDigitalProduct.syncCancel'), {}, { preserveScroll: true }); } };
 
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -1719,7 +1713,7 @@ export default function AnalysisDigitalProduct({
             segment: currentSegment,
             period: period,
             in_progress_year: currentInProgressYear,
-            witel: selectedWitel, // Sertakan witel saat ini
+            witel: selectedWitel,
             ...newFilters
         };
 
@@ -1762,9 +1756,10 @@ export default function AnalysisDigitalProduct({
         }
         return `${route('analysisDigitalProduct.export.inprogress')}?${params.toString()}`;
     }, [currentSegment, currentInProgressYear, selectedWitel]);
+
     function handleWitelChange(e) {
         const newWitel = e.target.value;
-        setSelectedWitel(newWitel); // Menggunakan setter yang benar
+        setSelectedWitel(newWitel);
         handleFilterChange({ witel: newWitel, page: 1 });
     }
 
@@ -1782,7 +1777,6 @@ export default function AnalysisDigitalProduct({
 
     const generatePeriodOptions = () => {
         const options = [];
-        // Mulai dari tanggal 1 bulan ini untuk menghindari bug
         let date = new Date();
         date.setDate(1);
 
@@ -1791,10 +1785,7 @@ export default function AnalysisDigitalProduct({
             const month = (date.getMonth() + 1).toString().padStart(2, '0');
             const value = `${year}-${month}`;
             const label = date.toLocaleString('id-ID', { month: 'long', year: 'numeric' });
-
             options.push(<option key={value} value={value}>{label}</option>);
-
-            // Pindah ke tanggal 1 bulan sebelumnya
             date.setMonth(date.getMonth() - 1);
         }
         return options;
@@ -1822,6 +1813,7 @@ export default function AnalysisDigitalProduct({
         }
     };
 
+    console.log("3. State tableConfig saat render:", tableConfig);
     return (
         <AuthenticatedLayout auth={auth} header="Analysis Digital Product">
             <Head title="Analysis Digital Product" />
@@ -1831,14 +1823,12 @@ export default function AnalysisDigitalProduct({
 
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                 <div className="lg:col-span-3 space-y-6">
-                    {/* [DIKEMBALIKAN] Komponen Konfigurator Tabel */}
                     <TableConfigurator
                         tableConfig={tableConfig}
                         setTableConfig={setTableConfig}
                         currentSegment={currentSegment}
                     />
 
-                    {/* [DIKEMBALIKAN] Komponen Tabel Laporan Utama */}
                     <div className="bg-white p-6 rounded-lg shadow-md">
                         <div className="flex flex-wrap justify-between items-center mb-4 gap-4">
                             <h3 className="font-semibold text-lg text-gray-800">Data Report</h3>
@@ -1862,7 +1852,12 @@ export default function AnalysisDigitalProduct({
                                 </select>
                             </div>
                         </div>
-                        <SmeReportTable data={reportData} decimalPlaces={decimalPlaces} tableConfig={tableConfig} setTableConfig={setTableConfig} />
+                        <SmeReportTable
+                            data={reportData}
+                            decimalPlaces={decimalPlaces}
+                            tableConfig={tableConfig}
+                            setTableConfig={setTableConfig}
+                        />
                     </div>
 
                     <div className="bg-white p-6 rounded-lg shadow-md">
@@ -1891,7 +1886,6 @@ export default function AnalysisDigitalProduct({
                             )}
                             {activeDetailView === 'inprogress' && (
                                 <div className="flex items-center gap-2 flex-wrap">
-                                    {/* Filter Witel BARU */}
                                     <select
                                         value={selectedWitel}
                                         onChange={handleWitelChange}
@@ -1901,19 +1895,14 @@ export default function AnalysisDigitalProduct({
                                         {witelList.map(w => <option key={w} value={w}>{w}</option>)}
                                     </select>
 
-                                    {/* Filter Tahun yang sudah ada */}
                                     <select
                                         value={currentInProgressYear}
                                         onChange={handleInProgressYearChange}
                                         className="border border-gray-300 rounded-md text-sm p-2"
                                     >
-                                        {/* Panggil fungsi generateYearOptions di sini jika ada */}
-                                        <option value="2025">2025</option>
-                                        <option value="2024">2024</option>
-                                        <option value="2023">2023</option>
+                                        {generateYearOptions()}
                                     </select>
 
-                                    {/* Tombol Export yang sudah dinamis */}
                                     <a
                                         href={exportUrl}
                                         className="px-3 py-2 text-sm font-bold text-white bg-green-600 rounded-md hover:bg-green-700"
@@ -1924,15 +1913,12 @@ export default function AnalysisDigitalProduct({
                             )}
                             {activeDetailView === 'history' && (
                                 <div className="w-full md:w-auto flex items-center gap-2">
-                                    {/* Tombol Export Excel (menggunakan tag <a> untuk download) */}
                                     <a
                                         href={route('analysisDigitalProduct.export.history')}
                                         className="w-full px-4 py-2 text-sm font-bold text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none"
                                     >
                                         Export Excel
                                     </a>
-
-                                    {/* Tombol Kosongkan History yang sudah ada */}
                                     <button
                                         onClick={handleClearHistory}
                                         className="w-full px-4 py-2 text-sm font-bold text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none"
@@ -2005,9 +1991,6 @@ export default function AnalysisDigitalProduct({
                                     />
                                     {completeErrors.complete_document && <p className="text-red-500 text-xs mt-1">{completeErrors.complete_document}</p>}
                                 </div>
-
-                                {/* Progress bar tidak lagi diperlukan karena prosesnya sekarang sinkron/langsung */}
-
                                 <PrimaryButton
                                     type="submit"
                                     className="bg-green-600 hover:bg-green-700 focus:bg-green-700 active:bg-green-800"

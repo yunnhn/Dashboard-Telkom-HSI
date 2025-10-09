@@ -50,6 +50,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/galaksi', [GalaksiController::class, 'index'])->name('galaksi.index');
 
+    Route::post('/analysis-digital-product/save-config', [App\Http\Controllers\AnalysisDigitalProductController::class, 'saveTableConfig'])->name('analysisDigitalProduct.saveConfig');
+
+    Route::post('/analysis-digital-product/reset-config', [App\Http\Controllers\AnalysisDigitalProductController::class, 'resetTableConfig'])->name('analysisDigitalProduct.resetConfig');
+
+    Route::get('/analysis-digital-product/get-config', [App\Http\Controllers\AnalysisDigitalProductController::class, 'getTableConfig'])->name('analysisDigitalProduct.getConfig');
+
     /*
     |--------------------------------------------------------------------------
     | Rute HANYA untuk Admin & Superadmin

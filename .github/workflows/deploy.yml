@@ -1,64 +1,66 @@
-# Nama workflow yang akan muncul di tab Actions GitHub
-name: Build and Deploy Laravel React App
+# Nama workflow yang akan muncul di tab "Actions" GitHub
+name: Deploy Laravel to Production
 
-# Pemicu: Jalankan workflow ini setiap kali ada push ke branch 'master'
+# Kapan workflow ini dijalankan?
 on:
   push:
     branches:
-      - master
+      - master # Pastikan ini adalah branch utama Anda
 
+# Daftar pekerjaan (jobs) yang akan dilakukan
 jobs:
-  build-and-deploy:
-    # Menggunakan server virtual Ubuntu terbaru untuk menjalankan proses
+  build-and-deploy: # Nama job (sebelumnya 'deploy')
+    # Menggunakan server virtual Ubuntu terbaru dari GitHub
     runs-on: ubuntu-latest
 
+    # Langkah-langkah yang akan dieksekusi secara berurutan
     steps:
-      # Langkah 1: Mengambil kode dari repositori Anda
+      # 1. Mengambil kode dari repositori Anda
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
-      # 2. Setup PHP dengan versi yang sesuai
+      # 2. Setup PHP dan Composer
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: "8.2"
+          php-version: "8.2" # Sesuaikan dengan versi PHP Anda
           extensions: mbstring, dom, fileinfo, mysql
           coverage: none
-          tools: composer
+          tools: composer # <-- INI BAGIAN KUNCINYA
 
+      # 3. Install dependensi Composer
       - name: Install Composer Dependencies
         run: composer install --no-interaction --prefer-dist --no-dev --optimize-autoloader
 
-      # Langkah 3: Menyiapkan lingkungan Node.js untuk React
+      # 4. Setup Node.js untuk membangun aset frontend
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v3
         with:
-          node-version: "20" # Gunakan versi LTS atau yang sesuai dengan proyek Anda
+          node-version: "18" # Sesuaikan dengan versi Node.js Anda
 
-      # Langkah 4: Menginstal dependensi PHP (tanpa paket development)
-      - name: Install Composer dependencies
-        run: composer install --no-interaction --prefer-dist --no-dev --optimize-autoloader
+      # 5. Install dependensi NPM
+      - name: Install NPM dependencies
+        run: npm install
 
-      # Langkah 5: Menginstal dependensi Node.js dan membangun aset React
-      - name: Install NPM dependencies and Build
-        run: |
-          npm install
-          npm run build
+      # 6. Build aset frontend (CSS & JS)
+      - name: Build Frontend Assets
+        run: npm run build
 
-      # Langkah 6: Deploy file ke server Anda menggunakan SSH
+      # 7. Proses Deployment ke Server Anda menggunakan SSH
       - name: Deploy to Server
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: 22 # Ganti jika port SSH Anda berbeda
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT }}
           script: |
-            cd ${{ secrets.PATH }}
+            cd /var/www/LaravelReactTelkom
             php artisan down
-            git pull origin main
+            git pull origin master
             composer install --no-interaction --prefer-dist --no-dev --optimize-autoloader
             php artisan migrate --force
             php artisan optimize:clear
-            php artisan optimize
+            php artisan config:cache
+            php artisan route:cache
             php artisan up

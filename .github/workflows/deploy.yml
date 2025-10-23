@@ -1,0 +1,61 @@
+# Nama workflow yang akan muncul di tab Actions GitHub
+name: Build and Deploy Laravel React App
+
+# Pemicu: Jalankan workflow ini setiap kali ada push ke branch 'main'
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    # Menggunakan server virtual Ubuntu terbaru untuk menjalankan proses
+    runs-on: ubuntu-latest
+
+    steps:
+      # Langkah 1: Mengambil kode dari repositori Anda
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Langkah 2: Menyiapkan lingkungan PHP
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.2" # Pastikan versi ini sama dengan di server Anda
+          extensions: mbstring, xml, ctype, json, tokenizer, pdo, pdo_mysql
+          tools: composer:v2
+          coverage: none
+
+      # Langkah 3: Menyiapkan lingkungan Node.js untuk React
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20" # Gunakan versi LTS atau yang sesuai dengan proyek Anda
+
+      # Langkah 4: Menginstal dependensi PHP (tanpa paket development)
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist --no-dev --optimize-autoloader
+
+      # Langkah 5: Menginstal dependensi Node.js dan membangun aset React
+      - name: Install NPM dependencies and Build
+        run: |
+          npm install
+          npm run build
+
+      # Langkah 6: Deploy file ke server Anda menggunakan SSH
+      - name: Deploy to Server
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22 # Ganti jika port SSH Anda berbeda
+          script: |
+            cd ${{ secrets.PATH }}
+            php artisan down
+            git pull origin main
+            composer install --no-interaction --prefer-dist --no-dev --optimize-autoloader
+            php artisan migrate --force
+            php artisan optimize:clear
+            php artisan optimize
+            php artisan up

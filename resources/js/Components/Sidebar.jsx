@@ -107,6 +107,18 @@ const UserProfile = ({ user, isSidebarOpen }) => {
                                     <MdWifiTethering className="mr-3" size={16} /> Cek Konektivitas Google
                                 </button>
                             )}
+
+                            {user.role === 'superadmin' && ( // Atau sesuaikan dengan role yang diizinkan
+                                <Link
+                                    href={route('admin.merge-excel.create')}
+                                    className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                    onClick={() => setIsProfileOpen(false)}
+                                >
+                                    {/* Anda bisa menggunakan ikon lain jika mau */}
+                                    <MdAssessment className="mr-3" />
+                                    Merge Excel
+                                </Link>
+                            )}
                             {/* === AKHIR PERUBAHAN === */}
 
                             <Link href={route('profile.edit')} className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100" onClick={() => setIsProfileOpen(false)}>

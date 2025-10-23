@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AccountOfficerController;
+use App\Http\Controllers\Admin\ExcelMergeController;
 use App\Http\Controllers\AnalysisDigitalProductController;
 use App\Http\Controllers\DashboardDigitalProductController;
 use App\Http\Controllers\DataReportController;
@@ -28,6 +29,10 @@ Route::get('/google-drive-test', function () {
     // Gunakan Inertia::render untuk merender komponen React Anda
     return Inertia::render('Upload');
 })->name('google.drive.test');
+
+Route::get('/cek-php', function () {
+    phpinfo();
+});
 
 // --- RUTE YANG MEMERLUKAN AUTENTIKASI ---
 Route::middleware(['auth', 'verified'])->group(function () {
@@ -106,6 +111,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
             // Rute Resource untuk Account Officer (hanya store dan update)
             Route::resource('account-officers', AccountOfficerController::class)->only(['store', 'update']);
+
+            Route::get('/merge-excel', [ExcelMergeController::class, 'create'])->name('merge-excel.create');
+            Route::post('/merge-excel', [ExcelMergeController::class, 'merge'])->name('merge-excel.merge');
+
+            Route::get('/merge-excel/download', [ExcelMergeController::class, 'download'])->name('merge-excel.download');
+            Route::get('/merge-excel/download-url', [ExcelMergeController::class, 'getDownloadUrl'])->name('merge-excel.download-url');
         });
 
     /*

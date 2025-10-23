@@ -104,9 +104,9 @@ const UserProfile = ({ user, isSidebarOpen, onLogout }) => {
                             {/* === PERUBAHAN DI SINI === */}
                             {/* Tombol ini sekarang hanya muncul untuk superadmin */}
                             {user.role === 'superadmin' && (
-                                <button onClick={handleOpenConnectivityTool} className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                <Link href={route('tools.google-drive-test')} className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                                     <MdWifiTethering className="mr-3" size={16} /> Cek Konektivitas Google
-                                </button>
+                                </Link>
                             )}
 
                             {(user.role === 'superadmin' || user.role === 'admin') && ( // Atau sesuaikan dengan role yang diizinkan

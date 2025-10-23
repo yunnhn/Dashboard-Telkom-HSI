@@ -56,6 +56,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::post('/run-traceroute', [TracerouteController::class, 'run'])->name('traceroute.run');
 
+    Route::get('/tools/google-drive-test', function () {
+        return Inertia::render('Tools/GoogleDriveTest');
+    })->name('tools.google-drive-test');
+
     /*
     |--------------------------------------------------------------------------
     | Rute Progress Bar Upload Dokumen

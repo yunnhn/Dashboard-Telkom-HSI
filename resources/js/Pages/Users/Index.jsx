@@ -7,13 +7,9 @@ export default function Index({ auth, users }) {
     return (
         <AuthenticatedLayout
             user={auth.user}
+            // Header sekarang hanya berisi judul
             header={
-                <div className="flex justify-between items-center">
-                    <h2 className="font-semibold text-xl text-gray-800 leading-tight">User Management</h2>
-                    <Link href={route('users.create')} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded">
-                        Add User
-                    </Link>
-                </div>
+                <h2 className="font-semibold text-xl text-gray-800 leading-tight">User Management</h2>
             }
         >
             <Head title="Users" />
@@ -21,7 +17,14 @@ export default function Index({ auth, users }) {
             <div className="py-12">
                 <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
 
-                    {/* PERBAIKAN DI SINI: Menggunakan optional chaining (?.) */}
+                    {/* Tombol "Add User" dipindah ke sini */}
+                    <div className="flex justify-end mb-4">
+                        <Link href={route('users.create')} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded">
+                            Add User
+                        </Link>
+                    </div>
+
+                    {/* Flash messages tetap sama */}
                     {auth.flash?.success && (
                         <div className="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-4" role="alert">
                             <p>{auth.flash.success}</p>
@@ -33,7 +36,10 @@ export default function Index({ auth, users }) {
                         </div>
                     )}
 
-                    <div className="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
+                    {/* ======================= PERBAIKAN TABEL DI SINI ======================= */}
+                    {/* Ganti 'overflow-hidden' dengan 'overflow-x-auto' */}
+                    <div className="bg-white overflow-x-auto shadow-sm sm:rounded-lg p-6">
+                        {/* ======================================================================= */}
                         <table className="min-w-full divide-y divide-gray-200">
                             <thead className="bg-gray-50">
                                 <tr>

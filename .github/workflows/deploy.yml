@@ -1,11 +1,11 @@
 # Nama workflow yang akan muncul di tab Actions GitHub
 name: Build and Deploy Laravel React App
 
-# Pemicu: Jalankan workflow ini setiap kali ada push ke branch 'main'
+# Pemicu: Jalankan workflow ini setiap kali ada push ke branch 'master'
 on:
   push:
     branches:
-      - main
+      - master
 
 jobs:
   build-and-deploy:

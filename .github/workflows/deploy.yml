@@ -1,66 +1,42 @@
-# Nama workflow yang akan muncul di tab "Actions" GitHub
-name: Deploy Laravel to Production
+name: Build and Notify Deploy
 
-# Kapan workflow ini dijalankan?
 on:
   push:
     branches:
-      - master # Pastikan ini adalah branch utama Anda
+      - master
 
-# Daftar pekerjaan (jobs) yang akan dilakukan
 jobs:
-  build-and-deploy: # Nama job (sebelumnya 'deploy')
-    # Menggunakan server virtual Ubuntu terbaru dari GitHub
+  build-and-notify:
     runs-on: ubuntu-latest
-
-    # Langkah-langkah yang akan dieksekusi secara berurutan
     steps:
-      # 1. Mengambil kode dari repositori Anda
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # 2. Setup PHP dan Composer
-      - name: Setup PHP
+      - name: Setup PHP and Composer
         uses: shivammathur/setup-php@v2
         with:
-          php-version: "8.2" # Sesuaikan dengan versi PHP Anda
-          extensions: mbstring, dom, fileinfo, mysql
-          coverage: none
-          tools: composer # <-- INI BAGIAN KUNCINYA
+          php-version: "8.2"
+          tools: composer
 
-      # 3. Install dependensi Composer
       - name: Install Composer Dependencies
         run: composer install --no-interaction --prefer-dist --no-dev --optimize-autoloader
 
-      # 4. Setup Node.js untuk membangun aset frontend
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: "20" # Sesuaikan dengan versi Node.js Anda
+          node-version: "20"
 
-      # 5. Install dependensi NPM
       - name: Install NPM dependencies
         run: npm install
 
-      # 6. Build aset frontend (CSS & JS)
       - name: Build Frontend Assets
         run: npm run build
 
-      # 7. Proses Deployment ke Server Anda menggunakan SSH
-      - name: Deploy to Server
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: 22
-          script: |
-            cd /var/www/LaravelReactTelkom
-            php artisan down
-            git pull origin master
-            composer install --no-interaction --prefer-dist --no-dev --optimize-autoloader
-            php artisan migrate --force
-            php artisan optimize:clear
-            php artisan config:cache
-            php artisan route:cache
-            php artisan up
+      # --- BAGIAN YANG DIUBAH ---
+      # Tidak ada lagi langkah SSH.
+      # Gantinya, kita memanggil URL webhook di server Anda.
+      - name: Notify Server via Webhook
+        uses: distributhor/workflow-webhook@v3
+        env:
+          webhook_url: ${{ secrets.WEBHOOK_URL }}
+          webhook_secret: ${{ secrets.WEBHOOK_SECRET }}

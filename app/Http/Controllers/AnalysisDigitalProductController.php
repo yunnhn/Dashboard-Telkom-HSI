@@ -180,11 +180,12 @@ class AnalysisDigitalProductController extends Controller
 
         $historyQuery = UpdateLog::query()->latest();
 
+        // Query [A] untuk produk tunggal (dari document_data)
         $singleProductsQuery = DB::table('document_data')
             ->select(
                 'order_id as uid',
                 'order_id',
-                'product as product_name', // Gunakan alias agar konsisten
+                'product as product_name',
                 'net_price',
                 'nama_witel',
                 'customer_name',
@@ -193,45 +194,51 @@ class AnalysisDigitalProductController extends Controller
             )
             ->where('product', 'NOT LIKE', '%-%'); // Hanya ambil produk tunggal
 
-        // [2] Query untuk produk bundling dari `order_products`
+        // Query [B] untuk produk bundling (dari order_products)
         $bundleProductsQuery = DB::table('order_products')
             ->join('document_data', 'order_products.order_id', '=', 'document_data.order_id')
             ->select(
-                'order_products.id as uid', // Gunakan ID dari order_products
+                'order_products.id as uid',
                 'order_products.order_id',
                 'order_products.product_name',
                 'order_products.net_price',
                 'document_data.nama_witel',
                 'document_data.customer_name',
                 'document_data.order_created_date',
-                // Untuk produk bundling, kita anggap 'is_template_price' berdasarkan net_price-nya
-                DB::raw('CASE WHEN order_products.net_price > 0 THEN 0 ELSE 1 END as is_template_price')
+                DB::raw('1 as is_template_price') // Semua bundling adalah 'template'
             );
 
-        // [3] Gabungkan kedua query
-        $netPriceQuery = $singleProductsQuery->union($bundleProductsQuery);
+        // [PERBAIKAN] Terapkan filter PENCARIAN (search) ke sub-query SEBELUM union
+        if ($request->filled('search')) {
+            $searchTerm = $request->search;
+            // [FIX] Gunakan '=' untuk exact match
+            $singleProductsQuery->where('document_data.order_id', '=', $searchTerm);
+            $bundleProductsQuery->where('order_products.order_id', '=', $searchTerm);
+        }
 
-        // [4] Terapkan filter status harga PADA QUERY GABUNGAN
+        // [PERBAIKAN] Terapkan filter STATUS (pasti/template) ke sub-query SEBELUM union
         $netPriceStatus = $request->input('net_price_status');
-        if ($netPriceStatus === 'template') {
-            $netPriceQuery->where('is_template_price', true);
-        } elseif ($netPriceStatus === 'pasti') {
-            $netPriceQuery->where('is_template_price', false);
+
+        if ($netPriceStatus === 'pasti') {
+            // "Harga Pasti" HANYA dari produk tunggal & is_template_price = 0
+            $singleProductsQuery->where('is_template_price', false);
+            $netPriceQuery = $singleProductsQuery; // HANYA query A
+        } elseif ($netPriceStatus === 'template') {
+            // "Harga Template" = (Template 0-price) + (Semua Bundling)
+            $singleProductsQuery->where('is_template_price', true);
+            $netPriceQuery = $singleProductsQuery->union($bundleProductsQuery); // Query A + Query B
+        } else {
+            // Jika tidak ada filter, tampilkan semua (A + B)
+            $netPriceQuery = $singleProductsQuery->union($bundleProductsQuery);
         }
 
-        // Filter pencarian tetap berlaku
         if ($request->filled('search')) {
             $searchTerm = $request->search;
-            $netPriceQuery->where('order_id', 'like', "%{$searchTerm}%");
-        }
 
-        // Terapkan filter search umum ke query yang relevan
-        if ($request->filled('search')) {
-            $searchTerm = $request->search;
-            $inProgressQuery->where('order_id', 'like', "%{$searchTerm}%");
-            $completeQuery->where('order_id', 'like', "%{$searchTerm}%");
-            $qcQuery->where('order_id', 'like', "%{$searchTerm}%");
-            $netPriceQuery->where('order_id', 'like', "%{$searchTerm}%");
+            $inProgressQuery->where('order_id', '=', $searchTerm);
+            $completeQuery->where('order_id', '=', $searchTerm);
+            $qcQuery->where('order_id', '=', $searchTerm);
+            $historyQuery->where('order_id', '=', $searchTerm);
         }
 
         $tabCounts = [
@@ -239,7 +246,9 @@ class AnalysisDigitalProductController extends Controller
             'complete' => (clone $completeQuery)->count(),
             'qc' => (clone $qcQuery)->count(),
             'history' => (clone $historyQuery)->count(),
-            'netprice' => (clone $netPriceQuery)->count(),
+            'netprice' => DB::table(DB::raw("({$netPriceQuery->toSql()}) as sub"))
+                          ->mergeBindings($netPriceQuery)
+                          ->count(),
         ];
 
         // [3] INISIALISASI SEMUA DATA PAGINATOR SEBAGAI OBJEK KOSONG
@@ -266,7 +275,11 @@ class AnalysisDigitalProductController extends Controller
                 $historyData = $historyQuery->paginate(10)->withQueryString(); // History punya item per halaman berbeda
                 break;
             case 'netprice':
-                $netPriceData = $netPriceQuery->orderBy('order_created_date', 'desc')->paginate($paginationCount)->withQueryString();
+                $netPriceData = DB::table(DB::raw("({$netPriceQuery->toSql()}) as sub"))
+                    ->mergeBindings($netPriceQuery)
+                    ->orderBy('order_created_date', 'desc')
+                    ->paginate($paginationCount)
+                    ->withQueryString();
                 break;
         }
 

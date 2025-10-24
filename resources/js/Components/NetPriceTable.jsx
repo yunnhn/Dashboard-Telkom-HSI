@@ -2,7 +2,7 @@ import React from 'react';
 import { useForm, Link, router } from '@inertiajs/react';
 
 // ===================================================================
-// KOMPONEN INLINE UNTUK MENGATASI ERROR KOMPILASI
+// KOMPONEN INLINE
 // ===================================================================
 
 const PrimaryButton = ({ className = '', disabled, children, ...props }) => {
@@ -59,6 +59,28 @@ const Pagination = ({ links = [], activeView }) => {
     );
 };
 
+/**
+ * [MODIFIKASI] Komponen Tooltip
+ */
+const TooltipIcon = ({ icon, tooltipText, className = '' }) => (
+    // Span parent tetap 'relative'
+    <span className={`relative group inline-block ${className} cursor-help`}>
+        <span>{icon}</span>
+
+        {/* [PERBAIKAN] Box Tooltip diubah posisinya */}
+        <span className="
+            absolute hidden group-hover:block
+            top-1/2 -translate-y-1/2  /* Posisikan di tengah secara vertikal */
+            left-full ml-3            /* Posisikan di KANAN ikon + margin */
+            w-max max-w-xs p-3 text-xs text-white bg-gray-800 rounded-md shadow-lg z-10
+            whatsapp-bubble            /* Kelas kustom untuk 'ekor' bubble */
+        ">
+            {tooltipText}
+        </span>
+    </span>
+);
+
+
 // ===================================================================
 // Komponen Utama
 // ===================================================================
@@ -66,22 +88,18 @@ const Pagination = ({ links = [], activeView }) => {
 const TableRow = ({ item }) => {
     const { data, setData, put, processing, errors, recentlySuccessful } = useForm({
         net_price: item.net_price || '',
-        product_name: item.product_name, // [BARU] Sertakan product_name
+        product_name: item.product_name, // Ini penting untuk update
     });
 
     const submit = (e) => {
         e.preventDefault();
-        put(route('admin.analysisDigitalProduct.updateNetPrice', { order_id: item.order_id }), {
+        // Kirim 'product_name' agar update bisa membedakan order_id ganda
+        put(route('admin.analysisDigitalProduct.updateNetPrice', { order_id: item.order_id, product_name: data.product_name }), {
             preserveScroll: true,
             onSuccess: () => {
-                // Setelah berhasil, muat ulang halaman dengan filter yang benar
+                // Muat ulang halaman dengan filter yang sedang aktif
                 router.get(route('admin.analysisDigitalProduct.index'), {
-                    // Pertahankan filter yang ada jika ada (misal pencarian)
-                    ...route().params,
-                    // Arahkan ke tab yang benar
-                    tab: 'netprice',
-                    // Set filter status harga menjadi 'pasti'
-                    net_price_status: 'pasti'
+                    ...route().params, // Pertahankan semua filter/search/tab
                 }, {
                     preserveState: true,
                     replace: true,
@@ -90,11 +108,50 @@ const TableRow = ({ item }) => {
         });
     };
 
+    // Definisikan isi tooltip
+    const TEMPLATE_PRICE_TOOLTIP = (
+        <div className="text-left">
+            <strong className="block mb-1">Harga Template</strong>
+            <p className="font-normal">Harga 0/NULL diganti menjadi:</p>
+            <ul className="list-disc list-inside font-normal mt-1">
+                <li>Netmonk: 26,100</li>
+                <li>OCA: 104,000</li>
+                <li>Antares Eazy: 35,000</li>
+            </ul>
+        </div>
+    );
+
+    const BUNDLING_PRICE_TOOLTIP = "product hasil bundling";
+
+    // [LOGIKA IKON]
+    const productName = item.product_name || '';
+    const isBundling = productName.includes('-');
+    const isTemplate = item.is_template_price == 1 && !isBundling;
 
 
     return (
         <tr className="bg-white border-b hover:bg-gray-50">
-            <td className="px-4 py-2">{item.product_name || item.product}</td>
+            <td className="px-4 py-2">
+                <div className="flex items-center gap-1.5">
+                    <span>{productName}</span>
+
+                    {/* Tampilkan ℹ️ HANYA jika isTemplate (bukan bundling) */}
+                    {isTemplate && (
+                        <TooltipIcon
+                            icon="ℹ️" // Ikon info
+                            tooltipText={TEMPLATE_PRICE_TOOLTIP}
+                        />
+                    )}
+
+                    {/* Tampilkan 📦 jika isBundling */}
+                    {isBundling && (
+                        <TooltipIcon
+                            icon="📦"
+                            tooltipText={BUNDLING_PRICE_TOOLTIP}
+                        />
+                    )}
+                </div>
+            </td>
             <td className="px-4 py-2 font-mono">{item.order_id}</td>
             <td className="px-4 py-2">{item.nama_witel}</td>
             <td className="px-4 py-2">{item.customer_name}</td>
@@ -125,6 +182,21 @@ const TableRow = ({ item }) => {
 export default function NetPriceTable({ dataPaginator, activeView }) {
     return (
         <>
+            {/* [PERBAIKAN] Tambahkan tag <style> untuk 'ekor' bubble chat */}
+            <style>{`
+                .whatsapp-bubble::before {
+                    content: '';
+                    position: absolute;
+                    top: 50%;
+                    right: 100%; /* Posisikan di tepi kiri bubble */
+                    transform: translateY(-50%);
+                    border-width: 6px;
+                    border-style: solid;
+                    /* Buat segitiga menunjuk ke kiri (warna bg-gray-800) */
+                    border-color: transparent #1f2937 transparent transparent;
+                }
+            `}</style>
+
             <div className="overflow-x-auto text-sm">
                 <table className="w-full">
                     <thead className="bg-gray-50">
@@ -139,7 +211,8 @@ export default function NetPriceTable({ dataPaginator, activeView }) {
                     </thead>
                     <tbody className="divide-y bg-white">
                         {dataPaginator && dataPaginator.data.length > 0 ? (
-                            dataPaginator.data.map((item) => <TableRow key={item.uid} item={item} />)
+                            // Gunakan key yang unik untuk order_id ganda
+                            dataPaginator.data.map((item) => <TableRow key={`${item.uid}-${item.product_name}`} item={item} />)
                         ) : (
                             <tr>
                                 <td colSpan="6" className="p-4 text-center text-gray-500">
@@ -154,5 +227,3 @@ export default function NetPriceTable({ dataPaginator, activeView }) {
         </>
     );
 }
-
-// ===================================================================

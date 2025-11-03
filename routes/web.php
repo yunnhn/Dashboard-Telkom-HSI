@@ -102,6 +102,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     Route::get('/export-galaksi', 'exportGalaksi')->name('exportGalaksi');
                     Route::post('/upload-po-list', 'uploadPoList')->name('uploadPoList');
                     Route::post('/add-po', 'addPoManually')->name('addPo');
+                    Route::post('/import/cancel', 'cancelImport')->name('import.cancel');
                 });
 
             // Rute Resource untuk Account Officer (hanya store dan update)

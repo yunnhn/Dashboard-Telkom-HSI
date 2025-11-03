@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import AuthenticatedLayout from "@/Layouts/AuthenticatedLayout";
 import { Head, useForm, usePage, router, Link } from "@inertiajs/react";
 import InputLabel from '@/Components/InputLabel';
@@ -97,6 +97,20 @@ export const sosTableConfigTemplateSODORO = [ // MERAH
     { key: 'total_gt_3bln', title: '>3BLN Total', headerClass: 'bg-red-800 text-white', type: 'numeric', isTotal: true, visible: true },
     { key: 'grand_total_order', title: 'Grand Total Order', headerClass: 'bg-red-800 text-white font-bold', isTotal: true, visible: true }
 ];
+
+const ProgressBar = ({ progress, text }) => (
+    <div className="mt-4">
+        <p className="text-sm font-semibold text-gray-700 mb-1">
+            {text} {progress}%
+        </p>
+        <div className="w-full bg-gray-200 rounded-full h-2.5">
+            <div
+                className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
+                style={{ width: `${progress}%` }}
+            ></div>
+        </div>
+    </div>
+);
 
 // export const sosTableConfigTemplate = [
 //     // Item 1: Grup <3BLN
@@ -288,23 +302,6 @@ const DetailsCard = ({ totals }) => (
     </div>
 );
 
-/**
- * Komponen Progress Bar untuk proses upload.
- */
-const ProgressBar = ({ progress, text }) => (
-    <div className="mt-4">
-        <p className="text-sm font-semibold text-gray-700 mb-1">
-            {text} {progress}%
-        </p>
-        <div className="w-full bg-gray-200 rounded-full">
-            <div
-                className="bg-blue-600 text-xs font-medium text-blue-100 text-center p-0.5 leading-none rounded-full transition-all duration-300"
-                style={{ width: `${progress}%` }}
-            ></div>
-        </div>
-    </div>
-);
-
 // ===================================================================
 // Komponen Tabel
 // ===================================================================
@@ -465,6 +462,14 @@ export default function AnalysisSOS({
     const [viewMode, setViewMode] = useState('AOMO');
     const activeDetailView = filters.tab || 'provide_order';
 
+    // [BARU] State untuk manajemen progress bar
+    const [progress, setProgress] = useState(null);
+    const [isPaused, setIsPaused] = useState(false);
+    const [timeRemaining, setTimeRemaining] = useState(null);
+    const startTimeRef = useRef(null);
+    // Helper untuk conditional rendering
+    const isProcessing = progress !== null && progress < 100;
+
     const witelList = [
         "BALI", "JATIM BARAT", "JATIM TIMUR", "NUSA TENGGARA", "SURAMADU"
     ];
@@ -608,7 +613,6 @@ export default function AnalysisSOS({
         }
     };
 
-    const [progress, setProgress] = useState(null);
     const [poProgress, setPoProgress] = useState(null);
 
     const { data: uploadData, setData: setUploadData, post: postUpload, processing, errors, reset } = useForm({
@@ -618,6 +622,80 @@ export default function AnalysisSOS({
     const { data: poUploadData, setData: setPoUploadData, post: postPoUpload, processing: processingPo, errors: errorsPo, reset: resetPo } = useForm({
         po_document: null,
     });
+
+    useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        let batchId = urlParams.get("batch_id") || sessionStorage.getItem('sos_active_batch_id');
+
+        const cleanup = () => {
+            if (window.sosJobInterval) clearInterval(window.sosJobInterval);
+            window.sosJobInterval = null;
+            setProgress(null);
+            sessionStorage.removeItem('sos_active_batch_id');
+            startTimeRef.current = null;
+            setTimeRemaining(null);
+            setIsPaused(false);
+
+            const currentUrl = new URL(window.location.href);
+            currentUrl.searchParams.delete("batch_id");
+            window.history.replaceState({}, document.title, currentUrl.toString());
+        };
+
+        if (batchId) {
+            sessionStorage.setItem('sos_active_batch_id', batchId);
+            if (progress === null) {
+                setProgress(0);
+            }
+
+            if (window.sosJobInterval) clearInterval(window.sosJobInterval);
+
+            window.sosJobInterval = setInterval(() => {
+                if (isPaused) return; // Jika dijeda, lewati pengecekan
+
+                axios.get(route("import.progress", { batchId }))
+                    .then(response => {
+                        const newProgress = response.data.progress ?? 0;
+                        setProgress(newProgress);
+
+                        // Kalkulasi estimasi waktu
+                        if (newProgress > 1 && newProgress < 100) {
+                            if (!startTimeRef.current) {
+                                startTimeRef.current = Date.now();
+                            }
+                            const elapsedTime = (Date.now() - startTimeRef.current) / 1000; // in seconds
+                            const remainingPercentage = 100 - newProgress;
+                            const estimatedTotalTime = (elapsedTime / newProgress) * 100;
+                            const remainingTimeInSeconds = estimatedTotalTime - elapsedTime;
+
+                            if (remainingTimeInSeconds > 0) {
+                                const minutes = Math.floor(remainingTimeInSeconds / 60);
+                                const seconds = Math.floor(remainingTimeInSeconds % 60);
+                                setTimeRemaining(`${minutes} menit ${seconds} detik`);
+                            }
+                        } else {
+                            setTimeRemaining(null);
+                        }
+
+                        if (newProgress >= 100) {
+                            cleanup();
+                            setTimeout(() => {
+                                toast.success("Proses impor data SOS selesai!");
+                                router.reload({ preserveScroll: true });
+                            }, 1500);
+                        }
+                    })
+                    .catch(error => {
+                        console.error("Gagal mengambil progres job:", error);
+                        toast.error("Terjadi kesalahan saat memproses file.");
+                        cleanup();
+                    });
+            }, 2500); // Poll setiap 2.5 detik
+        }
+
+        return () => {
+            if (window.sosJobInterval) clearInterval(window.sosJobInterval);
+        };
+    }, [isPaused]);
 
     // Handle job progress from backend
     useEffect(() => {
@@ -724,6 +802,32 @@ export default function AnalysisSOS({
         });
     }
 
+    const handlePauseToggle = () => setIsPaused(prev => !prev);
+
+    const handleCancelUpload = () => {
+        if (!confirm("Anda yakin ingin membatalkan proses impor ini?")) return;
+
+        const batchId = sessionStorage.getItem('sos_active_batch_id');
+        if (batchId) {
+            axios.post(route('admin.analysisSOS.import.cancel'), { batch_id: batchId })
+                .then(response => {
+                    toast.success(response.data.message || "Proses dibatalkan.");
+                    if (window.sosJobInterval) clearInterval(window.sosJobInterval);
+
+                    // Membersihkan state secara manual setelah pembatalan
+                    setProgress(null);
+                    sessionStorage.removeItem('sos_active_batch_id');
+                    startTimeRef.current = null;
+                    setTimeRemaining(null);
+                    setIsPaused(false);
+                })
+                .catch(error => {
+                    toast.error("Gagal membatalkan proses.");
+                    console.error(error);
+                });
+        }
+    };
+
     // Definisi kolom untuk setiap tabel detail
     const provideOrderColumns = useMemo(() => provideOrderColumnsTemplate, []);
     const inProcessColumns = useMemo(() => inProcessColumnsTemplate, []);
@@ -813,32 +917,62 @@ export default function AnalysisSOS({
 
                         <div className="bg-white p-6 rounded-lg shadow-md">
                             <h3 className="font-semibold text-lg text-gray-800">Unggah Data Mentah</h3>
-                            <p className="text-gray-500 mt-1 text-sm">Unggah file Excel (xlsx, xls, csv) untuk memperbarui data.</p>
-                            <form onSubmit={handleUploadSubmit} className="mt-4 space-y-4">
-                                <div>
-                                    <input
-                                        type="file"
-                                        className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                                        onChange={(e) => setUploadData("document", e.target.files[0])}
-                                        disabled={processing}
+
+                            {/* [PERUBAHAN] Tampilkan form ATAU progress bar */}
+                            {!isProcessing ? (
+                                <>
+                                    <p className="text-gray-500 mt-1 text-sm">Unggah file Excel (xlsx, xls, csv) untuk memperbarui data.</p>
+                                    <form onSubmit={handleUploadSubmit} className="mt-4 space-y-4">
+                                        <div>
+                                            <input
+                                                type="file"
+                                                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                                                onChange={(e) => setUploadData("document", e.target.files[0])}
+                                                disabled={processing}
+                                            />
+                                            <InputError message={errors.document} className="mt-2" />
+                                        </div>
+                                        <button
+                                            type="submit"
+                                            disabled={processing}
+                                            className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700 disabled:bg-blue-400"
+                                        >
+                                            {processing ? "Mengunggah..." : "Unggah Dokumen"}
+                                        </button>
+                                    </form>
+                                </>
+                            ) : (
+                                <div className="mt-4 space-y-4">
+                                    <ProgressBar
+                                        progress={progress}
+                                        text={`Memproses file...`}
                                     />
-                                    <InputError message={errors.document} className="mt-2" />
+                                    {timeRemaining && (
+                                        <p className="text-sm text-gray-600 animate-pulse">
+                                            Perkiraan waktu selesai: <strong>{timeRemaining}</strong>
+                                        </p>
+                                    )}
+                                    <div className="flex items-center gap-4 mt-2">
+                                        <button
+                                            type="button"
+                                            onClick={handlePauseToggle}
+                                            className={`w-1/2 px-4 py-2 text-sm font-semibold rounded-md text-white transition-colors ${isPaused
+                                                ? "bg-green-500 hover:bg-green-600"
+                                                : "bg-yellow-500 hover:bg-yellow-600"
+                                                }`}
+                                        >
+                                            {isPaused ? "Lanjutkan" : "Jeda"}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={handleCancelUpload}
+                                            className="w-1/2 px-4 py-2 text-sm bg-red-600 text-white font-semibold rounded-md hover:bg-red-700 transition-colors"
+                                        >
+                                            Batalkan
+                                        </button>
+                                    </div>
                                 </div>
-
-                                {progress !== null && (
-                                    <ProgressBar progress={progress} text="Memproses file..." />
-                                )}
-
-                                <button
-                                    type="submit"
-                                    disabled={processing}
-                                    className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700 disabled:bg-blue-400"
-                                >
-                                    {processing
-                                        ? "Mengunggah..."
-                                        : "Unggah Dokumen"}
-                                </button>
-                            </form>
+                            )}
                         </div>
 
                         <div className="bg-white p-6 rounded-lg shadow-md">

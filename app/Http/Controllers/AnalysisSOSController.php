@@ -14,7 +14,9 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redirect;
 use Inertia\Inertia;
 use Maatwebsite\Excel\Facades\Excel;
@@ -128,14 +130,27 @@ class AnalysisSOSController extends Controller
 
     public function upload(Request $request)
     {
+        Log::info('Proses upload dimulai.'); // Log 1
+
         $request->validate(['document' => 'required|file|mimes:xlsx,xls,csv']);
-        $path = $request->file('document')->store('excel-imports', 'local');
+        Log::info('Validasi file berhasil.'); // Log 2
 
-        $batch = Bus::batch([new ProcessSOSImport($path)])
-            ->name('Import Data SOS')
-            ->dispatch();
+        try {
+            $path = $request->file('document')->store('excel-imports', 'local');
+            Log::info('File berhasil disimpan di: '.$path); // Log 3
 
-        return Redirect::route('admin.analysisSOS.index', ['batch_id' => $batch->id]);
+            $batch = Bus::batch([new ProcessSOSImport($path)])
+                ->name('Import Data SOS')
+                ->dispatch();
+
+            Log::info('Job berhasil dikirim ke antrian dengan batch ID: '.$batch->id); // Log 4
+
+            return Redirect::route('admin.analysisSOS.index', ['batch_id' => $batch->id]);
+        } catch (\Throwable $e) {
+            Log::error('Terjadi error saat upload: '.$e->getMessage()); // Log 5 (Error)
+
+            return Redirect::back()->with('error', 'Gagal memproses file. Cek log untuk detail.'); // Kirim pesan error
+        }
     }
 
     /**
@@ -384,5 +399,24 @@ class AnalysisSOSController extends Controller
 
         // Redirect kembali ke halaman sebelumnya dengan pesan sukses
         return Redirect::back()->with('success', 'Data PO berhasil ditambahkan/diperbarui.');
+    }
+
+    public function cancelImport(Request $request)
+    {
+        $validated = $request->validate([
+            'batch_id' => 'required|string',
+        ]);
+
+        $batch = Bus::findBatch($validated['batch_id']);
+
+        if ($batch) {
+            $batch->cancel();
+            // Hapus cache progress agar tidak salah dibaca nanti
+            Cache::forget('import_progress_'.$validated['batch_id']);
+
+            return response()->json(['message' => 'Proses impor berhasil dibatalkan.']);
+        }
+
+        return response()->json(['message' => 'Batch tidak ditemukan.'], 404);
     }
 }

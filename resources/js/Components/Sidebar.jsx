@@ -177,20 +177,21 @@ const UserProfile = ({ user, isSidebarOpen, onLogout }) => {
 
 export default function Sidebar({ user, isSidebarOpen, toggleSidebar, isCmsMode, onLogout }) {
     const [isDashboardOpen, setIsDashboardOpen] = useState(false);
+    const [isConnectivityOpen, setIsConnectivityOpen] = useState(false);
     const [isReportsOpen, setIsReportsOpen] = useState(false);
     const [isDigitalProductOpen, setIsDigitalProductOpen] = useState(false);
     const [isSosOpen, setIsSosOpen] = useState(false);
+    const [isAnalysisConnOpen, setIsAnalysisConnOpen] = useState(false);
     const [isAnalysisOpen, setIsAnalysisOpen] = useState(true); // Default open untuk admin
 
     // Cek route aktif menggunakan Inertia
-    const isDashboardActive = route().current('dashboardDigitalProduct');
+    const isDashboardActive = route().current('dashboardDigitalProduct') || route().current('dashboard.sos');
     const isReportsActive = route().current('data-report.index') || route().current('galaksi.index');
     const isAdminAnalysisActive = route().current('admin.analysisDigitalProduct.index') || route().current('admin.analysisSOS.index');
     const isUserManagementActive = route().current('superadmin.users.*'); // <-- Sesuaikan dengan route group Anda
     const isRollbackActive = route().current('superadmin.rollback.show'); // <-- Sesuaikan dengan route group Anda
 
     useEffect(() => {
-        // Otomatis buka menu jika route aktif dan sidebar terbuka
         if (isSidebarOpen && isAdminAnalysisActive) setIsAnalysisOpen(true);
         if (isSidebarOpen && isReportsActive) {
             setIsReportsOpen(true);
@@ -200,33 +201,22 @@ export default function Sidebar({ user, isSidebarOpen, toggleSidebar, isCmsMode,
         }
         if (isSidebarOpen && isDashboardActive) setIsDashboardOpen(true);
 
-        // Tutup semua dropdown jika sidebar ditutup
         if (!isSidebarOpen) {
             setIsDashboardOpen(false);
+            setIsConnectivityOpen(false);
             setIsReportsOpen(false);
             setIsDigitalProductOpen(false);
             setIsSosOpen(false);
+            setIsAnalysisConnOpen(false);
             setIsAnalysisOpen(false);
         }
-        // Tidak perlu dependensi currentPath karena `route().current()` sudah reaktif
     }, [isSidebarOpen, isAdminAnalysisActive, isReportsActive, isDashboardActive]);
 
-    // Fungsi cek role
     const hasRole = (roleName) => user?.role === roleName;
 
-    // ==========================================================
-    // == PERUBAHAN LOGIKA KONDISIONAL TAMPILAN SIDEBAR ==
-    // ==========================================================
-
-    // Menentukan apakah sidebar harus tampil seperti user biasa
-    // Kondisi: Bukan superadmin DAN (Bukan admin ATAU (admin TAPI TIDAK dalam CMS Mode))
     const showUserSidebar = !hasRole('superadmin') && (!hasRole('admin') || (hasRole('admin') && !isCmsMode));
 
-    // Menentukan apakah sidebar harus tampil seperti Admin CMS Mode
-    // Kondisi: Admin DAN dalam CMS Mode
     const showAdminCmsSidebar = hasRole('admin') && isCmsMode;
-
-    // ==========================================================
 
     return (
         <div className={`flex flex-col bg-white h-screen fixed shadow-lg z-30 transition-transform duration-300 ease-in-out
@@ -246,29 +236,17 @@ export default function Sidebar({ user, isSidebarOpen, toggleSidebar, isCmsMode,
                 {/* === TAMPILAN UNTUK SUPER ADMIN === */}
                 {hasRole('superadmin') && (
                     <>
-                        <NavLink
-                            href={route('superadmin.users.index')} // <-- Pastikan nama route ini benar
-                            active={isUserManagementActive}
-                            icon={<FiUsers size={22} />}
-                            isSidebarOpen={isSidebarOpen}
-                        >
+                        <NavLink href={route('superadmin.users.index')} active={isUserManagementActive} icon={<FiUsers size={22} />} isSidebarOpen={isSidebarOpen}>
                             User Management
                         </NavLink>
-                        {/* [BARU] Menu Rollback */}
-                        <NavLink
-                            href={route('superadmin.rollback.show')} // <-- Pastikan nama route ini benar
-                            active={isRollbackActive}
-                            icon={<MdHistory size={22} />} // <-- Ikon baru
-                            isSidebarOpen={isSidebarOpen}
-                        >
+                        <NavLink href={route('superadmin.rollback.show')} active={isRollbackActive} icon={<MdHistory size={22} />} isSidebarOpen={isSidebarOpen}>
                             Rollback Batch
                         </NavLink>
-                        {/* Tambahkan menu superadmin lain di sini jika perlu */}
                     </>
                 )}
 
                 {/* === TAMPILAN UNTUK ADMIN (CMS MODE) === */}
-                {showAdminCmsSidebar && ( // <-- Menggunakan variabel baru
+                {showAdminCmsSidebar && (
                     <>
                         <div className="relative">
                             <button onClick={() => isSidebarOpen && setIsAnalysisOpen(!isAnalysisOpen)} className={`w-full flex items-center py-4 text-gray-600 hover:bg-gray-100 transition duration-300 text-left ${isSidebarOpen ? 'px-6' : 'justify-center'} ${isAdminAnalysisActive ? 'bg-gray-200 text-gray-800 font-bold' : ''}`}>
@@ -278,17 +256,28 @@ export default function Sidebar({ user, isSidebarOpen, toggleSidebar, isCmsMode,
                             </button>
                             {isSidebarOpen && isAnalysisOpen && (
                                 <div className="pl-12 pr-4 py-2 flex flex-col space-y-1">
-                                    <Link href={route('admin.analysisDigitalProduct.index')} className={`block px-4 py-2 text-sm rounded-md ${route().current('admin.analysisDigitalProduct.index') ? 'bg-blue-100 text-blue-700 font-semibold' : 'hover:bg-gray-100'}`}>Analisis Report Digital Product</Link>
-                                    <Link href={route('admin.analysisSOS.index')} className={`block px-4 py-2 text-sm rounded-md ${route().current('admin.analysisSOS.index') ? 'bg-blue-100 text-blue-700 font-semibold' : 'hover:bg-gray-100'}`}>Analisis Report SOS</Link>
+                                    <Link href={route('admin.analysisDigitalProduct.index')} className={`block px-4 py-2 text-sm rounded-md ${route().current('admin.analysisDigitalProduct.index') ? 'bg-blue-100 text-blue-700 font-semibold' : 'hover:bg-gray-100'}`}>Report Digital Product</Link>
+                                    <div>
+                                        <button onClick={() => setIsAnalysisConnOpen(!isAnalysisConnOpen)} className="w-full flex items-center justify-between px-4 py-2 text-sm rounded-md hover:bg-gray-200">
+                                            <span>Report Connectivity</span>
+                                            <MdKeyboardArrowDown size={18} className={`transition-transform duration-300 ${isAnalysisConnOpen ? 'rotate-180' : ''}`} />
+                                        </button>
+                                        {isAnalysisConnOpen && (
+                                            <div className="pl-6 mt-1 space-y-1">
+                                                <Link href="#" className="block px-4 py-2 text-sm text-gray-400 cursor-not-allowed rounded-md">Report Jaringan Tambahan</Link>
+                                                <Link href={route('admin.analysisSOS.index')} className={`block px-4 py-2 text-sm rounded-md ${route().current('admin.analysisSOS.index') ? 'bg-blue-100 text-blue-700 font-semibold' : 'hover:bg-gray-100'}`}>Report Datin</Link>
+                                                <Link href="#" className="block px-4 py-2 text-sm text-gray-400 cursor-not-allowed rounded-md">Report HSI</Link>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             )}
                         </div>
-                        {/* Tambahkan menu admin lain di sini jika perlu */}
                     </>
                 )}
 
                 {/* === TAMPILAN UNTUK USER BIASA (DAN ADMIN NON-CMS MODE) === */}
-                {showUserSidebar && ( // <-- Menggunakan variabel baru
+                {showUserSidebar && (
                     <>
                         <div className="relative">
                             <button onClick={() => isSidebarOpen && setIsDashboardOpen(!isDashboardOpen)} className={`w-full flex items-center py-4 text-gray-600 hover:bg-gray-100 transition duration-300 text-left ${isSidebarOpen ? 'px-6' : 'justify-center'} ${isDashboardActive ? 'bg-gray-200 text-gray-800 font-bold' : ''}`}>
@@ -297,9 +286,29 @@ export default function Sidebar({ user, isSidebarOpen, toggleSidebar, isCmsMode,
                                 {isSidebarOpen && <MdKeyboardArrowDown size={20} className={`ml-auto transition-transform duration-300 ${isDashboardOpen ? 'rotate-180' : ''}`} />}
                             </button>
                             {isSidebarOpen && isDashboardOpen && (
-                                <div className="pl-12 pr-4 py-2 flex flex-col space-y-1">
+                                <div className="pl-12 pr-4 py-2 flex flex-col space-y-1 bg-gray-50 border-t border-b">
                                     <Link href={route('dashboardDigitalProduct')} className={`block px-4 py-2 text-sm rounded-md ${route().current('dashboardDigitalProduct') ? 'bg-blue-100 text-blue-700 font-semibold' : 'hover:bg-gray-100'}`}>Dashboard Digital Product</Link>
-                                    <Link href="#" className="block px-4 py-2 text-sm text-gray-400 cursor-not-allowed rounded-md">Dashboard SOS</Link>
+
+                                    {/* [LANGKAH 3] Ganti Link statis menjadi komponen dropdown baru */}
+                                    <div>
+                                        <button onClick={() => setIsConnectivityOpen(!isConnectivityOpen)} className="w-full flex items-center text-left justify-between px-4 py-2 text-sm rounded-md text-gray-700 hover:bg-gray-200">
+                                            <span>Dashboard Connectivity</span>
+                                            <MdKeyboardArrowDown size={18} className={`transition-transform duration-300 ${isConnectivityOpen ? 'rotate-180' : ''}`} />
+                                        </button>
+                                        {isConnectivityOpen && (
+                                            <div className="pl-6 mt-1 space-y-1">
+                                                <Link href="#" className="block px-4 py-2 text-sm text-gray-400 cursor-not-allowed rounded-md text-left">Dashboard Jaringan Tambahan</Link>
+                                                <Link
+                                                    href={route('dashboard.sos')}
+                                                    className={`block px-4 py-2 text-sm rounded-md text-left ${route().current('dashboard.sos') ? 'bg-blue-100 text-blue-700 font-semibold' : 'text-gray-700 hover:bg-gray-100'}`}
+                                                >
+                                                    Dashboard Datin
+                                                </Link>
+                                                <Link href="#" className="block px-4 py-2 text-sm text-gray-400 cursor-not-allowed rounded-md text-left">Dashboard HSI</Link>
+                                            </div>
+                                        )}
+                                    </div>
+
                                 </div>
                             )}
                         </div>
@@ -325,7 +334,7 @@ export default function Sidebar({ user, isSidebarOpen, toggleSidebar, isCmsMode,
                                     </div>
                                     <div>
                                         <button onClick={() => setIsSosOpen(!isSosOpen)} className="w-full flex items-center justify-between px-4 py-2 text-sm rounded-md text-gray-700 hover:bg-gray-200">
-                                            <span>Report SOS</span>
+                                            <span>Report Connectivity</span>
                                             <MdKeyboardArrowDown size={18} className={`transition-transform duration-300 ${isSosOpen ? 'rotate-180' : ''}`} />
                                         </button>
                                         {isSosOpen && (
@@ -340,7 +349,6 @@ export default function Sidebar({ user, isSidebarOpen, toggleSidebar, isCmsMode,
                         </div>
                     </>
                 )}
-
             </nav>
 
             <UserProfile user={user} isSidebarOpen={isSidebarOpen} onLogout={onLogout} />

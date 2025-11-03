@@ -5,10 +5,11 @@ use App\Http\Controllers\Admin\ExcelMergeController;
 use App\Http\Controllers\AnalysisDigitalProductController;
 use App\Http\Controllers\AnalysisSOSController;
 use App\Http\Controllers\DashboardDigitalProductController;
+use App\Http\Controllers\DashboardSOSController; // <-- [TAMBAHKAN INI]
 use App\Http\Controllers\DataReportController;
 use App\Http\Controllers\GalaksiController;
 use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\SuperAdminController; // <-- Tambahkan ini
+use App\Http\Controllers\SuperAdminController; // [CATATAN] Ini sudah Anda tambahkan, bagus
 use App\Http\Controllers\TracerouteController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Redirect;
@@ -35,6 +36,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     */
     Route::get('/dashboard', [DashboardDigitalProductController::class, 'index'])->name('dashboard');
     Route::get('/dashboardDigitalProduct', [DashboardDigitalProductController::class, 'index'])->name('dashboardDigitalProduct');
+
+    // <-- [TAMBAHKAN INI] Rute untuk Dashboard SOS baru Anda
+    Route::get('/dashboard-sos', [DashboardSOSController::class, 'index'])->name('dashboard.sos');
+
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
@@ -84,8 +89,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     Route::put('/qc-update/{documentData:order_id}/progress', 'updateQcStatusToProgress')->name('qc.update.progress');
                     Route::put('/qc-update/{documentData:order_id}/done', 'updateQcStatusToDone')->name('qc.update.done');
                     Route::put('/qc-update/{documentData:order_id}/cancel', 'updateQcStatusToCancel')->name('qc.update.cancel');
-                    // Hapus rollbackBatch dari sini jika sudah dipindah ke SuperAdminController
-                    // Route::post('/rollback-batch', 'rollbackBatch')->name('rollbackBatch'); // <-- HAPUS JIKA DIPINDAH
                 });
 
             // Grup Controller untuk Analisis SOS

@@ -89,40 +89,73 @@ class AnalysisSOSController extends Controller
         ]);
     }
 
+    // Ganti fungsi getGalaksiReportData() yang lama dengan yang ini.
+
     private function getGalaksiReportData()
     {
-        $poColumnInSos = 'standard_name';
-
-        $masterPoList = ListPo::query()
+        // 1. [PERBAIKAN] Tambahkan aturan bisnis untuk menggabungkan nama PO
+        $nipnasToPoMap = ListPo::query()
             ->whereNotNull('po')
             ->where('po', '!=', '')
             ->whereNotIn('po', ['HOLD', 'LANDING'])
-            ->distinct()
-            ->orderBy('po')
-            ->pluck('po');
+            ->get(['nipnas', 'po'])
+            ->pluck('po', 'nipnas')
+            ->map(function ($poName) {
+                // Pertama, bersihkan spasi tersembunyi
+                $cleanedName = trim($poName);
 
+                // Terapkan aturan penggabungan spesifik
+                if (strtoupper($cleanedName) === 'EKA SARI AYUNINGTYAS') {
+                    return 'EKA SARI';
+                }
+
+                // Kembalikan nama yang sudah bersih
+                return $cleanedName;
+            });
+
+        // 2. Lakukan agregasi data (Logika ini sudah benar dan tidak perlu diubah)
         $aggregatedData = SosData::query()
             ->select(
-                "{$poColumnInSos} as po",
+                'nipnas',
+                DB::raw("SUM(CASE WHEN kategori_umur = '< 3 BLN' AND UPPER(order_subtype) = 'NEW INSTALL' THEN 1 ELSE 0 END) as ao_lt_3bln"),
+                DB::raw("SUM(CASE WHEN kategori_umur = '< 3 BLN' AND UPPER(order_subtype) = 'SUSPEND' THEN 1 ELSE 0 END) as so_lt_3bln"),
+                DB::raw("SUM(CASE WHEN kategori_umur = '< 3 BLN' AND UPPER(order_subtype) = 'DISCONNECT' THEN 1 ELSE 0 END) as do_lt_3bln"),
+                DB::raw("SUM(CASE WHEN kategori_umur = '< 3 BLN' AND UPPER(order_subtype) IN ('MODIFY PRICE', 'MODIFY', 'MODIFY BA', 'RENEWAL AGREEMENT', 'MODIFY TERMIN') THEN 1 ELSE 0 END) as mo_lt_3bln"),
+                DB::raw("SUM(CASE WHEN kategori_umur = '< 3 BLN' AND UPPER(order_subtype) = 'RESUME' THEN 1 ELSE 0 END) as ro_lt_3bln"),
+                DB::raw("SUM(CASE WHEN kategori_umur = '> 3 BLN' AND UPPER(order_subtype) = 'NEW INSTALL' THEN 1 ELSE 0 END) as ao_gt_3bln"),
+                DB::raw("SUM(CASE WHEN kategori_umur = '> 3 BLN' AND UPPER(order_subtype) = 'SUSPEND' THEN 1 ELSE 0 END) as so_gt_3bln"),
+                DB::raw("SUM(CASE WHEN kategori_umur = '> 3 BLN' AND UPPER(order_subtype) = 'DISCONNECT' THEN 1 ELSE 0 END) as do_gt_3bln"),
+                DB::raw("SUM(CASE WHEN kategori_umur = '> 3 BLN' AND UPPER(order_subtype) IN ('MODIFY PRICE', 'MODIFY', 'MODIFY BA', 'RENEWAL AGREEMENT', 'MODIFY TERMIN') THEN 1 ELSE 0 END) as mo_gt_3bln"),
+                DB::raw("SUM(CASE WHEN kategori_umur = '> 3 BLN' AND UPPER(order_subtype) = 'RESUME' THEN 1 ELSE 0 END) as ro_gt_3bln")
             )
-            ->whereNotNull($poColumnInSos)
-            ->where($poColumnInSos, '!=', '')
-            ->groupBy('po')
-            ->get()
-            ->keyBy('po');
+            ->where(DB::raw('UPPER(li_status)'), 'IN PROGRESS')
+            ->groupBy('nipnas')
+            ->get();
 
-        $finalData = [];
+        // 3. Siapkan struktur hasil akhir. (Logika ini sudah benar)
+        $resultsByPoName = [];
         $blankRow = [
             'ao_lt_3bln' => 0, 'so_lt_3bln' => 0, 'do_lt_3bln' => 0, 'mo_lt_3bln' => 0, 'ro_lt_3bln' => 0,
             'ao_gt_3bln' => 0, 'so_gt_3bln' => 0, 'do_gt_3bln' => 0, 'mo_gt_3bln' => 0, 'ro_gt_3bln' => 0,
         ];
 
-        foreach ($masterPoList as $poName) {
-            if (isset($aggregatedData[$poName])) {
-                $finalData[] = $aggregatedData[$poName]->toArray();
-            } else {
-                $finalData[] = array_merge(['po' => $poName], $blankRow);
+        foreach ($aggregatedData as $item) {
+            if (isset($nipnasToPoMap[$item->nipnas])) {
+                $poName = $nipnasToPoMap[$item->nipnas]; // Nama PO di sini sudah digabungkan
+                if (!isset($resultsByPoName[$poName])) {
+                    $resultsByPoName[$poName] = array_merge(['po' => $poName], $blankRow);
+                }
+                foreach ($blankRow as $key => $value) {
+                    $resultsByPoName[$poName][$key] += $item->$key;
+                }
             }
+        }
+
+        // 4. Pastikan semua PO dari master list tetap muncul di tabel. (Logika ini sudah benar)
+        $uniquePoNames = collect($nipnasToPoMap->values())->unique()->sort();
+        $finalData = [];
+        foreach ($uniquePoNames as $poName) {
+            $finalData[] = $resultsByPoName[$poName] ?? array_merge(['po' => $poName], $blankRow);
         }
 
         return $finalData;
@@ -222,40 +255,55 @@ class AnalysisSOSController extends Controller
         return Redirect::back()->with('success', 'Tampilan tabel berhasil di-reset ke pengaturan awal.');
     }
 
-    /**
-     * Helper method untuk mengagregasi data report utama dari tabel sos_data.
-     */
+    // Ganti seluruh fungsi getSosReportData() dengan versi final ini.
+
     private function getSosReportData()
     {
-        // 1. Definisikan master data Witel dan Segmen
+        // 1. [PERBAIKAN] Definisikan Witel yang akan ditampilkan di tabel akhir
         $masterWitelList = ['BALI', 'JATIM BARAT', 'JATIM TIMUR', 'NUSA TENGGARA', 'SURAMADU'];
-        $masterSegmentList = ['SME', 'GOV', 'PRIVATE', 'SOE'];
 
-        // 2. Ambil semua data, diindeks berdasarkan segmen dan witel
+        // Definisikan Witel sumber dari database yang akan kita proses
+        $sourceWitelList = ['BALI', 'MALANG', 'SIDOARJO', 'NUSA TENGGARA', 'SURAMADU'];
+
+        // Definisikan Segmen (sama seperti sebelumnya)
+        $masterSegmentList = ['PRIVATE SERVICE', 'REGIONAL', 'GOVERNMENT', 'STATE-OWNED ENTERPRISE SERVICE', 'ENTERPRISE'];
+
+        // 2. Query utama dengan logika pemetaan Witel
         $dbData = SosData::query()
             ->select(
-                'segmen', 'bill_witel as witel',
-                DB::raw("SUM(CASE WHEN kategori_umur = '<3BLN' AND kategori = '1. PROVIDE ORDER' THEN 1 ELSE 0 END) as provide_order_lt_3bln"),
-                DB::raw("SUM(CASE WHEN kategori_umur = '<3BLN' AND kategori = '1. PROVIDE ORDER' THEN revenue ELSE 0 END) / 1000000 as est_bc_provide_order_lt_3bln"),
-                DB::raw("SUM(CASE WHEN kategori_umur = '<3BLN' AND kategori = '2. IN PROCESS' THEN 1 ELSE 0 END) as in_process_lt_3bln"),
-                DB::raw("SUM(CASE WHEN kategori_umur = '<3BLN' AND kategori = '2. IN PROCESS' THEN revenue ELSE 0 END) / 1000000 as est_bc_in_process_lt_3bln"),
-                DB::raw("SUM(CASE WHEN kategori_umur = '<3BLN' AND kategori = '3. READY TO BILL' THEN 1 ELSE 0 END) as ready_to_bill_lt_3bln"),
-                DB::raw("SUM(CASE WHEN kategori_umur = '<3BLN' AND kategori = '3. READY TO BILL' THEN revenue ELSE 0 END) / 1000000 as est_bc_ready_to_bill_lt_3bln"),
-                DB::raw("SUM(CASE WHEN kategori_umur = '>3BLN' AND kategori = '1. PROVIDE ORDER' THEN 1 ELSE 0 END) as provide_order_gt_3bln"),
-                DB::raw("SUM(CASE WHEN kategori_umur = '>3BLN' AND kategori = '1. PROVIDE ORDER' THEN revenue ELSE 0 END) / 1000000 as est_bc_provide_order_gt_3bln"),
-                DB::raw("SUM(CASE WHEN kategori_umur = '>3BLN' AND kategori = '2. IN PROCESS' THEN 1 ELSE 0 END) as in_process_gt_3bln"),
-                DB::raw("SUM(CASE WHEN kategori_umur = '>3BLN' AND kategori = '2. IN PROCESS' THEN revenue ELSE 0 END) / 1000000 as est_bc_in_process_gt_3bln"),
-                DB::raw("SUM(CASE WHEN kategori_umur = '>3BLN' AND kategori = '3. READY TO BILL' THEN 1 ELSE 0 END) as ready_to_bill_gt_3bln"),
-                DB::raw("SUM(CASE WHEN kategori_umur = '>3BLN' AND kategori = '3. READY TO BILL' THEN revenue ELSE 0 END) / 1000000 as est_bc_ready_to_bill_gt_3bln")
+                DB::raw('TRIM(UPPER(segmen)) as segmen'),
+
+                // [LOGIKA BARU] Petakan ulang nama Witel menggunakan CASE WHEN
+                DB::raw("CASE
+                        WHEN TRIM(UPPER(bill_witel)) = 'MALANG' THEN 'JATIM BARAT'
+                        WHEN TRIM(UPPER(bill_witel)) = 'SIDOARJO' THEN 'JATIM TIMUR'
+                        ELSE TRIM(UPPER(bill_witel))
+                     END as witel"),
+
+                // Query SUM tetap sama
+                DB::raw("SUM(CASE WHEN kategori_umur = '< 3 BLN' AND UPPER(kategori) = '1. PROVIDE ORDER' THEN 1 ELSE 0 END) as provide_order_lt_3bln"),
+                DB::raw("SUM(CASE WHEN kategori_umur = '< 3 BLN' AND UPPER(kategori) = '1. PROVIDE ORDER' THEN revenue ELSE 0 END) / 1000000 as est_bc_provide_order_lt_3bln"),
+                DB::raw("SUM(CASE WHEN kategori_umur = '< 3 BLN' AND UPPER(kategori) = '2. IN PROCESS' THEN 1 ELSE 0 END) as in_process_lt_3bln"),
+                DB::raw("SUM(CASE WHEN kategori_umur = '< 3 BLN' AND UPPER(kategori) = '2. IN PROCESS' THEN revenue ELSE 0 END) / 1000000 as est_bc_in_process_lt_3bln"),
+                DB::raw("SUM(CASE WHEN kategori_umur = '< 3 BLN' AND UPPER(kategori) = '3. READY TO BILL' THEN 1 ELSE 0 END) as ready_to_bill_lt_3bln"),
+                DB::raw("SUM(CASE WHEN kategori_umur = '< 3 BLN' AND UPPER(kategori) = '3. READY TO BILL' THEN revenue ELSE 0 END) / 1000000 as est_bc_ready_to_bill_lt_3bln"),
+                DB::raw("SUM(CASE WHEN kategori_umur = '> 3 BLN' AND UPPER(kategori) = '1. PROVIDE ORDER' THEN 1 ELSE 0 END) as provide_order_gt_3bln"),
+                DB::raw("SUM(CASE WHEN kategori_umur = '> 3 BLN' AND UPPER(kategori) = '1. PROVIDE ORDER' THEN revenue ELSE 0 END) / 1000000 as est_bc_provide_order_gt_3bln"),
+                DB::raw("SUM(CASE WHEN kategori_umur = '> 3 BLN' AND UPPER(kategori) = '2. IN PROCESS' THEN 1 ELSE 0 END) as in_process_gt_3bln"),
+                DB::raw("SUM(CASE WHEN kategori_umur = '> 3 BLN' AND UPPER(kategori) = '2. IN PROCESS' THEN revenue ELSE 0 END) / 1000000 as est_bc_in_process_gt_3bln"),
+                DB::raw("SUM(CASE WHEN kategori_umur = '> 3 BLN' AND UPPER(kategori) = '3. READY TO BILL' THEN 1 ELSE 0 END) as ready_to_bill_gt_3bln"),
+                DB::raw("SUM(CASE WHEN kategori_umur = '> 3 BLN' AND UPPER(kategori) = '3. READY TO BILL' THEN revenue ELSE 0 END) / 1000000 as est_bc_ready_to_bill_gt_3bln")
             )
-            ->whereIn('bill_witel', $masterWitelList)
-            ->whereIn('segmen', $masterSegmentList)
-            ->groupBy('segmen', 'bill_witel')
+            // [FILTER BARU] Hanya ambil data dari witel sumber yang relevan
+            ->whereIn(DB::raw('TRIM(UPPER(bill_witel))'), $sourceWitelList)
+            ->whereIn(DB::raw('TRIM(UPPER(segmen))'), $masterSegmentList)
+            // Group by nama witel yang sudah dipetakan ulang
+            ->groupBy('segmen', 'witel')
             ->get()
             ->keyBy(fn ($item) => $item->segmen.'_'.$item->witel)
             ->toArray();
 
-        // 3. Bangun struktur data akhir
+        // 3. Bangun struktur data akhir (Tidak ada perubahan di sini, akan bekerja otomatis)
         $processedData = [];
         $grandTotal = $this->getBlankTotalRow('GRAND TOTAL');
 
@@ -265,12 +313,9 @@ class AnalysisSOSController extends Controller
 
             foreach ($masterWitelList as $witel) {
                 $key = $segment.'_'.$witel;
-                // Jika data tidak ada, buat baris kosong dengan nilai 0
                 $rowData = $dbData[$key] ?? array_merge(['segmen' => $segment, 'witel' => $witel], $this->getBlankTotalRow(null));
-
                 $segmentWitelRows[] = $this->calculateRowTotals($rowData);
 
-                // Akumulasi data ke total segmen dan grand total
                 foreach ($rowData as $colKey => $value) {
                     if (is_numeric($value)) {
                         $segmentTotal[$colKey] += $value;
@@ -279,13 +324,10 @@ class AnalysisSOSController extends Controller
                 }
             }
 
-            // [PERBAIKAN] Hapus pengecekan 'if ($hasDataInSegment)'
-            // Selalu tambahkan baris total segmen dan baris witelnya, bahkan jika nilainya 0.
             $processedData[] = $this->calculateRowTotals($segmentTotal);
             $processedData = array_merge($processedData, $segmentWitelRows);
         }
 
-        // Tambahkan baris Grand Total di akhir
         $processedData[] = $this->calculateRowTotals($grandTotal);
 
         return $processedData;

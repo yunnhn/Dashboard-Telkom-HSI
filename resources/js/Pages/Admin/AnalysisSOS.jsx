@@ -365,7 +365,7 @@ const SosReportTable = ({ data, tableConfig, viewMode }) => {
                         // Cek apakah ini baris total (baik segmen maupun grand total)
                         if (item.isTotal) {
                             const isGrandTotal = item.witel === 'GRAND TOTAL';
-                            const segmentTotalNames = ['SME', 'GOV', 'PRIVATE', 'SOE'];
+                            const segmentTotalNames = ['PRIVATE SERVICE', 'REGIONAL', 'GOVERNMENT', 'STATE-OWNED ENTERPRISE SERVICE', 'ENTERPRISE'];
                             const isSegmentTotal = segmentTotalNames.includes(item.witel);
 
                             // [PERUBAHAN] Logika penentuan kelas CSS untuk baris total
@@ -835,8 +835,8 @@ export default function AnalysisSOS({
     const provCompleteColumns = useMemo(() => provCompleteColumnsTemplate, []);
 
     return (
-        <AuthenticatedLayout auth={auth} header="Analysis SOS">
-            <Head title="Analysis SOS" />
+        <AuthenticatedLayout auth={auth} header="Analysis Datin">
+            <Head title="Analysis Datin" />
             <DndContext
                 sensors={sensors}
                 collisionDetection={closestCenter}
@@ -983,7 +983,7 @@ export default function AnalysisSOS({
                             >
                                 <h3 className="font-semibold text-lg text-gray-800">Master Data PO</h3>
                                 <button className="text-blue-600 hover:text-blue-800 text-sm font-semibold flex items-center gap-2">
-                                    {isPoFormVisible ? 'Tutup' : 'Buka Form'}
+                                    {isPoFormVisible ? 'Tutup' : 'Tambah PO'}
                                     {/* Icon panah sederhana */}
                                     <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 transition-transform ${isPoFormVisible ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />

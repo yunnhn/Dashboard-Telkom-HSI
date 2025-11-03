@@ -35,19 +35,14 @@ class ProcessSOSImport implements ShouldQueue
             return;
         }
 
-        // 1. Buat nama tabel sementara yang unik
         $temporaryTableName = 'temp_sos_import_'.Str::random(10);
         Log::info("Membuat tabel sementara: {$temporaryTableName}");
 
-        // 2. Dapatkan path absolut dari file yang disimpan
         $filePath = Storage::disk('local')->path($this->path);
-        // Ganti backslash (\) dengan forward slash (/) agar kompatibel dengan SQL
         $filePath = str_replace('\\', '/', $filePath);
 
         try {
-            // BUAT TABEL SEMENTARA: Strukturnya harus mencakup SEMUA 77 kolom dari CSV Anda.
-            // Kita hanya perlu mendefinisikan kolom yang akan digunakan untuk filter dan data.
-            // Cukup gunakan VARCHAR untuk semua agar simpel.
+            // [FIX] Mengembalikan definisi kolom yang lengkap dan benar
             DB::statement("
                 CREATE TEMPORARY TABLE `{$temporaryTableName}` (
                     `nipnas` VARCHAR(255) NULL, `standard_name` VARCHAR(255) NULL, `order_id` VARCHAR(255) NULL,
@@ -73,28 +68,33 @@ class ProcessSOSImport implements ShouldQueue
                     `product_activation_date` VARCHAR(255) NULL, `quote_row_id` VARCHAR(255) NULL, `line_item_description` TEXT NULL,
                     `asset_integ_id` VARCHAR(255) NULL, `action_cd` VARCHAR(255) NULL, `kategori_umur` VARCHAR(255) NULL,
                     `am` VARCHAR(255) NULL, `x_billcomp_dt` VARCHAR(255) NULL, `umur_order` VARCHAR(255) NULL,
-                    INDEX `idx_order_id` (`order_id`),
-                    INDEX `idx_bill_region` (`bill_region`),
-                    INDEX `idx_kategori` (`kategori`),
-                    INDEX `idx_li_product_name` (`li_product_name`)
+                    INDEX `idx_order_id` (`order_id`)
                 )
             ");
 
-            // 3. JALANKAN LOAD DATA INFILE
-            // Perintah ini akan membaca CSV dan memasukkannya ke tabel sementara
             Log::info("Memulai LOAD DATA INFILE dari: {$filePath}");
-            DB::connection()->getPdo()->exec("
+
+            $query = "
                 LOAD DATA LOCAL INFILE '{$filePath}'
                 INTO TABLE `{$temporaryTableName}`
+                CHARACTER SET utf8mb4
                 FIELDS TERMINATED BY ','
                 ENCLOSED BY '\"'
-                LINES TERMINATED BY '\\r\\n'
+                LINES TERMINATED BY '\\n'
                 IGNORE 1 ROWS
-            ");
+            ";
+            DB::connection()->getPdo()->exec($query);
 
-            // 4. JALANKAN SATU QUERY UPSERT DARI TABEL SEMENTARA KE TABEL UTAMA
-            // Query ini memilih data dari tabel sementara, menerapkan filter, dan memasukkannya.
-            Log::info('Memulai proses INSERT... ON DUPLICATE KEY UPDATE');
+            $tempRowCount = DB::table($temporaryTableName)->count();
+            Log::info("Data berhasil dimuat ke tabel sementara. Jumlah baris: {$tempRowCount}");
+
+            if ($tempRowCount === 0) {
+                Log::warning('Tidak ada data yang dimuat ke tabel sementara. Proses dihentikan.');
+
+                return;
+            }
+
+            Log::info('Memulai proses INSERT INTO ... SELECT ...');
 
             $affectedRows = DB::statement("
                 INSERT INTO sos_data (
@@ -107,9 +107,20 @@ class ProcessSOSImport implements ShouldQueue
                 SELECT
                     order_id, nipnas, standard_name, order_subtype, order_description, segmen, sub_segmen,
                     custcity, cust_witel, servcity, service_witel, bill_witel, li_product_name,
-                    STR_TO_DATE(li_billdate, '%m/%d/%Y'), li_milestone, kategori, li_status, STR_TO_DATE(li_status_date, '%m/%d/%Y'), is_termin,
-                    biaya_pasang, hrg_bulanan, revenue, STR_TO_DATE(order_created_date, '%m/%d/%Y %H:%i:%s'), agree_type, STR_TO_DATE(agree_start_date, '%m/%d/%Y'),
-                    STR_TO_DATE(agree_end_date, '%m/%d/%Y'), lama_kontrak_hari, amortisasi, action_cd, kategori_umur, umur_order, NOW(), NOW()
+                    STR_TO_DATE(NULLIF(li_billdate, ''), '%Y-%m-%d'),
+                    li_milestone, kategori, li_status,
+                    STR_TO_DATE(NULLIF(li_status_date, ''), '%Y-%m-%d'), is_termin,
+                    COALESCE(NULLIF(biaya_pasang, ''), 0),
+                    COALESCE(NULLIF(hrg_bulanan, ''), 0),
+                    COALESCE(NULLIF(revenue, ''), 0),
+                    STR_TO_DATE(NULLIF(order_created_date, ''), '%Y-%m-%d %H:%i:%s'),
+                    agree_type,
+                    STR_TO_DATE(NULLIF(agree_start_date, ''), '%Y-%m-%d'),
+                    STR_TO_DATE(NULLIF(agree_end_date, ''), '%Y-%m-%d'),
+                    COALESCE(NULLIF(lama_kontrak_hari, ''), 0),
+                    amortisasi, action_cd, kategori_umur,
+                    COALESCE(NULLIF(umur_order, ''), 0),
+                    NOW(), NOW()
                 FROM `{$temporaryTableName}`
                 WHERE
                     bill_region IN ('BB REGIONAL 3', 'B2B REGIONAL 3')
@@ -121,14 +132,24 @@ class ProcessSOSImport implements ShouldQueue
                         'IP Transit NeuCentrIX', 'VPN FR', 'NeuCentrIX Interconnect Node'
                     )
                 ON DUPLICATE KEY UPDATE
-                    nipnas = VALUES(nipnas), standard_name = VALUES(standard_name), segmen = VALUES(segmen),
-                    -- ... (tambahkan semua kolom yang perlu di-update) ...
+                    nipnas = VALUES(nipnas), standard_name = VALUES(standard_name), order_subtype = VALUES(order_subtype),
+                    order_description = VALUES(order_description), segmen = VALUES(segmen), sub_segmen = VALUES(sub_segmen),
+                    cust_city = VALUES(cust_city), cust_witel = VALUES(cust_witel), serv_city = VALUES(serv_city),
+                    service_witel = VALUES(service_witel), bill_witel = VALUES(bill_witel), li_product_name = VALUES(li_product_name),
+                    li_billdate = VALUES(li_billdate), li_milestone = VALUES(li_milestone), kategori = VALUES(kategori),
+                    li_status = VALUES(li_status), li_status_date = VALUES(li_status_date), is_termin = VALUES(is_termin),
+                    biaya_pasang = VALUES(biaya_pasang), hrg_bulanan = VALUES(hrg_bulanan), revenue = VALUES(revenue),
+                    order_created_date = VALUES(order_created_date), agree_type = VALUES(agree_type), agree_start_date = VALUES(agree_start_date),
+                    agree_end_date = VALUES(agree_end_date), lama_kontrak_hari = VALUES(lama_kontrak_hari), amortisasi = VALUES(amortisasi),
+                    action_cd = VALUES(action_cd), kategori_umur = VALUES(kategori_umur), umur_order = VALUES(umur_order),
                     updated_at = NOW()
             ");
 
             Log::info("Proses INSERT/UPDATE selesai. Terdapat {$affectedRows} baris yang terpengaruh.");
+        } catch (\Throwable $e) {
+            Log::error('Error selama proses import: '.$e->getMessage());
+            throw $e;
         } finally {
-            // 5. SELALU HAPUS TABEL SEMENTARA
             Log::info("Menghapus tabel sementara: {$temporaryTableName}");
             DB::statement("DROP TEMPORARY TABLE IF EXISTS `{$temporaryTableName}`");
         }

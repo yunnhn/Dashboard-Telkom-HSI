@@ -1,5 +1,3 @@
-// file: resources/js/Components/Sos/GalaksiReportTable.jsx
-
 import React, { useMemo } from 'react';
 
 const formatNumber = (value) => {
@@ -35,7 +33,20 @@ const GalaksiReportTable = ({ galaksiData = [] }) => {
 
     const grand_total_lt_3bln = grandTotal.ao_lt_3bln + grandTotal.so_lt_3bln + grandTotal.do_lt_3bln + grandTotal.mo_lt_3bln + grandTotal.ro_lt_3bln;
     const grand_total_gt_3bln = grandTotal.ao_gt_3bln + grandTotal.so_gt_3bln + grandTotal.do_gt_3bln + grandTotal.mo_gt_3bln + grandTotal.ro_gt_3bln;
-    const grand_achievement = grand_total_lt_3bln > 0 ? (grand_total_gt_3bln / grand_total_lt_3bln) * 100 : 100;
+
+    // [PERBAIKAN] Logika kalkulasi Grand Achievement baru
+    let grand_achievement;
+    if (grand_total_gt_3bln === 0) {
+        grand_achievement = 100;
+    } else if (grand_total_gt_3bln >= 1 && grand_total_gt_3bln <= 5) {
+        grand_achievement = 80;
+    } else if (grand_total_gt_3bln >= 6 && grand_total_gt_3bln <= 10) {
+        grand_achievement = 60;
+    } else if (grand_total_gt_3bln >= 11 && grand_total_gt_3bln <= 20) {
+        grand_achievement = 40;
+    } else { // Lebih dari 20
+        grand_achievement = 20;
+    }
 
     return (
         <div className="overflow-x-auto">
@@ -66,18 +77,20 @@ const GalaksiReportTable = ({ galaksiData = [] }) => {
                     {galaksiData.map((item, index) => {
                         const total_lt_3bln = Number(item.ao_lt_3bln ?? 0) + Number(item.so_lt_3bln ?? 0) + Number(item.do_lt_3bln ?? 0) + Number(item.mo_lt_3bln ?? 0) + Number(item.ro_lt_3bln ?? 0);
                         const total_gt_3bln = Number(item.ao_gt_3bln ?? 0) + Number(item.so_gt_3bln ?? 0) + Number(item.do_gt_3bln ?? 0) + Number(item.mo_gt_3bln ?? 0) + Number(item.ro_gt_3bln ?? 0);
-                        const achievement = total_lt_3bln > 0 ? (total_gt_3bln / total_lt_3bln) * 100 : 100;
 
-                        // **[LOGIKA KONDISI]** Mengecek apakah semua kolom di grup > 3 BLN bernilai nol
-                        const isAllGt3BlnZero =
-                            (Number(item.ao_gt_3bln ?? 0) === 0) &&
-                            (Number(item.so_gt_3bln ?? 0) === 0) &&
-                            (Number(item.do_gt_3bln ?? 0) === 0) &&
-                            (Number(item.mo_gt_3bln ?? 0) === 0) &&
-                            (Number(item.ro_gt_3bln ?? 0) === 0);
-
-                        // **[PERUBAHAN]** Menentukan kelas CSS hanya untuk sel di grup > 3 BLN
-                        const gt3BlnCellClass = isAllGt3BlnZero ? 'bg-yellow-100' : '';
+                        // [PERBAIKAN] Logika kalkulasi Achievement baru untuk setiap baris
+                        let achievement;
+                        if (total_gt_3bln === 0) {
+                            achievement = 100;
+                        } else if (total_gt_3bln >= 1 && total_gt_3bln <= 5) {
+                            achievement = 80;
+                        } else if (total_gt_3bln >= 6 && total_gt_3bln <= 10) {
+                            achievement = 60;
+                        } else if (total_gt_3bln >= 11 && total_gt_3bln <= 20) {
+                            achievement = 40;
+                        } else { // Lebih dari 20
+                            achievement = 20;
+                        }
 
                         return (
                             <tr key={index} className="text-center bg-white hover:bg-gray-50">
@@ -91,18 +104,16 @@ const GalaksiReportTable = ({ galaksiData = [] }) => {
                                 <td className="py-2 px-3 border-r border-b border-gray-300">{formatNumber(item.ro_lt_3bln)}</td>
                                 <td className="py-2 px-3 border-r border-b border-gray-300 font-bold bg-gray-100">{formatNumber(total_lt_3bln)}</td>
 
-                                {/* Kolom > 3 BLN (Dengan Kelas Kondisional) */}
-                                <td className={`py-2 px-3 border-r border-b border-gray-300 ${gt3BlnCellClass}`}>{formatNumber(item.ao_gt_3bln)}</td>
-                                <td className={`py-2 px-3 border-r border-b border-gray-300 ${gt3BlnCellClass}`}>{formatNumber(item.so_gt_3bln)}</td>
-                                <td className={`py-2 px-3 border-r border-b border-gray-300 ${gt3BlnCellClass}`}>{formatNumber(item.do_gt_3bln)}</td>
-                                <td className={`py-2 px-3 border-r border-b border-gray-300 ${gt3BlnCellClass}`}>{formatNumber(item.mo_gt_3bln)}</td>
-                                <td className={`py-2 px-3 border-r border-b border-gray-300 ${gt3BlnCellClass}`}>{formatNumber(item.ro_gt_3bln)}</td>
+                                {/* [PERBAIKAN] Kolom > 3 BLN diberi warna kuning secara permanen */}
+                                <td className="py-2 px-3 border-r border-b border-gray-300 bg-yellow-100">{formatNumber(item.ao_gt_3bln)}</td>
+                                <td className="py-2 px-3 border-r border-b border-gray-300 bg-yellow-100">{formatNumber(item.so_gt_3bln)}</td>
+                                <td className="py-2 px-3 border-r border-b border-gray-300 bg-yellow-100">{formatNumber(item.do_gt_3bln)}</td>
+                                <td className="py-2 px-3 border-r border-b border-gray-300 bg-yellow-100">{formatNumber(item.mo_gt_3bln)}</td>
+                                <td className="py-2 px-3 border-r border-b border-gray-300 bg-yellow-100">{formatNumber(item.ro_gt_3bln)}</td>
+                                <td className="py-2 px-3 border-r border-b border-gray-300 font-bold bg-yellow-100">{formatNumber(total_gt_3bln)}</td>
 
-                                {/* Kolom Total > 3 BLN (Dengan Kelas Kondisional pada bg-gray-100) */}
-                                <td className={`py-2 px-3 border-r border-b border-gray-300 font-bold ${isAllGt3BlnZero ? 'bg-yellow-100' : 'bg-gray-100'}`}>{formatNumber(total_gt_3bln)}</td>
-
-                                {/* Kolom Achievement (Tanpa Perubahan) */}
-                                <td className="py-2 px-3 border-b border-gray-300 font-bold bg-gray-100">{`${achievement.toFixed(0)}%`}</td>
+                                {/* Kolom Achievement dengan logika baru */}
+                                <td className="py-2 px-3 border-b border-gray-300 font-bold bg-gray-100">{`${achievement}%`}</td>
                             </tr>
                         );
                     })}
@@ -122,7 +133,7 @@ const GalaksiReportTable = ({ galaksiData = [] }) => {
                         <td className="py-2 px-3 border-r border-gray-400">{formatNumber(grandTotal.mo_gt_3bln)}</td>
                         <td className="py-2 px-3 border-r border-gray-400">{formatNumber(grandTotal.ro_gt_3bln)}</td>
                         <td className="py-2 px-3 border-r border-gray-400">{formatNumber(grand_total_gt_3bln)}</td>
-                        <td className="py-2 px-3 bg-gray-600">{`${grand_achievement.toFixed(0)}%`}</td>
+                        <td className="py-2 px-3 bg-gray-600">{`${grand_achievement}%`}</td>
                     </tr>
                 </tfoot>
             </table>

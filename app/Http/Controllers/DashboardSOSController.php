@@ -5,11 +5,13 @@ namespace App\Http\Controllers;
 use App\Models\SosData;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
 
 class DashboardSOSController extends Controller
 {
-    public function index(Request $request)
+    // [BARU] Buat fungsi private untuk kueri agar tidak duplikat kode
+    private function getDashboardData(Request $request)
     {
         // 1. Validasi filter
         $validated = $request->validate([
@@ -23,14 +25,14 @@ class DashboardSOSController extends Controller
 
         $limit = $validated['limit'] ?? '10';
 
-        // 2. Siapkan opsi untuk dropdown filter di frontend
+        // 2. Siapkan opsi untuk dropdown filter
         $filterOptions = [
             'witelList' => SosData::query()->select(DB::raw('TRIM(UPPER(bill_witel)) as witel'))->whereNotNull('bill_witel')->distinct()->orderBy('witel')->pluck('witel'),
             'segmenList' => SosData::query()->select(DB::raw('TRIM(UPPER(segmen)) as segmen'))->whereNotNull('segmen')->distinct()->orderBy('segmen')->pluck('segmen'),
             'kategoriList' => SosData::query()->select('kategori')->whereNotNull('kategori')->distinct()->orderBy('kategori')->pluck('kategori'),
         ];
 
-        // 3. Buat closure untuk menerapkan filter secara konsisten
+        // 3. Buat closure untuk menerapkan filter
         $applyFilters = function ($query) use ($validated) {
             if (!empty($validated['startDate'])) {
                 $query->where('order_created_date', '>=', $validated['startDate'].' 00:00:00');
@@ -49,7 +51,7 @@ class DashboardSOSController extends Controller
             }
         };
 
-        // 4. Query untuk data chart (Tidak berubah)
+        // 4. Query untuk data chart
         $baseQuery = SosData::query()->tap($applyFilters);
 
         $ordersByCategory = (clone $baseQuery)->select(
@@ -70,15 +72,15 @@ class DashboardSOSController extends Controller
         )->whereNotNull('bill_witel')->groupBy('witel')->orderBy('value', 'desc')->get();
 
         $segmenDistribution = (clone $baseQuery)->select(
-            DB::raw('TRIM(UPPER(segmen)) as witel'),
+            DB::raw('TRIM(UPPER(segmen)) as witel'), // Anda menggunakan 'witel' sebagai alias di sini, saya biarkan
             DB::raw('COUNT(*) as value')
         )->whereNotNull('segmen')->groupBy('witel')->orderBy('value', 'desc')->get();
 
-        // 5. [PERBAIKAN] Query untuk Data Preview
+        // 5. Query untuk Data Preview
         $dataPreview = SosData::query()
             ->select(
                 'id', 'order_id', 'nipnas', 'standard_name', 'li_product_name',
-                'segmen', 'bill_witel', // <-- Kolom 'segmen' dan 'bill_witel' ditambahkan
+                'segmen', 'bill_witel',
                 'kategori', 'li_status', 'kategori_umur', 'order_created_date'
             )
             ->tap($applyFilters)
@@ -86,7 +88,8 @@ class DashboardSOSController extends Controller
             ->paginate($limit)
             ->withQueryString();
 
-        return Inertia::render('DashboardSOS', [
+        // 6. Kembalikan semua data sebagai array
+        return [
             'ordersByCategory' => $ordersByCategory,
             'revenueByCategory' => $revenueByCategory,
             'witelDistribution' => $witelDistribution,
@@ -94,6 +97,35 @@ class DashboardSOSController extends Controller
             'dataPreview' => $dataPreview,
             'filters' => $validated + ['limit' => $limit],
             'filterOptions' => $filterOptions,
-        ]);
+        ];
+    }
+
+    public function index(Request $request)
+    {
+        // === [BARU] Cek Pengaturan Embed ===
+        $settings = Cache::get('granular_embed_settings', []);
+
+        if (isset($settings['datin']) && $settings['datin']['enabled'] && !empty($settings['datin']['url'])) {
+            return Inertia::render('Dashboard/ExternalEmbed', [
+                'embedUrl' => $settings['datin']['url'],
+                'headerTitle' => 'Dashboard SOS Datin' // Judul untuk layout
+            ]);
+        }
+
+        $data = $this->getDashboardData($request);
+        return Inertia::render('DashboardSOS', array_merge($data, [
+            'isEmbed' => false,
+        ]));
+    }
+
+    // ===== METHOD BARU UNTUK EMBED =====
+    public function embed(Request $request)
+    {
+        // Panggil data menggunakan fungsi private
+        $data = $this->getDashboardData($request);
+
+        return Inertia::render('DashboardSOS', array_merge($data, [
+            'isEmbed' => true, // <-- Tambahkan ini
+        ]))->rootView('embed'); // <-- Tambahkan ini
     }
 }

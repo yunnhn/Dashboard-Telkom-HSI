@@ -6,11 +6,21 @@ use App\Models\DocumentData;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\Cache;
 
 class DashboardDigitalProductController extends Controller
 {
     public function index(Request $request)
     {
+        $settings = Cache::get('granular_embed_settings', []);
+
+        if (isset($settings['digitalProduct']) && $settings['digitalProduct']['enabled'] && !empty($settings['digitalProduct']['url'])) {
+            return Inertia::render('Dashboard/ExternalEmbed', [
+                'embedUrl' => $settings['digitalProduct']['url'],
+                'headerTitle' => 'Dashboard Digital Product' // Judul untuk layout
+            ]);
+        }
+
         // 1. Validasi filter (sudah benar)
         $validated = $request->validate([
             'startDate' => 'nullable|date_format:Y-m-d',

@@ -1,155 +1,280 @@
-import React, { useMemo } from 'react';
+// resources/js/Components/DataReportTable.jsx
+// [VERSI FINAL DENGAN PERBAIKAN WARNA LINK & ALIGNMENT GRAND TOTAL]
 
-// Asumsi Anda punya file utils/index.js untuk formatting
-const formatPercent = (value) => `${(Number(value) || 0).toFixed(1)}%`;
-const formatRupiah = (value, decimals = 2) => (Number(value) || 0).toFixed(decimals);
-const formatNumber = (value) => Number(value) || 0;
+import React from 'react';
+import { Link } from '@inertiajs/react';
 
-const DataReportTable = ({ data = [], decimalPlaces, tableConfig = [] }) => {
-    // Fungsi-fungsi ini disalin dari AnalysisDigitalProduct.jsx
-    const findColumnDefinition = (keyToFind) => {
-        for (const group of tableConfig) {
-            for (const col of group.columns) {
-                if (col.key === keyToFind) return { colDef: col, parentColDef: null };
-                if (col.subColumns) {
-                    for (const subCol of col.subColumns) {
-                        if (col.key + subCol.key === keyToFind) {
-                            return { colDef: subCol, parentColDef: col };
+/**
+ * Helper untuk format angka
+ */
+const formatNumber = (value, decimalPlaces) => {
+    const num = parseFloat(value);
+    if (isNaN(num)) {
+        return 0;
+    }
+    return num.toLocaleString('id-ID', {
+        minimumFractionDigits: decimalPlaces,
+        maximumFractionDigits: decimalPlaces,
+    });
+};
+
+/**
+ * Helper untuk kalkulasi
+ */
+const calculateValue = (item, calculation) => {
+    const { operation, operands } = calculation;
+    let result = 0;
+
+    try {
+        if (operation === 'sum') {
+            result = operands.reduce((acc, key) => acc + (parseFloat(item[key]) || 0), 0);
+            return formatNumber(result, 0);
+        }
+        else if (operation === 'percentage') {
+            const [realisasiKey, targetKey] = operands;
+            const realisasi = parseFloat(item[realisasiKey]) || 0;
+            const target = parseFloat(item[targetKey]) || 0;
+            result = (target === 0) ? 0 : (realisasi / target) * 100;
+            return formatNumber(result, 2);
+        }
+    } catch (e) {
+        console.error("Calculation error", e);
+        return 0;
+    }
+    return formatNumber(result, 0);
+};
+
+/**
+ * Render sel tabel
+ * [PERUBAHAN 1]: Fungsi ini sekarang menerima 'linkClass' opsional
+ */
+const renderCell = (item, colKey, value, props, linkClass = "text-gray-600 hover:text-gray-400") => {
+    const { segment, month } = props;
+
+    // 1. Logika Formatting
+    let formattedValue;
+    if (colKey.startsWith('revenue_')) {
+        formattedValue = formatNumber(value, 3);
+    } else {
+        formattedValue = formatNumber(value, 0);
+    }
+
+    // 2. Logika Link
+    const isClickable = (colKey.startsWith('in_progress_') || colKey.startsWith('prov_comp_')) && parseFloat(value) > 0;
+
+    if (isClickable) {
+        return (
+            <Link
+                href={route('data-report.details')}
+                data={{
+                    segment: segment,
+                    witel: item.nama_witel,
+                    month: month,
+                    kpi_key: colKey,
+                }}
+                // [PERUBAHAN 2]: Menerapkan 'linkClass' yang dikirim
+                className={`${linkClass} hover:underline font-bold`}
+                title={`Lihat detail ${colKey} untuk ${item.nama_witel || 'GRAND TOTAL'}`}
+            >
+                {formattedValue}
+            </Link>
+        );
+    }
+
+    return formattedValue;
+};
+
+
+// Komponen Utama
+export default function DataReportTable({ data, tableConfig, decimalPlaces, segment, month }) {
+
+    // 1. Render Header (Tidak ada perubahan)
+    const renderHeaders = () => {
+        return (
+            <>
+                {/* Baris Pertama (Group Title) */}
+                <tr className="text-xs text-white uppercase tracking-wider">
+                    <th rowSpan={3} className="py-3 px-4 bg-gray-700 sticky left-0 z-20 border-b border-gray-600 align-middle">WITEL</th>
+                    {tableConfig.map((group, index) => (
+                        <th
+                            key={index}
+                            colSpan={group.columns.reduce((acc, col) => acc + (col.subColumns ? col.subColumns.length : 1), 0)}
+                            rowSpan={group.columns.some(col => col.subColumns) ? 1 : 2}
+                            className={`py-2 px-2 text-center border-b border-l border-gray-600 ${group.groupClass || 'bg-gray-600'}`}
+                        >
+                            {group.groupTitle}
+                        </th>
+                    ))}
+                </tr>
+
+                {/* Baris Kedua (Column & Sub-Column Titles) */}
+                <tr className="text-xs text-white uppercase tracking-wider">
+                    {tableConfig.map((group) =>
+                        group.columns.map((col, colIndex) => {
+                            if (!col.subColumns) {
+                                return null;
+                            }
+                            return (
+                                <th
+                                    key={`${group.groupTitle}-${colIndex}`}
+                                    colSpan={col.subColumns.length}
+                                    className={`py-2 px-2 text-center border-b border-l border-gray-600 ${col.columnClass || group.columnClass}`}
+                                >
+                                    {col.title}
+                                </th>
+                            );
+                        })
+                    )}
+                </tr>
+
+                {/* Baris Ketiga (Sub-Column Titles & Column Titles tanpa sub-column) */}
+                <tr className="text-xs text-white uppercase tracking-wider">
+                    {tableConfig.map((group) =>
+                        group.columns.map((col, colIndex) => {
+                            if (col.subColumns) {
+                                // Render Sub-kolom
+                                return col.subColumns.map((subCol, subIndex) => (
+                                    <th key={`${col.key}-${subIndex}`} className={`py-2 px-2 text-center border-b border-l border-gray-600 ${col.subColumnClass || group.subColumnClass}`}>
+                                        {subCol.title}
+                                    </th>
+                                ));
+                            } else {
+                                // Render Kolom biasa
+                                return (
+                                    <th key={`${col.key}-${colIndex}`} rowSpan={1} className={`py-2 px-2 text-center border-b border-l border-gray-600 ${col.columnClass || group.columnClass}`}>
+                                        {col.title}
+                                    </th>
+                                );
+                            }
+                        })
+                    )}
+                </tr>
+            </>
+        );
+    };
+
+    // 2. Render Body (Tidak ada perubahan)
+    // 'renderCell' dipanggil tanpa 'linkClass', jadi akan default ke biru
+    const renderBody = () => {
+        return data.map((item, rowIndex) => (
+            <tr key={item.nama_witel || rowIndex} className="border-b hover:bg-gray-50 text-sm">
+                <td className="py-2 px-4 whitespace-nowrap sticky left-0 z-10 bg-white font-medium border-r">
+                    {item.nama_witel}
+                </td>
+                {tableConfig.flatMap(group =>
+                    group.columns.map(col => {
+                        if (col.subColumns) {
+                            return col.subColumns.map(subCol => {
+                                const colKey = `${col.key}${subCol.key}`;
+                                let value;
+                                if (subCol.type === 'calculation') {
+                                    value = calculateValue(item, subCol.calculation);
+                                    return <td key={colKey} className="py-2 px-4 text-center border-l">{value}</td>;
+                                } else {
+                                    value = item[colKey] || 0;
+                                    return (
+                                        <td key={colKey} className="py-2 px-4 text-center border-l">
+                                            {renderCell(item, colKey, value, { segment, month })}
+                                        </td>
+                                    );
+                                }
+                            });
+                        } else {
+                            const colKey = col.key;
+                            let value;
+                            if (col.type === 'calculation') {
+                                value = calculateValue(item, col.calculation);
+                                return <td key={colKey} className="py-2 px-4 text-center border-l">{value}</td>;
+                            } else {
+                                value = item[colKey] || 0;
+                                return (
+                                    <td key={colKey} className="py-2 px-4 text-center border-l">
+                                        {renderCell(item, colKey, value, { segment, month })}
+                                    </td>
+                                );
+                            }
                         }
-                    }
-                }
-            }
-        }
-        return { colDef: null, parentColDef: null };
+                    })
+                )}
+            </tr>
+        ));
     };
 
-    const getCellValue = (item, columnDef, parentColumnDef = null) => {
-        const fullKey = parentColumnDef ? parentColumnDef.key + columnDef.key : columnDef.key;
-
-        if (columnDef.type === "calculation") {
-            const { operation, operands } = columnDef.calculation;
-            const values = operands.map((opKey) => {
-                const { colDef: opDef, parentColDef: opParentDef } = findColumnDefinition(opKey);
-                if (!opDef) return 0;
-                return opDef.type === "calculation"
-                    ? getCellValue(item, opDef, opParentDef)
-                    : formatNumber(item[opKey] || 0);
-            });
-            switch (operation) {
-                case "percentage":
-                    const [numerator, denominator] = values;
-                    return denominator === 0 ? formatPercent(0) : formatPercent((numerator / denominator) * 100);
-                case "sum":
-                    return formatNumber(values.reduce((a, b) => a + b, 0));
-                case "average":
-                    if (values.length === 0) return 0;
-                    return formatNumber(
-                        values.reduce((a, b) => a + b, 0) / values.length,
-                    );
-                case "count":
-                    return values.filter((v) => v !== 0).length;
-                default: return "N/A";
-            }
-        }
-
-        if (fullKey.startsWith("revenue_")) {
-            return formatRupiah(item[fullKey], decimalPlaces);
-        }
-        return formatNumber(item[fullKey]);
-    };
-
-    const totals = useMemo(() => {
-        const initialTotals = {};
+    // =========================================================================
+    // [PERBAIKAN] Bagian 3: Render Total (Grand Total)
+    // =========================================================================
+    const renderTotals = () => {
+        // Hitung total
+        const totals = {};
         tableConfig.forEach(group => {
             group.columns.forEach(col => {
                 if (col.subColumns) {
                     col.subColumns.forEach(sc => {
                         if (sc.type !== 'calculation') {
                             const key = col.key + sc.key;
-                            initialTotals[key] = data.reduce((sum, item) => sum + formatNumber(item[key]), 0);
+                            totals[key] = data.reduce((sum, item) => sum + (parseFloat(item[key]) || 0), 0);
                         }
                     });
                 } else if (col.type !== 'calculation') {
-                    initialTotals[col.key] = data.reduce((sum, item) => sum + formatNumber(item[col.key]), 0);
+                    totals[col.key] = data.reduce((sum, item) => sum + (parseFloat(item[col.key]) || 0), 0);
                 }
             });
         });
-        return initialTotals;
-    }, [data, tableConfig]);
 
-    // Render tabel statis, tanpa DndContext atau komponen Draggable
+        return (
+            <tr className="font-bold text-white">
+                <td className="border-t border-gray-700 p-2 text-left sticky left-0 z-10 bg-gray-700">GRAND TOTAL</td>
+
+                {tableConfig.flatMap(group =>
+                    group.columns.map(col => {
+                        // [PERBAIKAN 5] Ambil kelas BG dari 'group.groupClass'
+                        const bgClass = group.groupClass || 'bg-gray-600';
+
+                        if (col.subColumns) {
+                            return col.subColumns.map(subCol => {
+                                const colKey = `${col.key}${subCol.key}`;
+                                let value;
+                                if (subCol.type === 'calculation') {
+                                    value = calculateValue(totals, subCol.calculation);
+                                } else {
+                                    value = totals[colKey] || 0;
+                                    value = renderCell(totals, colKey, value, { segment: 'ALL', month }, "text-white hover:text-gray-200");
+                                }
+
+                                // [PERUBAHAN 4] Tambahkan 'text-center'
+                                return <td key={`total-${colKey}`} className={`border-t border-l border-gray-700 p-2 text-center ${bgClass}`}>{value}</td>;
+                            });
+                        } else {
+                            const colKey = col.key;
+                            let value;
+                            if (col.type === 'calculation') {
+                                value = calculateValue(totals, col.calculation);
+                            } else {
+                                value = totals[colKey] || 0;
+                                // [PERUBAHAN 3] Kirim 'text-white' sebagai 'linkClass'
+                                value = renderCell(totals, colKey, value, { segment: 'ALL', month }, "text-white hover:text-gray-200");
+                            }
+
+                            // [PERUBAHAN 4] Tambahkan 'text-center'
+                            return <td key={`total-${colKey}`} className={`border-t border-l border-gray-700 p-2 text-center ${bgClass}`}>{value}</td>;
+                        }
+                    })
+                )}
+            </tr>
+        );
+    };
+
     return (
-        <div className="overflow-x-auto text-xs">
-            <table className="w-full border-collapse text-center">
-                <thead className="bg-gray-800 text-white">
-                    <tr>
-                        <th className="border p-2 align-middle" rowSpan={3}>WILAYAH TELKOM</th>
-                        {tableConfig.map(group => (
-                            <th key={group.groupTitle} className={`border p-2 ${group.groupClass}`} colSpan={group.columns.reduce((sum, col) => sum + (col.subColumns?.length || 1), 0)}>
-                                {group.groupTitle}
-                            </th>
-                        ))}
-                    </tr>
-                    <tr className="font-semibold">
-                        {tableConfig.map(group => group.columns.map(col => (
-                            <th key={col.key} className={`border p-2 ${group.columnClass || "bg-gray-700"}`} colSpan={col.subColumns?.length || 1} rowSpan={col.subColumns ? 1 : 2}>
-                                {col.title}
-                            </th>
-                        )))}
-                    </tr>
-                    <tr className="font-medium">
-                        {tableConfig.map(group => group.columns.map(col =>
-                            col.subColumns ? col.subColumns.map(subCol => (
-                                <th key={subCol.key} className={`border p-1 ${group.subColumnClass || "bg-gray-600"}`}>
-                                    {subCol.title}
-                                </th>
-                            )) : null
-                        ))}
-                    </tr>
+        <div className="overflow-x-auto shadow-md rounded-lg">
+            <table className="min-w-full bg-white border border-gray-200 text-sm">
+                <thead className="sticky top-0 z-30">
+                    {renderHeaders()}
                 </thead>
-                <tbody>
-                    {data.length > 0 ? (
-                        data.map(item => (
-                            <tr key={item.nama_witel} className="bg-white hover:bg-gray-50 text-black">
-                                <td className="border p-2 font-semibold text-left">{item.nama_witel}</td>
-                                {tableConfig.map(group => group.columns.map(col =>
-                                    col.subColumns ? (
-                                        col.subColumns.map(subCol => (
-                                            <td key={`${col.key}-${subCol.key}`} className="border p-2">
-                                                {getCellValue(item, subCol, col)}
-                                            </td>
-                                        ))
-                                    ) : (
-                                        <td key={col.key} className="border p-2">
-                                            {getCellValue(item, col)}
-                                        </td>
-                                    )
-                                ))}
-                            </tr>
-                        ))
-                    ) : (
-                        <tr><td colSpan={100} className="text-center p-4 border text-gray-500">Tidak ada data.</td></tr>
-                    )}
-                    <tr className="font-bold text-white">
-                        <td className="border p-2 text-left bg-gray-800">GRAND TOTAL</td>
-                        {tableConfig.map(group => group.columns.map(col =>
-                            col.subColumns ? (
-                                col.subColumns.map(subCol => (
-                                    <td key={`total-${col.key}-${subCol.key}`} className={`border p-2 ${group.groupClass}`}>
-                                        {getCellValue(totals, subCol, col)}
-                                    </td>
-                                ))
-                            ) : (
-                                <td key={`total-${col.key}`} className={`border p-2 ${group.groupClass}`}>
-                                    {getCellValue(totals, col)}
-                                </td>
-                            )
-                        ))}
-                    </tr>
+                <tbody className="text-gray-700">
+                    {renderBody()}
+                    {renderTotals()}
                 </tbody>
             </table>
         </div>
     );
-};
-
-export default DataReportTable;
+}

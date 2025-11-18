@@ -128,6 +128,8 @@ export default function DataReport({ smeReportData, legsReportData, inProgressDa
     const [legsTableConfig, setLegsTableConfig] = useState([]);
     const [selectedWitel, setSelectedWitel] = useState(filters.witel || '');
 
+    const currentMonth = filters.month || new Date().toISOString().slice(0, 7);
+
     // Efek untuk menampilkan notifikasi flash message dari backend
     useEffect(() => {
         if (flash?.success) toast.success(flash.success);
@@ -262,8 +264,10 @@ export default function DataReport({ smeReportData, legsReportData, inProgressDa
                                     <h2 className="text-lg font-medium text-gray-900 mb-4">Data Report (SME)</h2>
                                     <DataReportTable
                                         data={smeReportData}
-                                        decimalPlaces={2}
+                                        decimalPlaces={0}
                                         tableConfig={smeTableConfig}
+                                        segment="SME"  // <-- [TAMBAHKAN INI]
+                                        month={currentMonth} // <-- [TAMBAHKAN INI]
                                     />
                                 </section>
                             </div>
@@ -274,8 +278,10 @@ export default function DataReport({ smeReportData, legsReportData, inProgressDa
                                     <h2 className="text-lg font-medium text-gray-900 mb-4">Data Report (LEGS)</h2>
                                     <DataReportTable
                                         data={legsReportData}
-                                        decimalPlaces={2}
+                                        decimalPlaces={0}
                                         tableConfig={legsTableConfig}
+                                        segment="LEGS" // <-- [TAMBAHKAN INI]
+                                        month={currentMonth} // <-- [TAMBAHKAN INI]
                                     />
                                 </section>
                             </div>

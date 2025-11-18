@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Exports\DataReportExport;
 use App\Exports\InProgressExport;
 use App\Models\DocumentData;
+use App\Models\OrderProduct;
 use App\Models\Target;
 use App\Models\UserTableConfiguration;
 use Carbon\Carbon;
@@ -474,5 +475,89 @@ class DataReportController extends Controller
                 ],
             ],
         ];
+    }
+
+    public function showDetails(Request $request)
+    {
+        $validated = $request->validate([
+            'segment' => 'required|string|in:SME,LEGS',
+            'witel' => 'required|string',
+            'month' => 'required|date_format:Y-m',
+            'kpi_key' => 'required|string', // misal: "in_progress_n" atau "prov_comp_o_realisasi"
+        ]);
+
+        $period = Carbon::parse($validated['month']);
+
+        // 1. Tentukan Status (in progress / done)
+        $isDone = str_contains($validated['kpi_key'], 'prov_comp');
+        $statusWfm = $isDone ? 'done close bima' : 'in progress';
+
+        // 2. Tentukan Produk (n, o, ae, ps)
+        $productMap = [
+            'n' => ['netmonk'],
+            'o' => ['oca'],
+            'ae' => ['antares', 'antares eazy', 'antares eazysc'],
+            'ps' => ['pijar', 'pijar sekolah'],
+        ];
+
+        // Ekstrak inisial produk dari kpi_key
+        $keyParts = explode('_', $validated['kpi_key']);
+        $productInitial = end($keyParts); // 'n', 'o', 'ae', 'ps', atau 'realisasi'
+
+        // Handle 'realisasi' (untuk prov_comp_..._realisasi)
+        if ($productInitial === 'realisasi') {
+            $productInitial = $keyParts[count($keyParts) - 2]; // ambil satu sebelum 'realisasi'
+        }
+
+        // Jika key tidak ada di map, kembalikan array kosong
+        if (!isset($productMap[$productInitial])) {
+             return Inertia::render('DataReport/Details', [
+                'orders' => [],
+                'pageTitle' => "Detail Laporan (Produk tidak dikenal)",
+                'filters' => $validated,
+            ]);
+        }
+        $targetProducts = $productMap[$productInitial];
+
+        // 3. Tentukan Kolom Tanggal
+        $dateColumn = $isDone ? 'order_date' : 'order_created_date';
+
+        // 4. Query Order Tunggal (dari DocumentData)
+        $singleOrders = DocumentData::where('segment', $validated['segment'])
+            ->where('nama_witel', $validated['witel'])
+            ->where('status_wfm', $statusWfm)
+            ->whereYear($dateColumn, $period->year)
+            ->whereMonth($dateColumn, $period->month)
+            ->where(function ($query) use ($targetProducts) {
+                foreach ($targetProducts as $product) {
+                    $query->orWhereRaw('LOWER(TRIM(product)) = ?', [$product]);
+                }
+            })
+            ->select('order_id', 'product', 'customer_name', $dateColumn . ' as tanggal', 'milestone', 'status_wfm')
+            ->get();
+
+        // 5. Query Order Bundle (dari OrderProduct)
+        $bundleOrders = DB::table('order_products')
+            ->join('document_data', 'order_products.order_id', '=', 'document_data.order_id')
+            ->where('document_data.segment', $validated['segment'])
+            ->where('document_data.nama_witel', $validated['witel'])
+            ->where('order_products.status_wfm', $statusWfm)
+            ->whereYear('document_data.' . $dateColumn, $period->year)
+            ->whereMonth('document_data.' . $dateColumn, $period->month)
+            ->where(function ($query) use ($targetProducts) {
+                foreach ($targetProducts as $product) {
+                    $query->orWhereRaw('LOWER(TRIM(order_products.product_name)) = ?', [$product]);
+                }
+            })
+            ->select('order_products.order_id', 'order_products.product_name as product', 'document_data.customer_name', 'document_data.' . $dateColumn . ' as tanggal', 'document_data.milestone', 'order_products.status_wfm')
+            ->get();
+
+        $allOrders = $singleOrders->merge($bundleOrders)->sortByDesc('tanggal');
+
+        return Inertia::render('DataReport/Details', [
+            'orders' => $allOrders->values(),
+            'pageTitle' => "Detail Laporan",
+            'filters' => $validated,
+        ]);
     }
 }

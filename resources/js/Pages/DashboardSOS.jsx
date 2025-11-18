@@ -82,6 +82,52 @@ const WitelPieChart = ({ data = [] }) => {
     return <Pie options={options} data={chartData} />;
 };
 
+const WitelBarChart = ({ data = [] }) => {
+    const chartData = useMemo(() => {
+        // Data dari controller sudah diurutkan (DESC).
+        // Kita perlu .reverse() agar bar tertinggi tampil di ATAS.
+        const labels = data.map(item => item.witel).reverse();
+        const values = data.map(item => item.value).reverse();
+
+        return {
+            labels: labels,
+            datasets: [{
+                label: 'Jumlah Order',
+                data: values,
+                backgroundColor: '#4A90E2', // Warna biru konsisten
+                borderColor: '#3B82F6',
+                borderWidth: 1,
+            }],
+        };
+    }, [data]);
+
+    const options = {
+        indexAxis: 'y', // <-- Kunci untuk Horizontal Bar Chart
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: false, // Tidak perlu legenda, sudah jelas
+            },
+            title: {
+                display: false, // Judul sudah ada di <h3>
+            },
+        },
+        scales: {
+            x: {
+                beginAtZero: true,
+                title: { display: true, text: 'Jumlah Order' }
+            },
+            y: {
+                ticks: {
+                    autoSkip: false, // Tampilkan semua label Witel
+                }
+            }
+        }
+    };
+    return <Bar options={options} data={chartData} />;
+};
+
 // [BARU] Komponen Pagination (Meniru DashboardDigitalProduct)
 const Pagination = ({ links = [] }) => {
     if (links.length <= 3) return null;
@@ -116,6 +162,7 @@ export default function DashboardSOS({
     dataPreview, // <-- [BARU] Terima prop dataPreview
     filters = {},
     filterOptions = {},
+    isEmbed = false
 }) {
     const witelOptions = useMemo(() => filterOptions.witelList || [], [filterOptions.witelList]);
     const segmenOptions = useMemo(() => filterOptions.segmenList || [], [filterOptions.segmenList]);
@@ -149,18 +196,141 @@ export default function DashboardSOS({
             startDate: formatDateForQuery(localFilters.startDate),
             endDate: formatDateForQuery(localFilters.endDate),
         };
-        router.get(route('dashboard.sos'), queryParams, { replace: true, preserveState: true, preserveScroll: true });
+        const targetRoute = isEmbed ? route('dashboard.sos.embed') : route('dashboard.sos');
+        router.get(targetRoute, queryParams, { replace: true, preserveState: true, preserveScroll: true });
     };
 
     const resetFilters = () => {
-        router.get(route('dashboard.sos'), {}, { preserveScroll: true });
+        const targetRoute = isEmbed ? route('dashboard.sos.embed') : route('dashboard.sos');
+        router.get(targetRoute, {}, { preserveScroll: true });
     };
 
     // [BARU] Fungsi untuk mengubah limit paginasi
     const handleLimitChange = (value) => {
         const queryParams = { ...filters, limit: value };
         delete queryParams.page; // Reset ke halaman 1
-        router.get(route('dashboard.sos'), queryParams, { preserveScroll: true, replace: true });
+        const targetRoute = isEmbed ? route('dashboard.sos.embed') : route('dashboard.sos');
+        router.get(targetRoute, queryParams, { preserveScroll: true, replace: true });
+    }
+
+    const DashboardContent = (
+        <>
+            {/* Panel Filter Global */}
+            <div className="bg-white p-4 rounded-lg shadow-md">
+                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 items-end">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Rentang Tanggal</label>
+                        <DatePicker selectsRange startDate={localFilters.startDate} endDate={localFilters.endDate} onChange={(update) => setLocalFilters(prev => ({ ...prev, startDate: update[0], endDate: update[1] }))} isClearable={true} dateFormat="dd/MM/yyyy" className="w-full border-gray-300 rounded-md shadow-sm" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Witel</label>
+                        <DropdownCheckbox title="Pilih Witel" options={witelOptions} selectedOptions={localFilters.witels || []} onSelectionChange={s => setLocalFilters(p => ({ ...p, witels: s }))} />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Segmen</label>
+                        <DropdownCheckbox title="Pilih Segmen" options={segmenOptions} selectedOptions={localFilters.segmens || []} onSelectionChange={s => setLocalFilters(p => ({ ...p, segmens: s }))} />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Kategori</label>
+                        <DropdownCheckbox title="Pilih Kategori" options={kategoriOptions} selectedOptions={localFilters.kategoris || []} onSelectionChange={s => setLocalFilters(p => ({ ...p, kategoris: s }))} />
+                    </div>
+                </div>
+                <div className="flex justify-end gap-3 mt-4">
+                    <button onClick={resetFilters} className="px-4 py-2 bg-gray-600 text-white text-sm font-medium rounded-md hover:bg-gray-700">Reset</button>
+                    <button onClick={applyFilters} className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700">Terapkan</button>
+                </div>
+            </div>
+
+            {/* Grid Chart */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="bg-white p-6 rounded-lg shadow-md">
+                    <h3 className="font-semibold text-lg text-gray-800">Jumlah Order by Kategori</h3>
+                    <div className="h-80"><OrdersByCategoryChart data={ordersByCategory} /></div>
+                </div>
+                <div className="bg-white p-6 rounded-lg shadow-md">
+                    <h3 className="font-semibold text-lg text-gray-800">Estimasi Revenue by Kategori (Juta)</h3>
+                    <div className="h-80"><RevenueByCategoryChart data={revenueByCategory} /></div>
+                </div>
+                <div className="bg-white p-6 rounded-lg shadow-md">
+                    <h3 className="font-semibold text-lg text-gray-800">Distribusi Order by Witel</h3>
+                    {/* Menggunakan Bar Chart Horizontal yang baru */}
+                    <div className="h-80"><WitelBarChart data={witelDistribution} /></div>
+                </div>
+                <div className="bg-white p-6 rounded-lg shadow-md">
+                    <h3 className="font-semibold text-lg text-gray-800">Distribusi Order by Segmen</h3>
+                    {/* Tetap menggunakan Pie Chart */}
+                    <div className="h-80"><WitelPieChart data={segmenDistribution} /></div>
+                </div>
+            </div>
+
+            {/* [PERBAIKAN] Tabel Data Preview */}
+            <div className="bg-white p-6 rounded-lg shadow-md mt-6">
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="font-semibold text-lg text-gray-800">Data Preview</h3>
+                    <div>
+                        <label htmlFor="limit-filter" className="text-sm font-semibold text-gray-600 mr-2">Tampilkan:</label>
+                        <select id="limit-filter" value={filters.limit || '10'} onChange={e => handleLimitChange(e.target.value)} className="border border-gray-300 rounded-md text-sm p-2">
+                            <option value="10">10 Baris</option>
+                            <option value="50">50 Baris</option>
+                            <option value="100">100 Baris</option>
+                        </select>
+                    </div>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left text-gray-500">
+                        <thead className="text-xs text-gray-700 uppercase bg-gray-50">
+                            <tr>
+                                <th scope="col" className="px-4 py-3">Order ID</th>
+                                <th scope="col" className="px-4 py-3">NIPNAS</th>
+                                <th scope="col" className="px-4 py-3">Standard Name (PO)</th>
+                                <th scope="col" className="px-4 py-3">Produk</th>
+                                <th scope="col" className="px-4 py-3">Segmen</th>
+                                <th scope="col" className="px-4 py-3">Witel</th>
+                                <th scope="col" className="px-4 py-3">Kategori</th>
+                                <th scope="col" className="px-4 py-3">Status</th>
+                                <th scope="col" className="px-4 py-3">Umur</th>
+                                <th scope="col" className="px-4 py-3">Tgl Order</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {dataPreview?.data?.length > 0 ? (
+                                dataPreview.data.map((item) => (
+                                    <tr key={item.id} className="bg-white border-b hover:bg-gray-50">
+                                        <td className="px-4 py-4 font-mono">{item.order_id}</td>
+                                        <td className="px-4 py-4">{item.nipnas}</td>
+                                        <td className="px-4 py-4 font-medium text-gray-900">{item.standard_name}</td>
+                                        <td className="px-4 py-4">{item.li_product_name}</td>
+                                        <td className="px-4 py-4">{item.segmen}</td>
+                                        <td className="px-4 py-4">{item.bill_witel}</td>
+                                        <td className="px-4 py-4">{item.kategori}</td>
+                                        <td className="px-4 py-4">{item.li_status}</td>
+                                        <td className="px-4 py-4">{item.kategori_umur}</td>
+                                        <td className="px-4 py-4">{item.order_created_date ? new Date(item.order_created_date).toLocaleDateString('id-ID') : '-'}</td>
+                                    </tr>
+                                ))
+                            ) : (
+                                <tr><td colSpan="10" className="text-center py-4 text-gray-500">Tidak ada data yang cocok dengan filter yang dipilih.</td></tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+                {/* Pagination Links */}
+                {dataPreview?.links?.length > 0 && dataPreview.total > 0 && (
+                    <div className="mt-4 flex flex-col sm:flex-row justify-between items-center text-sm text-gray-600 gap-4">
+                        <span>Menampilkan {dataPreview.from} sampai {dataPreview.to} dari {dataPreview.total} hasil</span>
+                        <Pagination links={dataPreview.links} />
+                    </div>
+                )}
+            </div>
+        </>
+    );
+
+    if (isEmbed) {
+        return (
+            <div className="p-4 sm:p-6 bg-gray-100 font-sans">
+                {DashboardContent}
+            </div>
+        );
     }
 
     return (
@@ -211,7 +381,7 @@ export default function DashboardSOS({
                         </div>
                         <div className="bg-white p-6 rounded-lg shadow-md">
                             <h3 className="font-semibold text-lg text-gray-800">Distribusi Order by Witel</h3>
-                            <div className="h-80"><WitelPieChart data={witelDistribution} /></div>
+                            <div className="h-80"><WitelBarChart data={witelDistribution} /></div>
                         </div>
                         <div className="bg-white p-6 rounded-lg shadow-md">
                             <h3 className="font-semibold text-lg text-gray-800">Distribusi Order by Segmen</h3>

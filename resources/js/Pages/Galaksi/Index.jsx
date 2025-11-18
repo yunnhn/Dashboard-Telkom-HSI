@@ -1,13 +1,15 @@
-import React, { useState, useEffect, useMemo } from 'react'; // [TAMBAH] import useMemo
+// resources/js/Pages/Galaksi/Index.jsx
+// [PERBAIKAN TOTAL]
+
+import React, { useState, useEffect } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, useForm } from '@inertiajs/react';
+import { Head, useForm, Link } from '@inertiajs/react'; // [DIUBAH] Import Link, hapus router/axios
 import InputLabel from '@/Components/InputLabel';
 import InputError from '@/Components/InputError';
 import PrimaryButton from '@/Components/PrimaryButton';
 
-// Komponen Modal Edit Agent (ini sudah benar)
+// Komponen Modal Edit Agent (ini tidak berubah)
 const AgentFormModal = ({ isOpen, onClose, agent }) => {
-    // ... (tidak ada perubahan di sini)
     const { data, setData, post, put, processing, errors, reset } = useForm({
         name: '', display_witel: '', filter_witel_lama: '',
         special_filter_column: '', special_filter_value: '',
@@ -30,21 +32,33 @@ const AgentFormModal = ({ isOpen, onClose, agent }) => {
     const handleSubmit = (e) => {
         e.preventDefault();
         const onSuccess = () => onClose();
+
+        // [PERBAIKAN] Pastikan route 'admin.' digunakan jika ada di web.php
+        const updateRoute = route().has('admin.account-officers.update')
+            ? 'admin.account-officers.update'
+            : 'account-officers.update';
+
+        const storeRoute = route().has('admin.account-officers.store')
+            ? 'admin.account-officers.store'
+            : 'account-officers.store';
+
         if (agent) {
-            put(route('account-officers.update', agent.id), { onSuccess, preserveScroll: true });
+            put(route(updateRoute, agent.id), { onSuccess, preserveScroll: true });
         } else {
-            post(route('account-officers.store'), { onSuccess, preserveScroll: true });
+            post(route(storeRoute), { onSuccess, preserveScroll: true });
         }
     };
 
     if (!isOpen) return null;
 
     return (
+        // ... (Isi modal AgentFormModal tidak berubah) ...
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
             <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
                 <h2 className="text-lg font-bold mb-4">{agent ? 'Edit Agen' : 'Tambah Agen Baru'}</h2>
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
+                    {/* ... Input form ... */}
+                     <div>
                         <InputLabel htmlFor="name" value="Nama PO" />
                         <input id="name" type="text" value={data.name} onChange={e => setData('name', e.target.value)} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm" required />
                         <InputError message={errors.name} className="mt-2" />
@@ -81,9 +95,11 @@ const AgentFormModal = ({ isOpen, onClose, agent }) => {
 
 
 // Komponen Utama Halaman
-export default function GalaksiIndex({ auth, kpiData = [], accountOfficers = [] }) { // [DIUBAH] Menerima 'kpiData' dan diberi nilai default array kosong
+export default function GalaksiIndex({ auth, kpiData = [], accountOfficers = [] }) {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingAgent, setEditingAgent] = useState(null);
+
+    // [DIHAPUS] Semua state modal detail (isDetailsModalOpen, dll.) dihapus
 
     const openModal = (agent = null) => {
         setEditingAgent(agent);
@@ -92,6 +108,31 @@ export default function GalaksiIndex({ auth, kpiData = [], accountOfficers = [] 
     const closeModal = () => {
         setIsModalOpen(false);
         setEditingAgent(null);
+    };
+
+    // [DIHAPUS] Fungsi handleCellClick dan closeDetailsModal dihapus
+
+    // [DIUBAH] Helper render cell sekarang menggunakan <Link>
+    const renderClickableCell = (po, kpiType, channelType, value, title) => {
+        const count = parseInt(value, 10) || 0;
+
+        if (count > 0) {
+            return (
+                <Link
+                    href={route('galaksi.showDetails')}
+                    data={{
+                        officer_id: po.id,
+                        kpi_type: kpiType,
+                        channel_type: channelType
+                    }}
+                    className="text-gray-700 hover:text-gray-400 hover:underline font-bold"
+                    title={`Klik untuk melihat ${count} order`}
+                >
+                    {count}
+                </Link>
+            );
+        }
+        return count; // Tampilkan angka 0 jika tidak ada data
     };
 
     return (
@@ -125,15 +166,25 @@ export default function GalaksiIndex({ auth, kpiData = [], accountOfficers = [] 
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                            {/* [DIUBAH] Melakukan map pada 'kpiData' */}
                             {kpiData.map((po) => (
                                 <tr key={po.id} className="hover:bg-gray-50">
                                     <td className="px-4 py-2 whitespace-nowrap border font-medium">{po.nama_po}</td>
                                     <td className="px-4 py-2 whitespace-nowrap border">{po.witel}</td>
-                                    <td className="px-4 py-2 whitespace-nowrap border text-center">{po.done_ncx}</td>
-                                    <td className="px-4 py-2 whitespace-nowrap border text-center">{po.done_scone}</td>
-                                    <td className="px-4 py-2 whitespace-nowrap border text-center">{po.ogp_ncx}</td>
-                                    <td className="px-4 py-2 whitespace-nowrap border text-center">{po.ogp_scone}</td>
+
+                                    {/* Sel-sel ini sekarang me-Link ke halaman baru */}
+                                    <td className="px-4 py-2 whitespace-nowrap border text-center">
+                                        {renderClickableCell(po, 'done', 'ncx', po.done_ncx, 'Prodidi Done NCX')}
+                                    </td>
+                                    <td className="px-4 py-2 whitespace-nowrap border text-center">
+                                        {renderClickableCell(po, 'done', 'scone', po.done_scone, 'Prodidi Done Scone')}
+                                    </td>
+                                    <td className="px-4 py-2 whitespace-nowrap border text-center">
+                                        {renderClickableCell(po, 'ogp', 'ncx', po.ogp_ncx, 'Prodidi OGP NCX')}
+                                    </td>
+                                    <td className="px-4 py-2 whitespace-nowrap border text-center">
+                                        {renderClickableCell(po, 'ogp', 'scone', po.ogp_scone, 'Prodidi OGP Scone')}
+                                    </td>
+
                                     <td className="px-4 py-2 whitespace-nowrap border text-center font-bold">{po.total}</td>
                                     <td className="px-4 py-2 whitespace-nowrap border text-center font-bold bg-yellow-100">{po.ach_ytd}</td>
                                     <td className="px-4 py-2 whitespace-nowrap border text-center font-bold bg-yellow-100">{po.ach_q3}</td>
@@ -145,6 +196,9 @@ export default function GalaksiIndex({ auth, kpiData = [], accountOfficers = [] 
             </div>
 
             <AgentFormModal isOpen={isModalOpen} onClose={closeModal} agent={editingAgent} />
+
+            {/* [DIHAPUS] Panggilan <DetailsModal /> dihapus total */}
+
         </AuthenticatedLayout>
     );
 }

@@ -19,18 +19,24 @@ class SosReportExport implements FromView, WithTitle, ShouldAutoSize, WithEvents
     protected $viewMode;
     protected $galaksiData;
 
-    // [PERUBAHAN] Tambahkan $viewMode di constructor
-    public function __construct(array $reportData, string $cutoffDate, string $period, string $viewMode)
+    /**
+     * [PERBAIKAN] Tambahkan $galaksiData sebagai parameter ke-5
+     * (Kita bisa asumsikan ini array, atau hapus type hint agar fleksibel).
+     */
+    public function __construct(array $reportData, string $cutoffDate, string $period, string $viewMode, $galaksiData)
     {
         $this->reportData = $reportData;
         $this->cutoffDate = $cutoffDate;
         $this->period = $period;
         $this->viewMode = $viewMode;
+
+        // [PERBAIKAN] Sekarang $galaksiData sudah terdefinisi dari parameter
         $this->galaksiData = $galaksiData;
     }
 
     public function view(): View
     {
+        // View ini sudah benar, tidak perlu diubah
         return view('exports.sos_report', [
             'reportData' => $this->reportData,
             'cutoffDate' => $this->cutoffDate,
@@ -92,13 +98,14 @@ class SosReportExport implements FromView, WithTitle, ShouldAutoSize, WithEvents
 
                             // Ganti warna teks menjadi putih
                             $event->sheet->getDelegate()->getStyle("A{$currentRow}:O{$currentRow}")
-                               ->getFont()->setColor($textColor);
+                                ->getFont()->setColor($textColor);
                         }
                     }
                 }
 
                 // Logika untuk mewarnai tabel SO DO RO
-                $startRowSodoro = $startRow + count($this->reportData) + 5; // Estimasi spasi
+                // Asumsi ada 5 baris spasi + header
+                $startRowSodoro = $startRow + count($this->reportData) + 5;
                 foreach ($this->reportData as $index => $item) {
                     $currentRow = $startRowSodoro + $index;
                     if (isset($item['isTotal']) && $item['isTotal']) {
@@ -115,7 +122,7 @@ class SosReportExport implements FromView, WithTitle, ShouldAutoSize, WithEvents
                                 ->setFillType(Fill::FILL_SOLID)
                                 ->getStartColor()->setARGB($colorToApply);
                             $event->sheet->getDelegate()->getStyle("A{$currentRow}:I{$currentRow}")
-                               ->getFont()->setColor($textColor);
+                                ->getFont()->setColor($textColor);
                         }
                     }
                 }

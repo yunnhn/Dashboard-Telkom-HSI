@@ -28,12 +28,12 @@ class GalaksiController extends Controller
                 ->whereNotNull('product')
                 ->where('product', 'NOT LIKE', '%-%')
                 ->where('product', 'NOT LIKE', "%\n%")
-                ->when($specialFilter, fn($q) => $q->where($specialFilter['column'], $specialFilter['value']));
+                ->when($specialFilter, fn ($q) => $q->where($specialFilter['column'], $specialFilter['value']));
 
             $bundleQuery = DB::table('order_products')
                 ->join('document_data', 'order_products.order_id', '=', 'document_data.order_id')
                 ->where('document_data.witel_lama', $witelFilter)
-                ->when($specialFilter, fn($q) => $q->where('document_data.' . $specialFilter['column'], $specialFilter['value']));
+                ->when($specialFilter, fn ($q) => $q->where('document_data.'.$specialFilter['column'], $specialFilter['value']));
 
             // Hitung KPI (Done & OGP untuk NCX & SCONE)
             $done_ncx = $singleQuery->clone()->where('status_wfm', 'done close bima')->where('channel', '!=', 'SC-One')->count()
@@ -80,8 +80,8 @@ class GalaksiController extends Controller
                 'ogp_ncx' => $ogp_ncx,
                 'ogp_scone' => $ogp_scone,
                 'total' => $total_ytd,
-                'ach_ytd' => $total_ytd > 0 ? number_format((($done_ncx + $done_scone) / $total_ytd) * 100, 1) . '%' : '0.0%',
-                'ach_q3' => $total_q3 > 0 ? number_format((($done_ncx_q3 + $done_scone_q3) / $total_q3) * 100, 1) . '%' : '0.0%',
+                'ach_ytd' => $total_ytd > 0 ? number_format((($done_ncx + $done_scone) / $total_ytd) * 100, 1).'%' : '0.0%',
+                'ach_q3' => $total_q3 > 0 ? number_format((($done_ncx_q3 + $done_scone_q3) / $total_q3) * 100, 1).'%' : '0.0%',
             ];
         });
 
@@ -89,5 +89,130 @@ class GalaksiController extends Controller
             'kpiData' => $kpiData,
             'accountOfficers' => $officers, // Kirim juga data mentah officers untuk modal edit
         ]);
+    }
+
+    public function showDetails(Request $request)
+    {
+        // 1. Validasi input (Sama seperti rencana modal)
+        $validated = $request->validate([
+            'officer_id' => 'required|integer|exists:account_officers,id',
+            'kpi_type' => 'required|string|in:done,ogp',
+            'channel_type' => 'required|string|in:ncx,scone',
+        ]);
+
+        $officer = AccountOfficer::findOrFail($validated['officer_id']);
+
+        // 2. Tentukan parameter query (Sama seperti rencana modal)
+        $statusWfm = ($validated['kpi_type'] === 'done') ? 'done close bima' : 'in progress';
+        $channelOperator = ($validated['channel_type'] === 'ncx') ? '!=' : '=';
+        $channelValue = 'SC-One';
+
+        // 3. Ambil filter (Sama seperti rencana modal)
+        $witelFilter = $officer->filter_witel_lama;
+        $specialFilter = $officer->special_filter_column && $officer->special_filter_value
+            ? ['column' => $officer->special_filter_column, 'value' => $officer->special_filter_value]
+            : null;
+
+        // 4. Query untuk order tunggal
+        $singleQuery = DocumentData::where('witel_lama', $witelFilter)
+            ->whereNotNull('product')
+            ->where('product', 'NOT LIKE', '%-%')
+            ->where('product', 'NOT LIKE', "%\n%")
+            ->when($specialFilter, fn($q) => $q->where($specialFilter['column'], $specialFilter['value']));
+
+        $singleOrders = $singleQuery->clone()
+            ->where('status_wfm', $statusWfm)
+            ->where('channel', $channelOperator, $channelValue)
+            ->select('order_id', 'product', 'customer_name', 'order_created_date', 'status_wfm', 'milestone')
+            ->get();
+
+        // 5. Query untuk order bundle
+        $bundleQuery = DB::table('order_products')
+            ->join('document_data', 'order_products.order_id', '=', 'document_data.order_id')
+            ->where('document_data.witel_lama', $witelFilter)
+            ->when($specialFilter, fn($q) => $q->where('document_data.' . $specialFilter['column'], $specialFilter['value']));
+
+        $bundleOrders = $bundleQuery->clone()
+            ->where('order_products.status_wfm', $statusWfm)
+            ->where('order_products.channel', $channelOperator, $channelValue)
+            ->select(
+                'order_products.order_id',
+                'order_products.product_name as product',
+                'document_data.customer_name',
+                'document_data.order_created_date',
+                'order_products.status_wfm',
+                'document_data.milestone'
+            )
+            ->get();
+
+        // 6. Gabungkan hasil
+        $allOrders = $singleOrders->merge($bundleOrders)->sortByDesc('order_created_date');
+
+        // 7. Render Halaman Inertia (BUKAN JSON)
+        return Inertia::render('Galaksi/ShowDetails', [
+            'orders' => $allOrders->values(),
+            'pageTitle' => "Detail Order " . $officer->name,
+            'filters' => $validated // Kirim filter untuk info
+        ]);
+    }
+
+    public function getOrderDetails(Request $request)
+    {
+        // 1. Validasi input
+        $validated = $request->validate([
+            'officer_id' => 'required|integer|exists:account_officers,id',
+            'kpi_type' => 'required|string|in:done,ogp',
+            'channel_type' => 'required|string|in:ncx,scone',
+        ]);
+
+        $officer = AccountOfficer::findOrFail($validated['officer_id']);
+
+        // 2. Tentukan parameter query berdasarkan input
+        $statusWfm = ($validated['kpi_type'] === 'done') ? 'done close bima' : 'in progress';
+        $channelOperator = ($validated['channel_type'] === 'ncx') ? '!=' : '=';
+        $channelValue = 'SC-One';
+
+        // 3. Ambil filter dari data officer (SAMA SEPERTI DI INDEX)
+        $witelFilter = $officer->filter_witel_lama;
+        $specialFilter = $officer->special_filter_column && $officer->special_filter_value
+            ? ['column' => $officer->special_filter_column, 'value' => $officer->special_filter_value]
+            : null;
+
+        // 4. Query untuk order tunggal
+        $singleQuery = DocumentData::where('witel_lama', $witelFilter)
+            ->whereNotNull('product')
+            ->where('product', 'NOT LIKE', '%-%')
+            ->where('product', 'NOT LIKE', "%\n%")
+            ->when($specialFilter, fn ($q) => $q->where($specialFilter['column'], $specialFilter['value']));
+
+        $singleOrders = $singleQuery->clone()
+            ->where('status_wfm', $statusWfm)
+            ->where('channel', $channelOperator, $channelValue)
+            ->select('order_id', 'product', 'customer_name', 'order_created_date', 'status_wfm', 'milestone')
+            ->get();
+
+        // 5. Query untuk order bundle
+        $bundleQuery = DB::table('order_products')
+            ->join('document_data', 'order_products.order_id', '=', 'document_data.order_id')
+            ->where('document_data.witel_lama', $witelFilter)
+            ->when($specialFilter, fn ($q) => $q->where('document_data.'.$specialFilter['column'], $specialFilter['value']));
+
+        $bundleOrders = $bundleQuery->clone()
+            ->where('order_products.status_wfm', $statusWfm)
+            ->where('order_products.channel', $channelOperator, $channelValue)
+            ->select(
+                'order_products.order_id',
+                'order_products.product_name as product',
+                'document_data.customer_name',
+                'document_data.order_created_date',
+                'order_products.status_wfm',
+                'document_data.milestone'
+            )
+            ->get();
+
+        // 6. Gabungkan hasil dan kembalikan sebagai JSON
+        $allOrders = $singleOrders->merge($bundleOrders)->sortByDesc('order_created_date');
+
+        return response()->json($allOrders->values());
     }
 }

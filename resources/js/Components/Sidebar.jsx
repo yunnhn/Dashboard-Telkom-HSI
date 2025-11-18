@@ -115,13 +115,14 @@ const UserProfile = ({ user, isSidebarOpen, onLogout }) => {
                                         <MdAssessment className="mr-3" />
                                         Merge Excel
                                     </Link>
-                                    <button
-                                        onClick={handleOpenEmbedTool}
+                                    <Link
+                                        href={route('admin.embed.show')} // <-- Ini adalah nama rute baru Anda
                                         className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                        onClick={() => setIsProfileOpen(false)} // Tutup pop-up
                                     >
                                         <MdCode className="mr-3" />
                                         Embed Dashboard
-                                    </button>
+                                    </Link>
                                 </>
                             )}
 
@@ -155,22 +156,6 @@ const UserProfile = ({ user, isSidebarOpen, onLogout }) => {
             <Modal show={isToolOpen} onClose={() => setIsToolOpen(false)}>
                 <GoogleDriveUploader />
             </Modal>
-
-            <Modal show={isEmbedModalOpen} onClose={() => setIsEmbedModalOpen(false)}>
-                <h3 className="text-lg font-bold text-gray-800 mb-2">Embed Dashboard Digital Product</h3>
-                <p className="text-sm text-gray-600 mb-4">
-                    Salin dan tempel kode di bawah ini ke dalam file HTML di website atau aplikasi lain untuk menampilkan dashboard.
-                </p>
-                <textarea
-                    readOnly
-                    className="w-full h-32 p-3 border rounded-md font-mono text-sm bg-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    value={`<iframe \n  src="${route('dashboardDigitalProduct.embed')}" \n  style="border:0; width:100%; height:800px;" \n  allowfullscreen \n  scrolling="no">\n</iframe>`}
-                    onClick={(e) => e.target.select()}
-                />
-                <div className="mt-2 text-xs text-gray-500">
-                    Tips: Klik di dalam kotak untuk memilih semua teks, lalu salin (Ctrl+C). Anda bisa mengubah `width` dan `height` sesuai kebutuhan.
-                </div>
-            </Modal>
         </>
     );
 };
@@ -185,11 +170,14 @@ export default function Sidebar({ user, isSidebarOpen, toggleSidebar, isCmsMode,
     const [isAnalysisOpen, setIsAnalysisOpen] = useState(true); // Default open untuk admin
 
     // Cek route aktif menggunakan Inertia
-    const isDashboardActive = route().current('dashboardDigitalProduct') || route().current('dashboard.sos');
-    const isReportsActive = route().current('data-report.index') || route().current('galaksi.index');
+    const isDashboardActive = route().current('dashboardDigitalProduct') || route().current('dashboard.sos') || route().current('dashboard.jt');
+
+    // [PERBAIKAN] Tambahkan 'report.datin' ke pengecekan route aktif
+    const isReportsActive = route().current('data-report.index') || route().current('galaksi.index') || route().current('report.datin') || route().current('report.jt');
+
     const isAdminAnalysisActive = route().current('admin.analysisDigitalProduct.index') || route().current('admin.analysisSOS.index');
-    const isUserManagementActive = route().current('superadmin.users.*'); // <-- Sesuaikan dengan route group Anda
-    const isRollbackActive = route().current('superadmin.rollback.show'); // <-- Sesuaikan dengan route group Anda
+    const isUserManagementActive = route().current('superadmin.users.*');
+    const isRollbackActive = route().current('superadmin.rollback.show');
 
     useEffect(() => {
         if (isSidebarOpen && isAdminAnalysisActive) setIsAnalysisOpen(true);
@@ -197,6 +185,10 @@ export default function Sidebar({ user, isSidebarOpen, toggleSidebar, isCmsMode,
             setIsReportsOpen(true);
             if (route().current('data-report.index') || route().current('galaksi.index')) {
                 setIsDigitalProductOpen(true);
+            }
+            // [PERBAIKAN] Otomatis buka dropdown 'Report Connectivity' jika 'report.datin' aktif
+            if (route().current('report.datin') || route().current('report.jt')) {
+                setIsSosOpen(true);
             }
         }
         if (isSidebarOpen && isDashboardActive) setIsDashboardOpen(true);
@@ -264,7 +256,7 @@ export default function Sidebar({ user, isSidebarOpen, toggleSidebar, isCmsMode,
                                         </button>
                                         {isAnalysisConnOpen && (
                                             <div className="pl-6 mt-1 space-y-1">
-                                                <Link href="#" className="block px-4 py-2 text-sm text-gray-400 cursor-not-allowed rounded-md">Report Jaringan Tambahan</Link>
+                                                <Link href={route('admin.analysisJT.index')} className={`block px-4 py-2 text-sm rounded-md ${route().current('admin.analysisJT.index') ? 'bg-blue-100 text-blue-700 font-semibold' : 'hover:bg-gray-100'}`}>Report Jaringan Tambahan</Link>
                                                 <Link href={route('admin.analysisSOS.index')} className={`block px-4 py-2 text-sm rounded-md ${route().current('admin.analysisSOS.index') ? 'bg-blue-100 text-blue-700 font-semibold' : 'hover:bg-gray-100'}`}>Report Datin</Link>
                                                 <Link href="#" className="block px-4 py-2 text-sm text-gray-400 cursor-not-allowed rounded-md">Report HSI</Link>
                                             </div>
@@ -287,9 +279,8 @@ export default function Sidebar({ user, isSidebarOpen, toggleSidebar, isCmsMode,
                             </button>
                             {isSidebarOpen && isDashboardOpen && (
                                 <div className="pl-12 pr-4 py-2 flex flex-col space-y-1 bg-gray-50 border-t border-b">
-                                    <Link href={route('dashboardDigitalProduct')} className={`block px-4 py-2 text-sm rounded-md ${route().current('dashboardDigitalProduct') ? 'bg-blue-100 text-blue-700 font-semibold' : 'hover:bg-gray-100'}`}>Dashboard Digital Product</Link>
+                                    <Link href={route('dashboardDigitalProduct')} className={`block px-4 py-2 text-sm rounded-md text-left ${route().current('dashboardDigitalProduct') ? 'bg-blue-100 text-blue-700 font-semibold' : 'hover:bg-gray-100'}`}>Dashboard Digital Product</Link>
 
-                                    {/* [LANGKAH 3] Ganti Link statis menjadi komponen dropdown baru */}
                                     <div>
                                         <button onClick={() => setIsConnectivityOpen(!isConnectivityOpen)} className="w-full flex items-center text-left justify-between px-4 py-2 text-sm rounded-md text-gray-700 hover:bg-gray-200">
                                             <span>Dashboard Connectivity</span>
@@ -297,7 +288,12 @@ export default function Sidebar({ user, isSidebarOpen, toggleSidebar, isCmsMode,
                                         </button>
                                         {isConnectivityOpen && (
                                             <div className="pl-6 mt-1 space-y-1">
-                                                <Link href="#" className="block px-4 py-2 text-sm text-gray-400 cursor-not-allowed rounded-md text-left">Dashboard Jaringan Tambahan</Link>
+                                                <Link
+                                                    href={route('dashboard.jt')}
+                                                    className={`block px-4 py-2 text-sm rounded-md text-left ${route().current('dashboard.jt') ? 'bg-blue-100 text-blue-700 font-semibold' : 'text-gray-700 hover:bg-gray-100'}`}
+                                                >
+                                                    Dashboard Jaringan Tambahan
+                                                </Link>
                                                 <Link
                                                     href={route('dashboard.sos')}
                                                     className={`block px-4 py-2 text-sm rounded-md text-left ${route().current('dashboard.sos') ? 'bg-blue-100 text-blue-700 font-semibold' : 'text-gray-700 hover:bg-gray-100'}`}
@@ -321,26 +317,39 @@ export default function Sidebar({ user, isSidebarOpen, toggleSidebar, isCmsMode,
                             {isSidebarOpen && isReportsOpen && (
                                 <div className="pl-8 pr-4 py-2 flex flex-col space-y-1 bg-gray-50 border-t border-b">
                                     <div>
-                                        <button onClick={() => setIsDigitalProductOpen(!isDigitalProductOpen)} className="w-full flex items-center justify-between px-4 py-2 text-sm rounded-md text-gray-700 hover:bg-gray-200">
+                                        <button onClick={() => setIsDigitalProductOpen(!isDigitalProductOpen)} className="w-full flex items-center justify-between px-4 py-2 text-sm rounded-md text-gray-700 hover:bg-gray-200 text-left">
                                             <span>Report Digital Product</span>
                                             <MdKeyboardArrowDown size={18} className={`transition-transform duration-300 ${isDigitalProductOpen ? 'rotate-180' : ''}`} />
                                         </button>
                                         {isDigitalProductOpen && (
                                             <div className="pl-6 mt-1 space-y-1">
-                                                <Link href={route('data-report.index')} className={`block px-4 py-2 text-sm rounded-md ${route().current('data-report.index') ? 'bg-blue-100 text-blue-700 font-semibold' : 'hover:bg-gray-100'}`}>Data Report</Link>
-                                                <Link href={route('galaksi.index')} className={`block px-4 py-2 text-sm rounded-md ${route().current('galaksi.index') ? 'bg-blue-100 text-blue-700 font-semibold' : 'hover:bg-gray-100'}`}>Galaksi</Link>
+                                                <Link href={route('data-report.index')} className={`block px-4 py-2 text-sm rounded-md text-left ${route().current('data-report.index') ? 'bg-blue-100 text-blue-700 font-semibold' : 'hover:bg-gray-100'}`}>Data Report</Link>
+                                                <Link href={route('galaksi.index')} className={`block px-4 py-2 text-sm rounded-md text-left ${route().current('galaksi.index') ? 'bg-blue-100 text-blue-700 font-semibold' : 'hover:bg-gray-100'}`}>Galaksi</Link>
                                             </div>
                                         )}
                                     </div>
                                     <div>
-                                        <button onClick={() => setIsSosOpen(!isSosOpen)} className="w-full flex items-center justify-between px-4 py-2 text-sm rounded-md text-gray-700 hover:bg-gray-200">
+                                        <button onClick={() => setIsSosOpen(!isSosOpen)} className="w-full flex items-center justify-between px-4 py-2 text-sm rounded-md text-gray-700 hover:bg-gray-200 text-left">
                                             <span>Report Connectivity</span>
                                             <MdKeyboardArrowDown size={18} className={`transition-transform duration-300 ${isSosOpen ? 'rotate-180' : ''}`} />
                                         </button>
                                         {isSosOpen && (
                                             <div className="pl-6 mt-1 space-y-1">
-                                                <Link href="#" className="block px-4 py-2 text-sm text-gray-400 cursor-not-allowed rounded-md">Data Report</Link>
-                                                <Link href="#" className="block px-4 py-2 text-sm text-gray-400 cursor-not-allowed rounded-md">Galaksi</Link>
+                                                <Link
+                                                    href={route('report.jt')}
+                                                    className={`block px-4 py-2 text-sm rounded-md text-left ${route().current('report.jt') ? 'bg-blue-100 text-blue-700 font-semibold' : 'text-gray-700 hover:bg-gray-100'}`}
+                                                >
+                                                    Report Jaringan Tambahan
+                                                </Link>
+
+                                                <Link
+                                                    href={route('report.datin')}
+                                                    className={`block px-4 py-2 text-sm rounded-md text-left ${route().current('report.datin') ? 'bg-blue-100 text-blue-700 font-semibold' : 'text-gray-700 hover:bg-gray-100'}`}
+                                                >
+                                                    Report Datin
+                                                </Link>
+
+                                                <Link href="#" className="block px-4 py-2 text-sm text-gray-400 cursor-not-allowed rounded-md text-left">Report HSI</Link>
                                             </div>
                                         )}
                                     </div>
@@ -349,9 +358,11 @@ export default function Sidebar({ user, isSidebarOpen, toggleSidebar, isCmsMode,
                         </div>
                     </>
                 )}
+
             </nav>
 
             <UserProfile user={user} isSidebarOpen={isSidebarOpen} onLogout={onLogout} />
         </div>
     );
 }
+

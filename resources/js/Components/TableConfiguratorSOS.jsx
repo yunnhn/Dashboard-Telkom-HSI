@@ -8,7 +8,7 @@ import PrimaryButton from '@/Components/PrimaryButton';
 const MySwal = withReactContent(Swal);
 
 // [PERUBAHAN 1] Ganti nama komponen dan hapus prop 'currentSegment'
-const TableConfiguratorSOS = ({ tableConfig, setTableConfig, onSave }) => {
+const TableConfiguratorSOS = ({ tableConfig, setTableConfig, onSave, viewMode }) => {
     const [isExpanded, setIsExpanded] = useState(false);
 
     // Inisialisasi state dengan mencari grup pertama yang valid
@@ -88,8 +88,12 @@ const TableConfiguratorSOS = ({ tableConfig, setTableConfig, onSave }) => {
         });
 
         if (result.isConfirmed) {
-            router.post(route("admin.analysisSOS.resetConfig"), { // Route spesifik SOS
-                page_name: `analysis_sos` // Nama halaman spesifik SOS
+            const configPageName = viewMode === 'AOMO'
+                                     ? 'analysis_sos_aomo'
+                                     : 'analysis_sos_sodoro';
+
+            router.post(route("admin.analysisSOS.resetConfig"), {
+                page_name: configPageName
             }, {
                 preserveScroll: true,
                 onSuccess: () => toast.success("Tampilan berhasil direset ke default.")

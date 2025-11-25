@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Models\SosDataRaw;
 use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -9,14 +10,17 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\DB;
-use App\Models\SosDataRaw;
 
 class ProcessSOSImport implements ShouldQueue
 {
-    use Batchable, Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Batchable;
+    use Dispatchable;
+    use InteractsWithQueue;
+    use Queueable;
+    use SerializesModels;
 
     public int $timeout = 7200; // 2 Jam
     public $path;
@@ -39,7 +43,7 @@ class ProcessSOSImport implements ShouldQueue
         'VPN Backhaul',
         'IP Transit NeuCentrIX',
         'VPN FR',
-        'NeuCentrIX Interconnect Node'
+        'NeuCentrIX Interconnect Node',
     ];
 
     public function __construct($path)
@@ -54,7 +58,7 @@ class ProcessSOSImport implements ShouldQueue
         }
 
         $currentBatchId = $this->batch()->id;
-        Cache::put('import_progress_' . $currentBatchId, 5, now()->addHour());
+        Cache::put('import_progress_'.$currentBatchId, 5, now()->addHour());
         $originalFilePath = Storage::disk('local')->path($this->path);
         $filePathToImport = $originalFilePath;
         $tempCsvPath = null;
@@ -77,7 +81,7 @@ class ProcessSOSImport implements ShouldQueue
                 }
 
                 $tempCsvDirectory = sys_get_temp_dir();
-                $tempCsvPath = $tempCsvDirectory . DIRECTORY_SEPARATOR . 'unzipped_' . $currentBatchId . '.csv';
+                $tempCsvPath = $tempCsvDirectory.DIRECTORY_SEPARATOR.'unzipped_'.$currentBatchId.'.csv';
 
                 if (!$zip->extractTo($tempCsvDirectory, $firstFileName)) {
                     $zip->close();
@@ -85,7 +89,7 @@ class ProcessSOSImport implements ShouldQueue
                 }
                 $zip->close();
 
-                $extractedOriginalPath = $tempCsvDirectory . DIRECTORY_SEPARATOR . $firstFileName;
+                $extractedOriginalPath = $tempCsvDirectory.DIRECTORY_SEPARATOR.$firstFileName;
 
                 if (file_exists($tempCsvPath)) {
                     @unlink($tempCsvPath);
@@ -95,12 +99,12 @@ class ProcessSOSImport implements ShouldQueue
                 }
 
                 $filePathToImport = $tempCsvPath;
-                Cache::put('import_progress_' . $currentBatchId, 10, now()->addHour());
-                Log::info("Batch [{$currentBatchId}]: Ekstrak ZIP selesai. File CSV baru: " . $filePathToImport);
+                Cache::put('import_progress_'.$currentBatchId, 10, now()->addHour());
+                Log::info("Batch [{$currentBatchId}]: Ekstrak ZIP selesai. File CSV baru: ".$filePathToImport);
             }
 
             Log::info("Batch [{$currentBatchId}]: Memulai Manual Parsing & Filtering ke sos_data_raw...");
-            Cache::put('import_progress_' . $currentBatchId, 15, now()->addHour());
+            Cache::put('import_progress_'.$currentBatchId, 15, now()->addHour());
 
             $fileHandle = fopen($filePathToImport, 'r');
             if (!$fileHandle) {
@@ -109,11 +113,11 @@ class ProcessSOSImport implements ShouldQueue
 
             $headerLine = fgets($fileHandle);
             $headerLine = trim($headerLine, "\xEF\xBB\xBF");
-            $header = str_getcsv($headerLine, ",");
+            $header = str_getcsv($headerLine, ',');
 
             if (!$header) {
                 fclose($fileHandle);
-                throw new \Exception("Gagal membaca header dari file CSV.");
+                throw new \Exception('Gagal membaca header dari file CSV.');
             }
 
             $header = array_map('trim', $header);
@@ -125,7 +129,7 @@ class ProcessSOSImport implements ShouldQueue
 
             if ($billRegionIdx === false || $kategoriIdx === false || $productIdx === false) {
                 fclose($fileHandle);
-                Log::error("Header CSV tidak lengkap. Ditemukan: " . implode(', ', $header));
+                Log::error('Header CSV tidak lengkap. Ditemukan: '.implode(', ', $header));
                 throw new \Exception("Header CSV tidak lengkap. Pastikan 'BILL_REGION', 'KATEGORI', dan 'LI_PRODUCT_NAME' ada.");
             }
 
@@ -136,8 +140,8 @@ class ProcessSOSImport implements ShouldQueue
 
             $totalFileSize = filesize($filePathToImport);
 
-            while (($row = fgetcsv($fileHandle, 0, ",")) !== false) {
-                $rowCount++;
+            while (($row = fgetcsv($fileHandle, 0, ',')) !== false) {
+                ++$rowCount;
 
                 foreach ($row as $key => $value) {
                     if (is_string($value)) {
@@ -146,7 +150,7 @@ class ProcessSOSImport implements ShouldQueue
                 }
 
                 if (count($row) !== count($header)) {
-                    Log::warning("Batch [{$currentBatchId}]: Melewati baris {$rowCount}. Jumlah kolom tidak cocok. Header: " . count($header) . ", Baris: " . count($row));
+                    Log::warning("Batch [{$currentBatchId}]: Melewati baris {$rowCount}. Jumlah kolom tidak cocok. Header: ".count($header).', Baris: '.count($row));
                     continue;
                 }
 
@@ -159,10 +163,22 @@ class ProcessSOSImport implements ShouldQueue
                 $isProductOK = in_array($productName, self::$allowedProducts);
 
                 if ($isRegionOK && $isKategoriOK && $isProductOK) {
-                    $passedCount++;
+                    ++$passedCount;
 
+                    // Gabungkan Header (Key) dengan Row (Value)
                     $insertRow = array_combine($dbColumns, $row);
-                    unset($insertRow['progress']);
+
+                    // ============================================================
+                    // [FIX] SANITASI KOLOM KOSONG (GHOST COLUMNS)
+                    // ============================================================
+                    // Buang kolom yang key-nya kosong string ("") atau null.
+                    // Ini mengatasi error SQLSTATE[42S22]: Unknown column ''
+                    if (isset($insertRow[''])) {
+                        unset($insertRow['']);
+                    }
+                    unset($insertRow[null]); // Jaga-jaga
+                    unset($insertRow['progress']); // Bersihkan kolom progress jika ada
+                    // ============================================================
 
                     $insertRow['batch_id'] = $currentBatchId;
                     $insertRow['created_at'] = $now;
@@ -179,7 +195,7 @@ class ProcessSOSImport implements ShouldQueue
 
                 if ($rowCount % 5000 === 0) {
                     $percentReadFile = ($totalFileSize > 0) ? (ftell($fileHandle) / $totalFileSize) * 55 : 0;
-                    Cache::put('import_progress_' . $currentBatchId, 15 + $percentReadFile, now()->addHour());
+                    Cache::put('import_progress_'.$currentBatchId, 15 + $percentReadFile, now()->addHour());
                 }
 
                 if (count($dataToInsert) >= 500) {
@@ -190,32 +206,31 @@ class ProcessSOSImport implements ShouldQueue
             }
 
             if (!empty($dataToInsert)) {
-                Log::info("Batch [{$currentBatchId}]: Memasukkan sisa " . count($dataToInsert) . " baris...");
+                Log::info("Batch [{$currentBatchId}]: Memasukkan sisa ".count($dataToInsert).' baris...');
                 SosDataRaw::insert($dataToInsert);
             }
 
             fclose($fileHandle);
-            Cache::put('import_progress_' . $currentBatchId, 70, now()->addHour());
+            Cache::put('import_progress_'.$currentBatchId, 70, now()->addHour());
             Log::info("Batch [{$currentBatchId}]: Impor mentah SELESAI. Total dibaca: {$rowCount}. Total di-insert: {$passedCount}. Memulai pemrosesan SQL...");
 
             $this->processNewPos($currentBatchId);
-            Cache::put('import_progress_' . $currentBatchId, 80, now()->addHour());
+            Cache::put('import_progress_'.$currentBatchId, 80, now()->addHour());
             Log::info("Batch [{$currentBatchId}]: Pemrosesan ListPo SELESAI.");
 
             $this->processSosData($currentBatchId);
-            Cache::put('import_progress_' . $currentBatchId, 95, now()->addHour());
+            Cache::put('import_progress_'.$currentBatchId, 95, now()->addHour());
             Log::info("Batch [{$currentBatchId}]: Pemrosesan SosData SELESAI.");
 
             SosDataRaw::where('batch_id', $currentBatchId)->delete();
             Log::info("Batch [{$currentBatchId}]: Data mentah dibersihkan.");
 
-            Cache::put('import_progress_' . $currentBatchId, 100, now()->addHour());
+            Cache::put('import_progress_'.$currentBatchId, 100, now()->addHour());
             Log::info("Batch [{$currentBatchId}]: SEMUA PROSES SELESAI.");
-
         } catch (\Throwable $e) {
-            Cache::put('import_progress_' . $currentBatchId, -1, now()->addHour());
-            Log::error('Import Gagal di dalam Job: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
-            Cache::put('import_progress_' . $this->batch()->id, -1, now()->addHour());
+            Cache::put('import_progress_'.$currentBatchId, -1, now()->addHour());
+            Log::error('Import Gagal di dalam Job: '.$e->getMessage(), ['trace' => $e->getTraceAsString()]);
+            Cache::put('import_progress_'.$this->batch()->id, -1, now()->addHour());
             if ($this->batch()) {
                 $this->batch()->cancel();
             }
@@ -234,6 +249,8 @@ class ProcessSOSImport implements ShouldQueue
 
     private function processNewPos(string $batchId)
     {
+        // (Kode processNewPos tetap sama seperti sebelumnya, tidak perlu diubah)
+        // ... Salin isi method ini dari kode asli Anda jika belum ada di sini ...
         $sql = "
         INSERT INTO list_po (nipnas, po, segment, bill_city, witel, created_at, updated_at)
         SELECT
@@ -276,7 +293,6 @@ class ProcessSOSImport implements ShouldQueue
         DB::statement($sql, [$batchId]);
     }
 
-    // [PERBAIKAN FORMAT TANGGAL] Menggunakan CAST(LEFT(...)) untuk memotong timezone
     private function processSosData(string $batchId)
     {
         $sql = "
@@ -294,14 +310,12 @@ class ProcessSOSImport implements ShouldQueue
             raw.nipnas, raw.standard_name, raw.order_id, raw.order_subtype, raw.order_description, raw.segmen, raw.sub_segmen,
             raw.custcity, raw.cust_witel, raw.servcity, raw.service_witel, raw.bill_witel, raw.billcity, raw.li_product_name,
 
-            -- [PERBAIKAN TANGGAL] Ambil 19 karakter pertama (YYYY-MM-DD HH:MM:SS)
             CAST(LEFT(NULLIF(raw.li_billdate, ''), 19) AS DATETIME) AS li_billdate,
 
             raw.li_milestone,
             raw.kategori,
             raw.li_status,
 
-            -- [PERBAIKAN TANGGAL]
             CAST(LEFT(NULLIF(raw.li_status_date, ''), 19) AS DATETIME) AS li_status_date,
 
             raw.is_termin,
@@ -309,19 +323,21 @@ class ProcessSOSImport implements ShouldQueue
             CAST(IFNULL(NULLIF(raw.hrg_bulanan, ''), 0) AS DECIMAL(15,2)),
             CAST(IFNULL(NULLIF(raw.revenue, ''), 0) AS DECIMAL(15,2)),
 
-            -- [PERBAIKAN TANGGAL]
             CAST(LEFT(NULLIF(raw.order_created_date, ''), 19) AS DATETIME) AS order_created_date,
 
             raw.agree_type,
 
-            -- [PERBAIKAN TANGGAL]
             CAST(LEFT(NULLIF(raw.agree_start_date, ''), 19) AS DATETIME) AS agree_start_date,
             CAST(LEFT(NULLIF(raw.agree_end_date, ''), 19) AS DATETIME) AS agree_end_date,
 
-            CAST(IFNULL(NULLIF(raw.lama_kontrak_hari, ''), 0) AS INT),
+            -- [PERBAIKAN 1: GANTI INT KE SIGNED]
+            CAST(IFNULL(NULLIF(raw.lama_kontrak_hari, ''), 0) AS SIGNED),
+
             CAST(IFNULL(NULLIF(raw.amortisasi, ''), 0) AS DECIMAL(15,2)),
             raw.action_cd, raw.kategori_umur,
-            CAST(IFNULL(NULLIF(raw.umur_order, ''), 0) AS INT),
+
+            -- [PERBAIKAN 2: GANTI INT KE SIGNED]
+            CAST(IFNULL(NULLIF(raw.umur_order, ''), 0) AS SIGNED),
 
             lp.po AS po_name,
 
@@ -424,12 +440,11 @@ class ProcessSOSImport implements ShouldQueue
         DB::statement($sql, [$batchId, $batchId]);
     }
 
-
     public function failed(\Throwable $exception): void
     {
         $batchId = $this->batch() ? $this->batch()->id : 'N/A';
-        Cache::put('import_progress_' . $batchId, -1, now()->addHour());
-        Log::error("Job ProcessSOSImport GAGAL (failed method) untuk Batch [{$batchId}]: " . $exception->getMessage());
+        Cache::put('import_progress_'.$batchId, -1, now()->addHour());
+        Log::error("Job ProcessSOSImport GAGAL (failed method) untuk Batch [{$batchId}]: ".$exception->getMessage());
         SosDataRaw::where('batch_id', $batchId)->delete();
     }
 }

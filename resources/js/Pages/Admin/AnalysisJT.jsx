@@ -432,7 +432,7 @@ const DetailsCardJT = ({ totals }) => {
     return (
         <div className="bg-white p-6 rounded-lg shadow-md">
             <h3 className="font-semibold text-lg text-gray-800 mb-4">Ringkasan Report JT</h3>
-            <div className="space-y-3 text-sm">
+            <div className="space-y-3 text-xs overflow-x-auto">
                 <div>
                     <p className="font-semibold text-gray-700 mb-2">Total LOP On Progress (by Status)</p>
                     <table className="min-w-full text-left">
@@ -629,13 +629,30 @@ export default function AnalysisJT({
     const { filters = {} } = props;
     const activeDetailView = filters.tab || 'belum_go_live';
 
+    const [progressStates, setProgressStates] = useState({
+        mentah: null, // null = tidak ada proses, 0-100 = proses berjalan
+    });
+
+    const isProcessingMentah = progressStates.mentah !== null && progressStates.mentah < 100;
+
+    const witelList = ["BALI", "JATIM BARAT", "JATIM TIMUR", "NUSA TENGGARA", "SURAMADU"];
+
+    // --- Form Hooks ---
+    const { data: uploadData, setData: setUploadData, post: postUpload, processing: processingUpload, errors, reset } = useForm({
+        document: null,
+    });
+
+    // --- Toast Effect ---
+    useEffect(() => {
+        if (flash.success) toast.success(flash.success);
+        if (flash.error) toast.error(flash.error);
+    }, [flash]);
+
     const [queueProgress, setQueueProgress] = useState(null);
     const [isPaused, setIsPaused] = useState(false);
     const [timeRemaining, setTimeRemaining] = useState(null);
     const startTimeRef = useRef(null);
     const isQueueProcessing = queueProgress !== null;
-
-    const witelList = ["BALI", "JATIM BARAT", "JATIM TIMUR", "NUSA TENGGARA", "SURAMADU"];
 
     useEffect(() => {
         if (flash.success) toast.success(flash.success);
@@ -702,10 +719,6 @@ export default function AnalysisJT({
         }
     };
 
-    const { data: uploadData, setData: setUploadData, post: postUpload, processing: processingUpload, errors, reset, progress: uploadProgress } = useForm({
-        document: null,
-    });
-
     useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
         let batchId = urlParams.get("batch_id") || sessionStorage.getItem('jt_active_batch_id');
@@ -713,37 +726,50 @@ export default function AnalysisJT({
         const cleanup = () => {
             if (window.jtJobInterval) clearInterval(window.jtJobInterval);
             window.jtJobInterval = null;
-            setQueueProgress(null); // Gunakan state yang benar
+
+            setProgressStates({ mentah: null });
             sessionStorage.removeItem('jt_active_batch_id');
+
+            startTimeRef.current = null;
             setTimeRemaining(null);
             setIsPaused(false);
+
             const currentUrl = new URL(window.location.href);
             currentUrl.searchParams.delete("batch_id");
+            currentUrl.searchParams.delete("success");
             window.history.replaceState({}, document.title, currentUrl.toString());
         };
 
         if (batchId) {
             sessionStorage.setItem('jt_active_batch_id', batchId);
-            if (queueProgress === null) setQueueProgress(0);
+
+            // Set state awal jika belum ada
+            if (progressStates.mentah === null) {
+                setProgressStates({ mentah: 0 });
+            }
+
             if (window.jtJobInterval) clearInterval(window.jtJobInterval);
 
             window.jtJobInterval = setInterval(() => {
                 if (isPaused) return;
 
-                axios.get(route("import.progress", { batchId }))
+                // Panggil route spesifik untuk JT
+                axios.get(route("admin.analysisJT.getImportProgress", { batchId }))
                     .then(response => {
-                        const newProgress = response.data.progress ?? 0;
-                        setQueueProgress(newProgress); // Selalu update progress
+                        const progress = response.data.progress ?? 0;
+                        setProgressStates({ mentah: progress });
 
-                        // Hitung sisa waktu jika sedang berjalan
-                        if (newProgress > 1 && newProgress < 100) {
+                        // Hitung Estimasi Waktu
+                        if (progress > 1 && progress < 100) {
                             if (!startTimeRef.current) startTimeRef.current = Date.now();
+                            // Rumus estimasi sederhana
                             const elapsedTime = (Date.now() - startTimeRef.current) / 1000;
-                            const estimatedTotalTime = (elapsedTime / newProgress) * 100;
-                            const remainingTimeInSeconds = estimatedTotalTime - elapsedTime;
-                            if (remainingTimeInSeconds > 0) {
-                                const minutes = Math.floor(remainingTimeInSeconds / 60);
-                                const seconds = Math.floor(remainingTimeInSeconds % 60);
+                            const totalTime = (elapsedTime / progress) * 100;
+                            const remaining = totalTime - elapsedTime;
+
+                            if (remaining > 0) {
+                                const minutes = Math.floor(remaining / 60);
+                                const seconds = Math.floor(remaining % 60);
                                 setTimeRemaining(`${minutes} menit ${seconds} detik`);
                             }
                         } else {
@@ -751,30 +777,37 @@ export default function AnalysisJT({
                         }
 
                         // Logika Selesai
-                        if (newProgress >= 100) {
+                        if (progress >= 100) {
                             if (window.jtJobInterval) clearInterval(window.jtJobInterval);
                             window.jtJobInterval = null;
-                            setTimeRemaining(null);
 
+                            // Hapus state progress DULUAN agar UI bar hilang
+                            cleanup();
+
+                            // Beri jeda sedikit lalu reload data
                             setTimeout(() => {
-                                cleanup();
                                 toast.success("Proses impor data JT selesai!");
-                                router.reload({ preserveScroll: true });
-                            }, 4000); // <-- Ini sudah benar (4 detik)
+                                router.reload({
+                                    preserveScroll: true,
+                                    only: ['jtReportData', 'jtSummaryData', 'tocReportData', 'belumGoLiveList', 'top3ByWitel', 'top3ByPO']
+                                });
+                            }, 1500);
                         }
                     })
                     .catch(error => {
-                        console.error("Gagal mengambil progres job JT:", error);
-                        toast.error("Terjadi kesalahan saat memproses file JT.");
-                        cleanup();
+                        console.error("Polling error:", error);
+                        // Jika batch tidak ditemukan (404) atau error lain, hentikan
+                        if(error.response && error.response.status === 404) {
+                            cleanup();
+                        }
                     });
-            }, 2500);
+            }, 2000);
         }
+
         return () => {
             if (window.jtJobInterval) clearInterval(window.jtJobInterval);
         };
-    }, [isPaused, props.flash]);
-
+    }, [isPaused]);
 
     const handleSaveConfig = () => {
         const configToSave = tableConfig.filter(c => c.type !== 'fixed');

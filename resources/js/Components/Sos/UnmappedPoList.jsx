@@ -6,7 +6,7 @@ import InputLabel from '@/Components/InputLabel';
 import InputError from '@/Components/InputError';
 import PrimaryButton from '@/Components/PrimaryButton';
 import SecondaryButton from '@/Components/SecondaryButton';
-import { PencilIcon } from '@heroicons/react/24/solid'; // Pastikan Anda sudah install heroicons
+import { PencilIcon } from '@heroicons/react/24/solid';
 
 // Komponen Pagination
 const Pagination = ({ links = [] }) => {
@@ -27,16 +27,15 @@ const Pagination = ({ links = [] }) => {
     );
 };
 
-
-export default function UnmappedPoList({ dataPaginator }) {
+export default function UnmappedPoList({ dataPaginator, poOptions = [] }) {
     const { data: unmappedData, links } = dataPaginator;
-    const [modalData, setModalData] = useState(null); // Data untuk item yg diedit
+    const [modalData, setModalData] = useState(null);
 
     const { data, setData, post, processing, errors, reset } = useForm({
         order_id: '',
         po_name: '',
         nipnas: '',
-        segmen: '',
+        segmen: '', // State untuk Segmen
         bill_city: '',
         witel_baru: '',
     });
@@ -45,11 +44,11 @@ export default function UnmappedPoList({ dataPaginator }) {
         setModalData(item);
         setData({
             order_id: item.order_id,
-            po_name: item.po_name || '',
+            po_name: item.po_name === 'PO_TIDAK_TERDEFINISI' ? '' : item.po_name,
             nipnas: item.nipnas,
-            segmen: item.segmen,
-            bill_city: item.bill_city,
-            witel_baru: item.witel_baru,
+            segmen: item.segmen || '', // Load segmen yang ada
+            bill_city: item.bill_city || '',
+            witel_baru: item.witel_baru || '',
         });
     };
 
@@ -75,8 +74,9 @@ export default function UnmappedPoList({ dataPaginator }) {
                             <th className="py-2 px-4 border text-left">Order ID</th>
                             <th className="py-2 px-4 border text-left">NIPNAS</th>
                             <th className="py-2 px-4 border text-left">Nama Pelanggan</th>
+                            <th className="py-2 px-4 border text-left">Cust City</th>
+                            <th className="py-2 px-4 border text-left">Serv City</th>
                             <th className="py-2 px-4 border text-left">Bill Witel</th>
-                            {/* [BARU] Tambahkan header Bill City */}
                             <th className="py-2 px-4 border text-left">Bill City</th>
                             <th className="py-2 px-4 border text-center">Aksi</th>
                         </tr>
@@ -88,8 +88,9 @@ export default function UnmappedPoList({ dataPaginator }) {
                                     <td className="py-2 px-4 border">{item.order_id}</td>
                                     <td className="py-2 px-4 border">{item.nipnas}</td>
                                     <td className="py-2 px-4 border">{item.standard_name}</td>
+                                    <td className="py-2 px-4 border">{item.cust_city}</td>
+                                    <td className="py-2 px-4 border">{item.serv_city}</td>
                                     <td className="py-2 px-4 border">{item.bill_witel}</td>
-                                    {/* [BARU] Tambahkan data Bill City */}
                                     <td className="py-2 px-4 border">{item.bill_city}</td>
                                     <td className="py-2 px-4 border text-center">
                                         <button
@@ -104,8 +105,7 @@ export default function UnmappedPoList({ dataPaginator }) {
                             ))
                         ) : (
                             <tr>
-                                {/* [UBAH] Colspan dari 5 menjadi 6 */}
-                                <td colSpan="6" className="py-4 px-4 border text-center text-gray-500">
+                                <td colSpan="8" className="py-4 px-4 border text-center text-gray-500">
                                     Tidak ada data PO yang belum ter-mapping.
                                 </td>
                             </tr>
@@ -120,28 +120,81 @@ export default function UnmappedPoList({ dataPaginator }) {
             <Modal show={modalData !== null} onClose={closeModal}>
                 <form onSubmit={submit} className="p-6">
                     <h2 className="text-lg font-medium text-gray-900">
-                        Edit Manual PO Name
+                        Update Mapping PO
                     </h2>
-                    <p className="mt-1 text-sm text-gray-600">
-                        Perbarui PO Name untuk Order ID: <span className="font-semibold">{modalData?.order_id}</span>
+                    <p className="mt-1 text-sm text-gray-600 mb-4">
+                        Perbarui PO Name untuk NIPNAS: <span className="font-bold">{modalData?.nipnas}</span> ({modalData?.standard_name})
                     </p>
+
+                    {/* Input PO Name (Dropdown) */}
                     <div className="mt-4">
-                        <InputLabel htmlFor="po_name" value="PO Name Baru" />
-                        <TextInput
+                        <InputLabel htmlFor="po_name" value="Pilih PO Name (AM)" />
+                        <select
                             id="po_name"
                             value={data.po_name}
-                            className="mt-1 block w-full"
                             onChange={(e) => setData('po_name', e.target.value)}
+                            className="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"
                             required
-                            isFocused
-                        />
+                        >
+                            <option value="">-- Pilih Account Manager --</option>
+                            {poOptions.map((po, index) => (
+                                <option key={index} value={po}>
+                                    {po}
+                                </option>
+                            ))}
+                        </select>
                         <InputError message={errors.po_name} className="mt-2" />
+                    </div>
+
+                    {/* Input Bill City */}
+                    <div className="mt-4">
+                        <InputLabel htmlFor="bill_city" value="Bill City (Kota Tagihan)" />
+                        <TextInput
+                            id="bill_city"
+                            value={data.bill_city}
+                            onChange={(e) => setData('bill_city', e.target.value)}
+                            className="mt-1 block w-full bg-gray-50"
+                            placeholder="Contoh: SURABAYA"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                            *Ubah kota jika mapping Witel gagal.
+                        </p>
+                    </div>
+
+                    {/* Input Bill Witel */}
+                    <div className="mt-4">
+                        <InputLabel htmlFor="witel_baru" value="Bill Witel (Witel Tagihan)" />
+                        <TextInput
+                            id="witel_baru"
+                            value={data.witel_baru}
+                            onChange={(e) => setData('witel_baru', e.target.value)}
+                            className="mt-1 block w-full bg-gray-50"
+                            placeholder="Contoh: SURAMADU"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                            *Isi manual 5 Witel Utama (BALI, SURAMADU, dll) jika mapping otomatis gagal.
+                        </p>
+                    </div>
+
+                    {/* [BARU] Input Segmen */}
+                    <div className="mt-4">
+                        <InputLabel htmlFor="segmen" value="Segmen" />
+                        <TextInput
+                            id="segmen"
+                            value={data.segmen}
+                            onChange={(e) => setData('segmen', e.target.value)}
+                            className="mt-1 block w-full bg-gray-50"
+                            placeholder="Contoh: 1. SME"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                            *Segmen dari order ini (isi manual jika data kosong).
+                        </p>
                     </div>
 
                     <div className="mt-6 flex justify-end">
                         <SecondaryButton onClick={closeModal}>Batal</SecondaryButton>
                         <PrimaryButton className="ms-3" disabled={processing}>
-                            {processing ? 'Menyimpan...' : 'Simpan'}
+                            {processing ? 'Menyimpan...' : 'Simpan & Sinkronisasi'}
                         </PrimaryButton>
                     </div>
                 </form>

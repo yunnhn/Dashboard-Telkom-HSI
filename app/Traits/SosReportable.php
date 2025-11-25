@@ -10,26 +10,22 @@ trait SosReportable
 {
     /**
      * Helper method untuk mengagregasi data report utama dari tabel sos_data.
+     * * [MODIFIKASI] Sekarang menerima parameter $tipeGrup (AOMO / SODORO)
      */
-    private function getSosReportData()
+    private function getSosReportData($tipeGrup = null)
     {
-        // 1. Definisikan Witel (Sudah benar)
+        // 1. Definisikan Witel
         $masterWitelList = ['BALI', 'JATIM BARAT', 'JATIM TIMUR', 'NUSA TENGGARA', 'SURAMADU'];
-        $sourceWitelList = $masterWitelList; // Ambil dari witel_baru
+        $sourceWitelList = $masterWitelList;
 
-        // 2. Definisikan Segmen (Sudah benar)
+        // 2. Definisikan Segmen
         $masterSegmentList = ['1. SME', '2. GOV', '3. PRIVATE', '4. SOE'];
 
-        // 3. Query utama dengan logika pemetaan Witel
-        $dbData = SosData::query()
+        // 3. Mulai Query Builder
+        $query = SosData::query()
             ->select(
                 'segmen_baru',
-                'witel_baru as witel', // Gunakan witel_baru yang sudah bersih
-
-                // =================================================================
-                // [PERBAIKAN UTAMA] Menerapkan logika IN (...) dari Job Anda
-                // ke kolom 'kategori' mentah.
-                // =================================================================
+                'witel_baru as witel',
 
                 // --- < 3 BLN ---
                 DB::raw("SUM(CASE WHEN kategori_umur = '< 3 BLN' AND UPPER(kategori) IN ('PROVIDE ORDER', '1. PROVIDE ORDER') THEN 1 ELSE 0 END) as provide_order_lt_3bln"),
@@ -50,10 +46,18 @@ trait SosReportable
 
                 DB::raw("SUM(CASE WHEN kategori_umur = '> 3 BLN' AND UPPER(kategori) IN ('READY TO BILL', '3. READY TO BILL') THEN 1 ELSE 0 END) as ready_to_bill_gt_3bln"),
                 DB::raw("SUM(CASE WHEN kategori_umur = '> 3 BLN' AND UPPER(kategori) IN ('READY TO BILL', '3. READY TO BILL') THEN scalling2 ELSE 0 END) as est_bc_ready_to_bill_gt_3bln")
+            );
 
-                // [CATATAN] Saya tetap menggunakan 'scalling2' untuk EST BC (JT)
-                // karena ini sudah dihitung di Job Anda.
-            )
+        // =================================================================
+        // [PERBAIKAN UTAMA] Filter berdasarkan tipe_grup (AOMO / SODORO)
+        // =================================================================
+        if ($tipeGrup) {
+            // Pastikan nama kolom di database Anda benar 'tipe_grup'
+            $query->where('tipe_grup', $tipeGrup);
+        }
+
+        // Lanjutkan eksekusi query
+        $dbData = $query
             ->whereIn('witel_baru', $sourceWitelList)
             ->whereIn('segmen_baru', $masterSegmentList)
             ->groupBy('segmen_baru', 'witel_baru')
@@ -61,7 +65,7 @@ trait SosReportable
             ->keyBy(fn ($item) => $item->segmen_baru . '_' . $item->witel)
             ->toArray();
 
-        // 3. Bangun struktur data akhir (Logika ini sudah benar)
+        // 4. Bangun struktur data akhir (Logika ini tidak berubah)
         $processedData = [];
         $grandTotal = $this->getBlankTotalRow('GRAND TOTAL');
 
@@ -103,7 +107,6 @@ trait SosReportable
     /** Helper untuk membuat array kosong untuk baris total */
     private function getBlankTotalRow($witelName)
     {
-        // ... (Fungsi ini tidak perlu diubah)
         $row = [
             'provide_order_lt_3bln' => 0, 'est_bc_provide_order_lt_3bln' => 0, 'in_process_lt_3bln' => 0, 'est_bc_in_process_lt_3bln' => 0,
             'ready_to_bill_lt_3bln' => 0, 'est_bc_ready_to_bill_lt_3bln' => 0,
@@ -120,7 +123,6 @@ trait SosReportable
     /** Helper untuk menghitung total per baris */
     private function calculateRowTotals($row)
     {
-        // ... (Fungsi ini tidak perlu diubah)
         $row['total_lt_3bln'] = ($row['provide_order_lt_3bln'] ?? 0) + ($row['in_process_lt_3bln'] ?? 0) + ($row['ready_to_bill_lt_3bln'] ?? 0);
         $row['total_gt_3bln'] = ($row['provide_order_gt_3bln'] ?? 0) + ($row['in_process_gt_3bln'] ?? 0) + ($row['ready_to_bill_gt_3bln'] ?? 0);
         $row['grand_total_order'] = ($row['total_lt_3bln'] ?? 0) + ($row['total_gt_3bln'] ?? 0);
@@ -132,7 +134,6 @@ trait SosReportable
      */
     private function getGalaksiReportData()
     {
-        // ... (Tidak perlu diubah) ...
         // 1. Ambil PETA NIPNAS -> NAMA PO
         $nipnasToPoMap = ListPo::query()
             ->whereNotNull('po')

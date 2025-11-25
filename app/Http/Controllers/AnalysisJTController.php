@@ -3,66 +3,32 @@
 namespace App\Http\Controllers;
 
 use App\Exports\JtReportExport;
-use Maatwebsite\Excel\Facades\Excel;
 use App\Jobs\ProcessJTImport;
 use App\Models\CustomTarget;
-use App\Models\JtData;
 use App\Models\PoData;
-use App\Models\TableConfiguration;
+use App\Models\UserTableConfiguration;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redirect;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
-use App\Models\UserTableConfiguration;
 use Inertia\Inertia;
+use Maatwebsite\Excel\Facades\Excel;
 
 class AnalysisJTController extends Controller
 {
     /**
-     * Logika CASE untuk menentukan Nama PO (Penanggung Jawab)
-     * Mengembalikan string SQL mentah.
+     * CATATAN PERBAIKAN:
+     * Fungsi `getPoCaseStatementString` DIHAPUS.
+     * Alasannya: Logika penentuan PO Name (Penanggung Jawab) sekarang sudah ditangani
+     * di level Import (JtDataImport.php) dan disimpan ke kolom `po_name` di database.
+     * Menggunakan kolom DB langsung lebih efisien daripada CASE WHEN raksasa.
      */
-    private function getPoCaseStatementString()
-    {
-        // ... (Fungsi ini tetap sama) ...
-        return "
-            CASE
-                WHEN witel_lama = 'WITEL MADIUN' THEN 'ALFONSUS'
-                WHEN witel_lama = 'WITEL DENPASAR' THEN 'DIASTANTO'
-                WHEN witel_lama = 'WITEL SINGARAJA' THEN 'DIASTANTO'
-                WHEN witel_lama = 'WITEL JEMBER' THEN 'ILHAM MIFTAHUL'
-                WHEN witel_lama = 'WITEL PASURUAN' THEN 'I WAYAN KRISNA'
-                WHEN witel_lama = 'WITEL SIDOARJO' THEN 'IBRAHIM MUHAMMAD'
-                WHEN witel_lama = 'WITEL KEDIRI' THEN 'LUQMAN KURNIAWAN'
-                WHEN witel_lama = 'WITEL MALANG' THEN 'NURTRIA IMAN'
-                WHEN witel_lama = 'WITEL NTT' THEN 'MARIA FRANSISKA'
-                WHEN witel_lama = 'WITEL NTB' THEN 'ANDRE YANA'
-                WHEN witel_lama = 'WITEL SURABAYA UTARA' AND segmen = 'DBS' THEN 'FERIZKA PARAMITHA'
-                WHEN witel_lama = 'WITEL SURABAYA SELATAN' AND segmen = 'DBS' THEN 'FERIZKA PARAMITHA'
-                WHEN witel_lama = 'WITEL MADURA' AND segmen = 'DBS' THEN 'FERIZKA PARAMITHA'
-                WHEN witel_lama = 'WITEL MADURA' AND segmen = 'DGS' THEN 'EKA SARI'
-                WHEN witel_lama = 'WITEL SURABAYA SELATAN' AND segmen = 'DGS' THEN 'EKA SARI'
-                WHEN witel_lama = 'WITEL SURABAYA UTARA' AND segmen = 'DGS' THEN 'EKA SARI'
-                WHEN witel_lama = 'WITEL SURABAYA UTARA' AND segmen = 'DES' THEN 'DWIEKA SEPTIAN'
-                WHEN witel_lama = 'WITEL SURABAYA UTARA' AND segmen = 'DSS' THEN 'DWIEKA SEPTIAN'
-                WHEN witel_lama = 'WITEL SURABAYA UTARA' AND segmen = 'DPS' THEN 'DWIEKA SEPTIAN'
-                WHEN witel_lama = 'WITEL SURABAYA SELATAN' AND segmen = 'DES' THEN 'DWIEKA SEPTIAN'
-                WHEN witel_lama = 'WITEL SURABAYA SELATAN' AND segmen = 'DSS' THEN 'DWIEKA SEPTIAN'
-                WHEN witel_lama = 'WITEL SURABAYA SELATAN' AND segmen = 'DPS' THEN 'DWIEKA SEPTIAN'
-                WHEN witel_lama = 'WITEL MADURA' AND segmen = 'DES' THEN 'DWIEKA SEPTIAN'
-                WHEN witel_lama = 'WITEL MADURA' AND segmen = 'DPS' THEN 'DWIEKA SEPTIAN'
-                WHEN witel_lama = 'WITEL MADURA' AND segmen = 'DSS' THEN 'DWIEKA SEPTIAN'
-                ELSE 'Belum Terdefinisi'
-            END
-        ";
-    }
-
     private function getWitelSegments()
     {
-        // ... (Fungsi ini tetap sama) ...
         return [
             'WITEL BALI' => ['WITEL DENPASAR', 'WITEL SINGARAJA'],
             'WITEL JATIM BARAT' => ['WITEL KEDIRI', 'WITEL MADIUN', 'WITEL MALANG'],
@@ -89,7 +55,6 @@ class AnalysisJTController extends Controller
                     DB::raw('TRIM(witel_lama) as witel_lama'), // Anak
                     DB::raw('TRIM(witel_baru) as witel_baru'), // Induk
 
-                    // [PERBAIKAN] Hanya menggunakan kriteria dari kueri Anda
                     DB::raw("SUM(CASE
                     WHEN UPPER(keterangan_toc) = 'DALAM TOC'
                     AND go_live = 'N'
@@ -104,7 +69,6 @@ class AnalysisJTController extends Controller
                     THEN 1 ELSE 0
                 END) as lewat_toc")
                 )
-                // Filter witel ini tetap diperlukan untuk pengelompokan
                 ->whereRaw("TRIM(witel_baru) IN ({$parentPlaceholders})", $parentWitelList)
                 ->whereRaw("TRIM(witel_lama) IN ({$childPlaceholders})", $childWitelList)
                 ->groupBy(DB::raw('TRIM(witel_lama)'), DB::raw('TRIM(witel_baru)'))
@@ -114,7 +78,6 @@ class AnalysisJTController extends Controller
                 ->keyBy(fn ($item) => $item->witel_baru.'|'.$item->witel_lama);
         }
 
-        // Sisa dari fungsi ini (looping dan agregasi) sudah benar.
         $reportData = [];
         $grandTotal = [
             'witel_lama' => 'TOTAL',
@@ -187,7 +150,6 @@ class AnalysisJTController extends Controller
     public function index(Request $request)
     {
         $filters = $request->all('search', 'tab');
-        $poCaseString = $this->getPoCaseStatementString();
 
         $jtReportData = $this->getJtReportData();
         $jtSummaryData = collect($jtReportData)->firstWhere('isTotal', true);
@@ -199,29 +161,34 @@ class AnalysisJTController extends Controller
             'WITEL YOGYA JATENG SELATAN',
         ];
 
-        // Query $belumGoLiveList Anda...
+        // --- QUERY UTAMA ---
         $belumGoLiveList = DB::table('spmk_mom')
             ->select(
                 'spmk_mom.*',
-                DB::raw("({$poCaseString}) as po_name"),
+                // [PERBAIKAN] Tidak perlu CASE WHEN lagi, gunakan kolom po_name langsung
+                // Kita tetap select explicit jika perlu alias, tapi spmk_mom.* sudah mencakup po_name
+                'spmk_mom.po_name',
                 DB::raw('DATEDIFF(NOW(), spmk_mom.tanggal_cb) as umur_project')
             )
             ->whereNotIn('spmk_mom.status_proyek', ['Selesai', 'Dibatalkan', 'GO LIVE'])
-            ->when($request->input('search'), function ($query, $search) use ($poCaseString) {
+            ->when($request->input('search'), function ($query, $search) {
+                // Logika pencarian disesuaikan untuk menggunakan kolom po_name
                 if (request()->input('tab', 'belum_go_live') === 'belum_go_live') {
-                    $query->where(function ($q) use ($search, $poCaseString) {
+                    $query->where(function ($q) use ($search) {
                         $q->where('spmk_mom.no_nde_spmk', 'like', "%{$search}%")
                             ->orWhere('spmk_mom.uraian_kegiatan', 'like', "%{$search}%")
                             ->orWhere('spmk_mom.segmen', 'like', "%{$search}%")
-                            ->orWhereRaw("({$poCaseString}) LIKE ?", ["%{$search}%"]);
+                            // [PERBAIKAN] Search langsung ke kolom PO Name
+                            ->orWhere('spmk_mom.po_name', 'like', "%{$search}%");
                     });
                 }
             })
-            ->orderBy('umur_project', 'desc')
+            // [PERBAIKAN UTAMA] Sorting: Data terbaru (Import terakhir) muncul paling atas
+            ->orderBy('spmk_mom.created_at', 'desc')
             ->paginate(20, ['*'], 'page')
             ->appends(request()->query());
 
-        // Query $top3ByWitel Anda...
+        // --- QUERY TOP 3 BY WITEL ---
         $top3ByWitel = DB::table(function ($query) use ($excludedWitel) {
             $query->select(
                 'witel_baru',
@@ -231,79 +198,59 @@ class AnalysisJTController extends Controller
                 'revenue_plan as revenue',
                 'status_tomps_new as status_tomps',
                 DB::raw('DATEDIFF(NOW(), tanggal_mom) as umur_project'),
-                DB::raw('ROW_NUMBER() OVER(
-                            PARTITION BY witel_baru
-                            ORDER BY DATEDIFF(NOW(), tanggal_mom) DESC
-                        ) as rn')
+                DB::raw('ROW_NUMBER() OVER(PARTITION BY witel_baru ORDER BY DATEDIFF(NOW(), tanggal_mom) DESC) as rn')
             )
-                ->from('spmk_mom')
-                // ... (sisa kriteria where Anda) ...
-                ->whereNotIn('status_proyek', ['Selesai', 'Dibatalkan', 'GO LIVE'])
-                ->whereRaw("UPPER(status_tomps_new) NOT LIKE '%DROP%'")
-                ->whereRaw("UPPER(status_i_hld) NOT LIKE '%DROP%'")
-                ->whereRaw("UPPER(status_tomps_new) NOT LIKE '%GO LIVE%'")
-                ->where(function ($q) {
-                    $q->where('status_tomps_last_activity', '!=', 'CLOSE - 100%')
-                        ->orWhereNull('status_tomps_last_activity');
-                })
-                ->whereNotNull('tanggal_mom')
-                ->whereNotIn('witel_baru', $excludedWitel)
-                ->where('go_live', '=', 'N')
-                ->where('populasi_non_drop', '=', 'Y')
-                ->where(function ($q) {
-                    $q->where('bak', '=', '-')
-                        ->orWhereNull('bak');
-                });
+               ->from('spmk_mom')
+               ->where(function ($q) {
+                   $q->where('status_tomps_last_activity', '!=', 'CLOSE - 100%')
+                     ->orWhereNull('status_tomps_last_activity');
+               })
+               ->whereNotNull('tanggal_mom')
+               ->whereNotIn('witel_baru', $excludedWitel)
+               ->where('go_live', '=', 'N')
+               ->where('populasi_non_drop', '=', 'Y');
         }, 'ranked_projects')
-            ->where('rn', '<=', 3)
-            ->orderBy('witel_baru')
-            ->orderBy('umur_project', 'desc')
-            ->get()
-            ->groupBy('witel_baru');
+        ->where('rn', '<=', 3)
+        ->orderBy('witel_baru')
+        ->orderBy('umur_project', 'desc')
+        ->get()
+        ->groupBy('witel_baru');
 
-        // Query $top3ByPO Anda...
-        $top3ByPO = DB::table(function ($query) use ($poCaseString) {
+        // --- QUERY TOP 3 BY PO (DIPERBAIKI) ---
+        // Sekarang menggunakan kolom po_name langsung
+        $top3ByPO = DB::table(function ($query) use ($excludedWitel) {
             $query->select(
                 'uraian_kegiatan',
                 'id_i_hld as ihld',
                 'tanggal_mom as tgl_mom',
                 'revenue_plan as revenue',
                 'status_tomps_new as status_tomps',
-                DB::raw("({$poCaseString}) as po_name"),
+                'po_name', // [PERBAIKAN] Ambil kolom langsung
                 DB::raw('DATEDIFF(NOW(), tanggal_mom) as umur_project'),
-                DB::raw('ROW_NUMBER() OVER(
-                            PARTITION BY ('.$poCaseString.')
-                            ORDER BY DATEDIFF(NOW(), tanggal_mom) DESC
-                        ) as rn')
+                DB::raw('ROW_NUMBER() OVER(PARTITION BY po_name ORDER BY DATEDIFF(NOW(), tanggal_mom) DESC) as rn')
             )
-            ->from('spmk_mom')
-            // ... (sisa kriteria where Anda) ...
-            ->whereNotIn('status_proyek', ['Selesai', 'Dibatalkan', 'GO LIVE'])
-            ->whereRaw("UPPER(status_tomps_new) NOT LIKE '%DROP%'")
-            ->whereRaw("UPPER(status_tomps_new) NOT LIKE '%GO LIVE%'")
-            ->whereNotNull('tanggal_mom');
+               ->from('spmk_mom')
+               ->where(function ($q) {
+                   $q->where('status_tomps_last_activity', '!=', 'CLOSE - 100%')
+                     ->orWhereNull('status_tomps_last_activity');
+               })
+               ->whereNotNull('tanggal_mom')
+               ->whereNotIn('witel_baru', $excludedWitel)
+               ->where('go_live', '=', 'N')
+               ->where('populasi_non_drop', '=', 'Y');
         }, 'ranked_projects')
-            ->where('rn', '<=', 3)
-            ->where('po_name', '!=', 'Belum Terdefinisi')
-            ->whereNotNull('po_name')
-            ->where('po_name', '!=', '')
-            ->orderBy('po_name')
-            ->orderBy('umur_project', 'desc')
-            ->get()
-            ->groupBy('po_name');
+        ->where('rn', '<=', 3)
+        ->whereNotNull('po_name')
+        ->where('po_name', '!=', '')
+        ->where('po_name', '!=', 'Belum Terdefinisi') // Jaga-jaga jika masih ada text ini
+        ->orderBy('po_name')
+        ->orderBy('umur_project', 'desc')
+        ->get()
+        ->groupBy('po_name');
 
-
-        // Logika Pengambilan Konfigurasi yang Diperbaiki
-        // 1. Coba cari config khusus milik user ini dulu
-        $savedConfig = UserTableConfiguration::where('page_name', 'analysis_jt')
-            ->where('user_id', Auth::id())
-            ->first();
-
-        // 2. Jika tidak ada, cari config global (yang user_id-nya NULL)
+        $savedConfig = UserTableConfiguration::where('page_name', 'analysis_jt')->where('user_id', Auth::id())->first();
         if (!$savedConfig) {
-            $savedConfig = UserTableConfiguration::where('page_name', 'analysis_jt')
-                ->whereNull('user_id')
-                ->first();
+            $savedConfig = UserTableConfiguration::where('page_name', 'analysis_jt')->whereNull('user_id')->first();
         }
 
         return Inertia::render('Admin/AnalysisJT', [
@@ -324,24 +271,30 @@ class AnalysisJTController extends Controller
      */
     public function upload(Request $request)
     {
-        // ... (Fungsi ini sudah benar) ...
         $request->validate([
             'document' => 'required|file|mimes:xlsx,xls,csv|max:51200',
         ]);
+
         try {
             $path = $request->file('document')->store('imports', 'local');
+
             $batch = Bus::batch([
                 new ProcessJTImport($path),
             ])
-                ->name('JT Data Import')
-                ->finally(function ($batch) use ($path) {
-                    Storage::disk('local')->delete($path);
-                })
-                ->dispatch();
+            ->name('JT Data Import')
+            ->finally(function ($batch) use ($path) {
+                Storage::disk('local')->delete($path);
+            })
+            ->dispatch();
 
-            return Redirect::route('admin.analysisJT.index')
-                ->with('batch_id', $batch->id)
-                ->with('flash', ['success' => 'File sedang diproses.']);
+            // URL Bersih dengan Progress Bar
+            $queryParams = $request->except('document');
+            $queryParams['batch_id'] = $batch->id;
+            session()->flash('flash', ['success' => 'File sedang diproses.']);
+
+            return Inertia::location(
+                route('admin.analysisJT.index', $queryParams)
+            );
         } catch (\Exception $e) {
             Log::error('Gagal mengunggah file JT: '.$e->getMessage());
 
@@ -349,7 +302,6 @@ class AnalysisJTController extends Controller
         }
     }
 
-    // ... (Fungsi cancelImport, saveConfig, resetConfig, saveCustomTargets, uploadPoList, addPoManually, export... tetap sama) ...
     public function cancelImport(Request $request)
     {
         $batchId = $request->input('batch_id');
@@ -375,30 +327,25 @@ class AnalysisJTController extends Controller
         UserTableConfiguration::updateOrCreate(
             [
                 'page_name' => $validated['page_name'],
-                'user_id' => Auth::id() // <-- INI KUNCINYA
+                'user_id' => Auth::id(),
             ],
             [
-                'configuration' => $validated['configuration']
+                'configuration' => $validated['configuration'],
             ]
         );
 
         return Redirect::back()->with('success', 'Tampilan tabel berhasil disimpan!');
     }
 
-    /**
-     * [PERBAIKAN] Mereset konfigurasi tabel ke default untuk user.
-     */
     public function resetConfig(Request $request)
     {
         $validated = $request->validate(['page_name' => 'required|string']);
         $pageName = $validated['page_name'];
 
-        // 1. Hapus konfigurasi yang spesifik untuk user ini
         UserTableConfiguration::where('page_name', $pageName)
             ->where('user_id', Auth::id())
             ->delete();
 
-        // 2. Hapus juga konfigurasi global (user_id = NULL) yang mungkin ada
         UserTableConfiguration::where('page_name', $pageName)
             ->whereNull('user_id')
             ->delete();
@@ -453,13 +400,9 @@ class AnalysisJTController extends Controller
 
     public function export(Request $request)
     {
-        // 1. Ambil data dengan logika yang sama persis seperti di halaman
         $data = $this->getJtReportData();
-
-        // 2. Tentukan nama file
         $fileName = 'jt_report_'.date('Ymd_His').'.xlsx';
 
-        // 3. Unduh file menggunakan Export class yang baru kita buat
         return Excel::download(new JtReportExport($data), $fileName);
     }
 
@@ -470,7 +413,6 @@ class AnalysisJTController extends Controller
     */
     public function showRollbackPageJT()
     {
-        // [FIX] Ganti JtData::select ke DB::table('spmk_mom')
         $recentBatches = DB::table('spmk_mom')->select('batch_id', DB::raw('MAX(created_at) as last_upload_time'))
             ->whereNotNull('batch_id')
             ->groupBy('batch_id')
@@ -506,7 +448,7 @@ class AnalysisJTController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | [FUNGSI DIPERBARUI] METODE HELPER PRIBADI
+    | METODE HELPER PRIBADI
     |--------------------------------------------------------------------------
     */
 
@@ -514,17 +456,16 @@ class AnalysisJTController extends Controller
     {
         // 1. Definisikan ekspresi COUNT dan SUM (Revenue)
         $selectExpressions = [
-            // [PERBAIKAN] Menambahkan filter go_live = 'N' AND populasi_non_drop = 'Y'
             DB::raw("SUM(CASE WHEN UPPER(status_tomps_new) LIKE '%INITIAL%' AND go_live = 'N' AND populasi_non_drop = 'Y' THEN 1 ELSE 0 END) AS initial"),
             DB::raw("SUM(CASE WHEN UPPER(status_tomps_new) LIKE '%SURVEY & DRM%' AND go_live = 'N' AND populasi_non_drop = 'Y' THEN 1 ELSE 0 END) AS survey_drm"),
             DB::raw("SUM(CASE WHEN UPPER(status_tomps_new) LIKE '%PERIZINAN & MOS%' AND go_live = 'N' AND populasi_non_drop = 'Y' THEN 1 ELSE 0 END) AS perizinan_mos"),
             DB::raw("SUM(CASE WHEN UPPER(status_tomps_new) LIKE '%INSTALASI%' AND go_live = 'N' AND populasi_non_drop = 'Y' THEN 1 ELSE 0 END) AS instalasi"),
             DB::raw("SUM(CASE WHEN UPPER(status_tomps_new) LIKE '%FI - OGP GOLIVE%' AND go_live = 'N' AND populasi_non_drop = 'Y' THEN 1 ELSE 0 END) AS fi_ogp_live"),
 
-            // [PERBAIKAN] GOLIVE (JML LOP) hanya melihat go_live = 'Y'
+            // GOLIVE (JML LOP): hanya melihat go_live = 'Y'
             DB::raw("SUM(CASE WHEN go_live = 'Y' AND populasi_non_drop = 'Y' THEN 1 ELSE 0 END) AS golive_jml_lop"),
 
-            // [PERBAIKAN] DROP hanya melihat populasi_non_drop = 'N'
+            // DROP: hanya melihat populasi_non_drop = 'N'
             DB::raw("SUM(CASE WHEN populasi_non_drop = 'N' THEN 1 ELSE 0 END) AS `drop`"),
 
             // REVENUE (dihitung terpisah berdasarkan status + filter)
@@ -534,45 +475,38 @@ class AnalysisJTController extends Controller
             DB::raw("SUM(CASE WHEN UPPER(status_tomps_new) LIKE '%INSTALASI%' AND go_live = 'N' AND populasi_non_drop = 'Y' THEN COALESCE(revenue_plan, 0) ELSE 0 END) AS instalasi_rev"),
             DB::raw("SUM(CASE WHEN UPPER(status_tomps_new) LIKE '%FI - OGP GOLIVE%' AND go_live = 'N' AND populasi_non_drop = 'Y' THEN COALESCE(revenue_plan, 0) ELSE 0 END) AS fi_ogp_live_rev"),
 
-            // [PERBAIKAN] GOLIVE (REV LOP) hanya melihat go_live = 'Y'
+            // GOLIVE (REV LOP): hanya melihat go_live = 'Y'
             DB::raw("SUM(CASE WHEN go_live = 'Y' AND populasi_non_drop = 'Y' THEN COALESCE(revenue_plan, 0) ELSE 0 END) AS golive_rev_lop"),
 
             // REV ALL LOP (Total revenue dari SEMUA KECUALI DROP)
             DB::raw("SUM(CASE WHEN populasi_non_drop = 'Y' THEN COALESCE(revenue_plan, 0) ELSE 0 END) AS rev_all_lop"),
         ];
 
-        // 2. Ambil "Whitelist" Witel
         $witelSegments = $this->getWitelSegments();
         $parentWitelList = array_keys($witelSegments);
         $childWitelList = array_merge(...array_values($witelSegments));
 
-        // [FIX] Buat placeholder untuk binding yang aman
         if (empty($parentWitelList) || empty($childWitelList)) {
             $data = collect();
         } else {
             $parentPlaceholders = implode(',', array_fill(0, count($parentWitelList), '?'));
             $childPlaceholders = implode(',', array_fill(0, count($childWitelList), '?'));
 
-            // 3. Jalankan Query Utama
             $data = DB::table('spmk_mom')
                 ->select(
                     DB::raw('TRIM(witel_lama) as witel_lama'), // Anak
                     DB::raw('TRIM(witel_baru) as witel_baru'), // Induk
                     ...$selectExpressions
                 )
-                // [PENTING] Hapus filter 'status_proyek'
-
-                // Filter Witel
                 ->whereRaw("TRIM(witel_baru) IN ({$parentPlaceholders})", $parentWitelList)
                 ->whereRaw("TRIM(witel_lama) IN ({$childPlaceholders})", $childWitelList)
-
                 ->groupBy(DB::raw('TRIM(witel_lama)'), DB::raw('TRIM(witel_baru)'))
                 ->orderBy(DB::raw('TRIM(witel_baru)'))
                 ->orderBy(DB::raw('TRIM(witel_lama)'))
                 ->get();
         }
 
-        // 4. Proses data di PHP
+        // 4. Proses data di PHP (Struktur Laporan)
         $reportData = [];
         $allColumns = [
             'initial', 'survey_drm', 'perizinan_mos', 'instalasi', 'fi_ogp_live',
@@ -620,7 +554,7 @@ class AnalysisJTController extends Controller
                         }
                     }
 
-                    // [LOGIKA BARU] JML LOP (EXC DROP) = Total (Initial s/d Golive)
+                    // JML LOP (EXC DROP) = Total (Initial s/d Golive)
                     $rowData['jml_lop_exc_drop'] =
                         ($rowData['initial'] ?? 0) +
                         ($rowData['survey_drm'] ?? 0) +
@@ -629,7 +563,7 @@ class AnalysisJTController extends Controller
                         ($rowData['fi_ogp_live'] ?? 0) +
                         ($rowData['golive_jml_lop'] ?? 0);
 
-                    // [LOGIKA BARU] %CLOSE = GOLIVE / JML LOP (EXC DROP)
+                    // %CLOSE = GOLIVE / JML LOP (EXC DROP)
                     if ($rowData['jml_lop_exc_drop'] > 0) {
                         $rowData['percent_close'] = (($rowData['golive_jml_lop'] ?? 0) / $rowData['jml_lop_exc_drop']) * 100;
                     } else {
@@ -678,5 +612,16 @@ class AnalysisJTController extends Controller
         $reportData[] = $grandTotal;
 
         return $reportData;
+    }
+
+    public function getImportProgress($batchId)
+    {
+        $batch = Bus::findBatch($batchId);
+        if (!$batch || $batch->finished()) {
+            return response()->json(['progress' => 100]);
+        }
+        $progress = Cache::get('import_progress_'.$batchId, 0);
+
+        return response()->json(['progress' => $progress]);
     }
 }

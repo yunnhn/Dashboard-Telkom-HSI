@@ -364,12 +364,14 @@ const SosReportTable = ({ data, tableConfig, viewMode }) => {
 
 export default function AnalysisSOS({
     auth,
-    reportData = [],
+    reportDataAomo = [],
+    reportDataSodoro = [],
     provideOrderData = { data: [], links: [] },
     inProcessData = { data: [], links: [] },
     readyToBillData = { data: [], links: [] },
     provCompleteData = { data: [], links: [] },
     unmappedPoData = { data: [], links: [] },
+    poListOptions = [],
     galaksiData = [],
     listPoData = { data: [], links: [] },
     savedConfigAomo,
@@ -656,12 +658,14 @@ export default function AnalysisSOS({
         }
     }, [usePage().props.url]); // [PERBAIKAN] Pantau URL di sini juga
 
+    const currentReportData = viewMode === 'AOMO' ? reportDataAomo : reportDataSodoro;
+
     const detailsTotals = useMemo(() => {
         // ... (Logika detailsTotals tidak berubah) ...
-        if (!reportData || reportData.length === 0) {
+        if (!currentReportData || currentReportData.length === 0) {
             return { grandTotalOrder: 0, totalEstBC: 0, totalLt3bln: 0, totalGt3bln: 0, totalEstBClt3bln: 0, totalEstBCgt3bln: 0 };
         }
-        const grandTotalRow = reportData.find(item => item.witel === 'GRAND TOTAL');
+        const grandTotalRow = currentReportData.find(item => item.witel === 'GRAND TOTAL');
         if (grandTotalRow) {
             const totalEstBClt3bln = (grandTotalRow.est_bc_provide_order_lt_3bln || 0) + (grandTotalRow.est_bc_in_process_lt_3bln || 0) + (grandTotalRow.est_bc_ready_to_bill_lt_3bln || 0);
             const totalEstBCgt3bln = (grandTotalRow.est_bc_provide_order_gt_3bln || 0) + (grandTotalRow.est_bc_in_process_gt_3bln || 0) + (grandTotalRow.est_bc_ready_to_bill_gt_3bln || 0);
@@ -676,7 +680,7 @@ export default function AnalysisSOS({
             };
         }
         return { grandTotalOrder: 0, totalEstBC: 0, totalLt3bln: 0, totalGt3bln: 0, totalEstBClt3bln: 0, totalEstBCgt3bln: 0 };
-    }, [reportData]);
+    }, [currentReportData]);
 
     const handleSaveConfig = () => {
         const configPageName = viewMode === 'AOMO' ? 'analysis_sos_aomo' : 'analysis_sos_sodoro';
@@ -762,7 +766,6 @@ export default function AnalysisSOS({
                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                     {/* Kolom Utama */}
                     <div className="lg:col-span-3 space-y-6">
-                        {/* ... (Konten kolom utama tidak berubah) ... */}
                         <TableConfiguratorSOS
                             tableConfig={tableConfig}
                             setTableConfig={setTableConfig}
@@ -788,7 +791,7 @@ export default function AnalysisSOS({
                                     Ekspor Excel
                                 </a>
                             </div>
-                            <SosReportTable data={reportData} tableConfig={tableConfig} viewMode={viewMode} />
+                            <SosReportTable data={currentReportData} tableConfig={tableConfig} viewMode={viewMode} />
                         </div>
 
                         <div className="bg-white p-6 rounded-lg shadow-md">
@@ -970,7 +973,10 @@ export default function AnalysisSOS({
                             <p className="text-sm text-gray-600 mb-4">
                                 Berikut adalah daftar order yang belum memiliki PO Name, namun berasal dari 5 Witel utama. Anda dapat mengedit PO Name secara manual.
                             </p>
-                            <UnmappedPoList dataPaginator={unmappedPoData} />
+                            <UnmappedPoList
+                                dataPaginator={unmappedPoData}
+                                poOptions={poListOptions} // <--- [2] Oper ke Child Component
+                            />
                         </div>
 
                         <CustomTargetFormSOS

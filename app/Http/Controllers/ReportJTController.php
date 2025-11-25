@@ -2,24 +2,18 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\JtData;
 use App\Models\UserTableConfiguration;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-// Pastikan model JtData diimpor jika Anda menggunakannya untuk helper lain,
-// meskipun kueri utama kita menggunakan DB::table
 use Inertia\Inertia;
 
 class ReportJTController extends Controller
 {
     // ===================================================================
-    // FUNGSI HELPER (Disalin dari AnalysisJTController)
+    // FUNGSI HELPER
     // ===================================================================
 
-    /**
-     * Mendefinisikan struktur Witel Induk (Parent) dan Witel Anak (Child).
-     */
     private function getWitelSegments()
     {
         return [
@@ -31,12 +25,8 @@ class ReportJTController extends Controller
         ];
     }
 
-    /**
-     * Logika CASE untuk menentukan Nama PO (Penanggung Jawab).
-     */
     private function getPoCaseStatementString()
     {
-        // [PERBAIKAN] Menggunakan 'witel_lama' agar konsisten dengan ProcessJTImport.
         return "
             CASE
                 WHEN witel_lama = 'WITEL MADIUN' THEN 'ALFONSUS'
@@ -61,43 +51,39 @@ class ReportJTController extends Controller
         ";
     }
 
-    /**
-     * Kueri untuk Tabel 1: Data Report JT.
-     */
     private function getJtReportData()
     {
-        // 1. Definisikan ekspresi COUNT dan SUM (Revenue)
+        $baseFilter = "go_live = 'N' AND populasi_non_drop = 'Y'";
         $selectExpressions = [
-            DB::raw("SUM(CASE WHEN UPPER(status_tomps_new) LIKE '%INITIAL%' AND go_live = 'N' AND populasi_non_drop = 'Y' THEN 1 ELSE 0 END) AS initial"),
-            DB::raw("SUM(CASE WHEN UPPER(status_tomps_new) LIKE '%SURVEY & DRM%' AND go_live = 'N' AND populasi_non_drop = 'Y' THEN 1 ELSE 0 END) AS survey_drm"),
-            DB::raw("SUM(CASE WHEN UPPER(status_tomps_new) LIKE '%PERIZINAN & MOS%' AND go_live = 'N' AND populasi_non_drop = 'Y' THEN 1 ELSE 0 END) AS perizinan_mos"),
-            DB::raw("SUM(CASE WHEN UPPER(status_tomps_new) LIKE '%INSTALASI%' AND go_live = 'N' AND populasi_non_drop = 'Y' THEN 1 ELSE 0 END) AS instalasi"),
-            DB::raw("SUM(CASE WHEN UPPER(status_tomps_new) LIKE '%FI - OGP GOLIVE%' AND go_live = 'N' AND populasi_non_drop = 'Y' THEN 1 ELSE 0 END) AS fi_ogp_live"),
+            DB::raw("SUM(CASE WHEN UPPER(status_tomps_new) LIKE '%INITIAL%' AND $baseFilter THEN 1 ELSE 0 END) AS initial"),
+            DB::raw("SUM(CASE WHEN UPPER(status_tomps_new) LIKE '%SURVEY%' AND $baseFilter THEN 1 ELSE 0 END) AS survey_drm"),
+            DB::raw("SUM(CASE WHEN (UPPER(status_tomps_new) LIKE '%PERIZINAN%' OR UPPER(status_tomps_new) LIKE '%MOS%') AND $baseFilter THEN 1 ELSE 0 END) AS perizinan_mos"),
+            DB::raw("SUM(CASE WHEN UPPER(status_tomps_new) LIKE '%INSTALASI%' AND $baseFilter THEN 1 ELSE 0 END) AS instalasi"),
+            DB::raw("SUM(CASE WHEN (UPPER(status_tomps_new) LIKE '%FI%' OR UPPER(status_tomps_new) LIKE '%OGP%') AND $baseFilter THEN 1 ELSE 0 END) AS fi_ogp_live"),
             DB::raw("SUM(CASE WHEN go_live = 'Y' AND populasi_non_drop = 'Y' THEN 1 ELSE 0 END) AS golive_jml_lop"),
             DB::raw("SUM(CASE WHEN populasi_non_drop = 'N' THEN 1 ELSE 0 END) AS `drop`"),
-            DB::raw("SUM(CASE WHEN UPPER(status_tomps_new) LIKE '%INITIAL%' AND go_live = 'N' AND populasi_non_drop = 'Y' THEN COALESCE(revenue_plan, 0) ELSE 0 END) AS initial_rev"),
-            DB::raw("SUM(CASE WHEN UPPER(status_tomps_new) LIKE '%SURVEY & DRM%' AND go_live = 'N' AND populasi_non_drop = 'Y' THEN COALESCE(revenue_plan, 0) ELSE 0 END) AS survey_drm_rev"),
-            DB::raw("SUM(CASE WHEN UPPER(status_tomps_new) LIKE '%PERIZINAN & MOS%' AND go_live = 'N' AND populasi_non_drop = 'Y' THEN COALESCE(revenue_plan, 0) ELSE 0 END) AS perizinan_mos_rev"),
-            DB::raw("SUM(CASE WHEN UPPER(status_tomps_new) LIKE '%INSTALASI%' AND go_live = 'N' AND populasi_non_drop = 'Y' THEN COALESCE(revenue_plan, 0) ELSE 0 END) AS instalasi_rev"),
-            DB::raw("SUM(CASE WHEN UPPER(status_tomps_new) LIKE '%FI - OGP GOLIVE%' AND go_live = 'N' AND populasi_non_drop = 'Y' THEN COALESCE(revenue_plan, 0) ELSE 0 END) AS fi_ogp_live_rev"),
+            DB::raw("SUM(CASE WHEN UPPER(status_tomps_new) LIKE '%INITIAL%' AND $baseFilter THEN COALESCE(revenue_plan, 0) ELSE 0 END) AS initial_rev"),
+            DB::raw("SUM(CASE WHEN UPPER(status_tomps_new) LIKE '%SURVEY%' AND $baseFilter THEN COALESCE(revenue_plan, 0) ELSE 0 END) AS survey_drm_rev"),
+            DB::raw("SUM(CASE WHEN (UPPER(status_tomps_new) LIKE '%PERIZINAN%' OR UPPER(status_tomps_new) LIKE '%MOS%') AND $baseFilter THEN COALESCE(revenue_plan, 0) ELSE 0 END) AS perizinan_mos_rev"),
+            DB::raw("SUM(CASE WHEN UPPER(status_tomps_new) LIKE '%INSTALASI%' AND $baseFilter THEN COALESCE(revenue_plan, 0) ELSE 0 END) AS instalasi_rev"),
+            DB::raw("SUM(CASE WHEN (UPPER(status_tomps_new) LIKE '%FI%' OR UPPER(status_tomps_new) LIKE '%OGP%') AND $baseFilter THEN COALESCE(revenue_plan, 0) ELSE 0 END) AS fi_ogp_live_rev"),
             DB::raw("SUM(CASE WHEN go_live = 'Y' AND populasi_non_drop = 'Y' THEN COALESCE(revenue_plan, 0) ELSE 0 END) AS golive_rev_lop"),
             DB::raw("SUM(CASE WHEN populasi_non_drop = 'Y' THEN COALESCE(revenue_plan, 0) ELSE 0 END) AS rev_all_lop"),
         ];
 
-        // 2. Ambil "Whitelist" Witel
         $witelSegments = $this->getWitelSegments();
         $parentWitelList = array_keys($witelSegments);
         $childWitelList = array_merge(...array_values($witelSegments));
+
         if (empty($parentWitelList) || empty($childWitelList)) {
             $data = collect();
         } else {
             $parentPlaceholders = implode(',', array_fill(0, count($parentWitelList), '?'));
             $childPlaceholders = implode(',', array_fill(0, count($childWitelList), '?'));
-            // 3. Jalankan Query Utama
             $data = DB::table('spmk_mom')
                 ->select(
-                    DB::raw('TRIM(witel_lama) as witel_lama'), // Anak
-                    DB::raw('TRIM(witel_baru) as witel_baru'), // Induk
+                    DB::raw('TRIM(witel_lama) as witel_lama'),
+                    DB::raw('TRIM(witel_baru) as witel_baru'),
                     ...$selectExpressions
                 )
                 ->whereRaw("TRIM(witel_baru) IN ({$parentPlaceholders})", $parentWitelList)
@@ -107,7 +93,7 @@ class ReportJTController extends Controller
                 ->orderBy(DB::raw('TRIM(witel_lama)'))
                 ->get();
         }
-        // 4. Proses data di PHP
+
         $reportData = [];
         $allColumns = [
             'initial', 'survey_drm', 'perizinan_mos', 'instalasi', 'fi_ogp_live',
@@ -134,12 +120,14 @@ class ReportJTController extends Controller
         $grandTotal = $initializeRow('GRAND TOTAL');
         $grandTotal['isTotal'] = true;
         $groupedBySegment = $data->groupBy('witel_baru');
+
         foreach ($witelSegments as $segmentName => $witelChildren) {
             $segmentTotal = $initializeRow($segmentName);
             $segmentTotal['isSegment'] = true;
             $childRows = [];
             $witelDataFromDB = $groupedBySegment->get($segmentName);
             $childDataLookup = $witelDataFromDB ? $witelDataFromDB->keyBy('witel_lama') : collect();
+
             foreach ($witelChildren as $childName) {
                 $witelData = $childDataLookup->get($childName);
                 $rowData = $initializeRow($childName);
@@ -196,9 +184,6 @@ class ReportJTController extends Controller
         return $reportData;
     }
 
-    /**
-     * Kueri untuk Tabel 2: Project Belum GO LIVE.
-     */
     private function getTocReportData()
     {
         $witelSegments = $this->getWitelSegments();
@@ -211,20 +196,10 @@ class ReportJTController extends Controller
             $childPlaceholders = implode(',', array_fill(0, count($childWitelList), '?'));
             $data = DB::table('spmk_mom')
                 ->select(
-                    DB::raw('TRIM(witel_lama) as witel_lama'), // Anak
-                    DB::raw('TRIM(witel_baru) as witel_baru'), // Induk
-                    DB::raw("SUM(CASE
-                        WHEN UPPER(keterangan_toc) = 'DALAM TOC'
-                        AND go_live = 'N'
-                        AND populasi_non_drop = 'Y'
-                        THEN 1 ELSE 0
-                    END) as dalam_toc"),
-                    DB::raw("SUM(CASE
-                        WHEN UPPER(keterangan_toc) = 'LEWAT TOC'
-                        AND go_live = 'N'
-                        AND populasi_non_drop = 'Y'
-                        THEN 1 ELSE 0
-                    END) as lewat_toc")
+                    DB::raw('TRIM(witel_lama) as witel_lama'),
+                    DB::raw('TRIM(witel_baru) as witel_baru'),
+                    DB::raw("SUM(CASE WHEN UPPER(keterangan_toc) LIKE '%DALAM TOC%' AND go_live = 'N' AND populasi_non_drop = 'Y' THEN 1 ELSE 0 END) as dalam_toc"),
+                    DB::raw("SUM(CASE WHEN UPPER(keterangan_toc) LIKE '%LEWAT TOC%' AND go_live = 'N' AND populasi_non_drop = 'Y' THEN 1 ELSE 0 END) as lewat_toc")
                 )
                 ->whereRaw("TRIM(witel_baru) IN ({$parentPlaceholders})", $parentWitelList)
                 ->whereRaw("TRIM(witel_lama) IN ({$childPlaceholders})", $childWitelList)
@@ -234,7 +209,7 @@ class ReportJTController extends Controller
                 ->get()
                 ->keyBy(fn ($item) => $item->witel_baru.'|'.$item->witel_lama);
         }
-        // Sisa proses (agregasi) di PHP sama...
+
         $reportData = [];
         $grandTotal = ['witel_lama' => 'TOTAL', 'dalam_toc' => 0, 'lewat_toc' => 0, 'jumlah_lop_on_progress' => 0, 'persen_dalam_toc' => '0,00%', 'isTotal' => true];
         $groupedBySegment = $data->groupBy('witel_baru');
@@ -274,9 +249,9 @@ class ReportJTController extends Controller
         return $reportData;
     }
 
-    /**
-     * Metode index utama untuk menampilkan halaman laporan.
-     */
+    // ===================================================================
+    // METODE INDEX UTAMA (YANG DIPERBAIKI)
+    // ===================================================================
     public function index(Request $request)
     {
         // 1. Ambil data untuk Tabel 1
@@ -285,13 +260,14 @@ class ReportJTController extends Controller
         // 2. Ambil data untuk Tabel 2
         $tocReportData = $this->getTocReportData();
 
-        // 3. Ambil data untuk Tabel 3 (Top 3 by Witel)
-        // ... (Query Top 3 Witel Anda) ...
+        // 3. Definisi Excluded Witel (Agar bisa dipakai di kedua query)
         $excludedWitel = [
             'WITEL SEMARANG JATENG UTARA',
             'WITEL SOLO JATENG TIMUR',
             'WITEL YOGYA JATENG SELATAN',
         ];
+
+        // 4. Query Tabel 3 (Top 3 by Witel) - DIPERBAIKI
         $top3ByWitel = DB::table(function ($query) use ($excludedWitel) {
             $query->select(
                 'witel_baru',
@@ -311,6 +287,7 @@ class ReportJTController extends Controller
             ->whereRaw("UPPER(status_tomps_new) NOT LIKE '%DROP%'")
             ->whereRaw("UPPER(status_i_hld) NOT LIKE '%DROP%'")
             ->whereRaw("UPPER(status_tomps_new) NOT LIKE '%GO LIVE%'")
+            // [PENAMBAHAN LOGIKA SESUAI REQUEST]
             ->where(function ($q) {
                 $q->where('status_tomps_last_activity', '!=', 'CLOSE - 100%')
                     ->orWhereNull('status_tomps_last_activity');
@@ -319,6 +296,7 @@ class ReportJTController extends Controller
             ->whereNotIn('witel_baru', $excludedWitel)
             ->where('go_live', '=', 'N')
             ->where('populasi_non_drop', '=', 'Y')
+            // [AKHIR PENAMBAHAN]
             ->where(function ($q) {
                 $q->where('bak', '=', '-')
                     ->orWhereNull('bak');
@@ -330,19 +308,19 @@ class ReportJTController extends Controller
             ->get()
             ->groupBy('witel_baru');
 
-        // 4. Ambil data untuk Tabel 4 (Top 3 by PO)
+        // 5. Query Tabel 4 (Top 3 by PO) - DIPERBAIKI
         $poCaseString = $this->getPoCaseStatementString();
-        $top3ByPO = DB::table(function ($query) use ($poCaseString) {
+        $top3ByPO = DB::table(function ($query) use ($poCaseString, $excludedWitel) {
             $query->select(
                 'uraian_kegiatan',
                 'id_i_hld as ihld',
                 'tanggal_mom as tgl_mom',
                 'revenue_plan as revenue',
                 'status_tomps_new as status_tomps',
-                DB::raw("({$poCaseString}) as po_name"),
+                DB::raw("COALESCE(NULLIF(po_name, ''), ({$poCaseString})) as po_name"),
                 DB::raw('DATEDIFF(NOW(), tanggal_mom) as umur_project'),
                 DB::raw('ROW_NUMBER() OVER(
-                            PARTITION BY ('.$poCaseString.')
+                            PARTITION BY COALESCE(NULLIF(po_name, ""), ('.$poCaseString.'))
                             ORDER BY DATEDIFF(NOW(), tanggal_mom) DESC
                         ) as rn')
             )
@@ -350,7 +328,16 @@ class ReportJTController extends Controller
             ->whereNotIn('status_proyek', ['Selesai', 'Dibatalkan', 'GO LIVE'])
             ->whereRaw("UPPER(status_tomps_new) NOT LIKE '%DROP%'")
             ->whereRaw("UPPER(status_tomps_new) NOT LIKE '%GO LIVE%'")
-            ->whereNotNull('tanggal_mom');
+            // [PENAMBAHAN LOGIKA SESUAI REQUEST]
+            ->where(function ($q) {
+                $q->where('status_tomps_last_activity', '!=', 'CLOSE - 100%')
+                    ->orWhereNull('status_tomps_last_activity');
+            })
+            ->whereNotNull('tanggal_mom')
+            ->whereNotIn('witel_baru', $excludedWitel)
+            ->where('go_live', '=', 'N')
+            ->where('populasi_non_drop', '=', 'Y');
+            // [AKHIR PENAMBAHAN]
         }, 'ranked_projects')
             ->where('rn', '<=', 3)
             ->where('po_name', '!=', 'Belum Terdefinisi')
@@ -361,36 +348,24 @@ class ReportJTController extends Controller
             ->get()
             ->groupBy('po_name');
 
-
-        // --- [PERBAIKAN DIMULAI DI SINI] ---
-
-        // 5. Ambil Konfigurasi Tabel JT
-
-        // Coba cari config khusus user ini dulu
+        // 6. Ambil Konfigurasi Tabel JT
         $configRecord = UserTableConfiguration::where('page_name', 'analysis_jt')
             ->where('user_id', Auth::id())
             ->first();
 
-        // Jika tidak ada config khusus user, cari config global (yang user_id-nya NULL)
         if (!$configRecord) {
             $configRecord = UserTableConfiguration::where('page_name', 'analysis_jt')
                 ->whereNull('user_id')
                 ->first();
         }
 
-        // --- [PERBAIKAN SELESAI] ---
-
-
-        // 6. Render tampilan
+        // 7. Render tampilan
         return Inertia::render('ReportJT', [
             'jtReportData' => $jtReportData,
             'tocReportData' => $tocReportData,
             'top3ByWitel' => $top3ByWitel,
             'top3ByPO' => $top3ByPO,
-
-            // Kirim prop baru ini
             'savedConfigJt' => $configRecord ? $configRecord->configuration : null,
-
             'flash' => session()->get('flash', []),
         ]);
     }
@@ -399,46 +374,45 @@ class ReportJTController extends Controller
     {
         $validated = $request->validate([
             'witel' => 'required|string',
-            'kpi_key' => 'required|string', // misal: 'initial', 'golive_jml_lop'
+            'kpi_key' => 'required|string',
         ]);
 
         $witelName = $validated['witel'];
         $kpiKey = $validated['kpi_key'];
 
-        // 1. Tentukan target Witel (Induk atau Anak)
         $witelSegments = $this->getWitelSegments();
         $targetWitelList = [];
 
         if (isset($witelSegments[$witelName])) {
-            // Jika yang diklik adalah Witel Induk (misal: 'WITEL BALI')
             $targetWitelList = $witelSegments[$witelName];
         } else {
-            // Jika yang diklik adalah Witel Anak (misal: 'WITEL DENPASAR')
             $targetWitelList = [$witelName];
         }
 
-        // 2. Bangun Query
         $query = DB::table('spmk_mom')->whereIn('witel_lama', $targetWitelList);
 
-        // 3. Terapkan filter KPI berdasarkan 'kpi_key'
-        // Ini menerjemahkan nama kolom menjadi logika query yang ada di getJtReportData()
-        $query->where(function($q) use ($kpiKey) {
+        $query->where(function ($q) use ($kpiKey) {
             match ($kpiKey) {
                 'jml_lop_exc_drop' => $q->where('populasi_non_drop', 'Y'),
-                'rev_all_lop' => $q->where('populasi_non_drop', 'Y'), // Akan mengambil semua, revenue diformat di frontend
-                'initial' => $q->where('UPPER(status_tomps_new)', 'LIKE', '%INITIAL%')->where('go_live', 'N')->where('populasi_non_drop', 'Y'),
-                'survey_drm' => $q->where('UPPER(status_tomps_new)', 'LIKE', '%SURVEY & DRM%')->where('go_live', 'N')->where('populasi_non_drop', 'Y'),
-                'perizinan_mos' => $q->where('UPPER(status_tomps_new)', 'LIKE', '%PERIZINAN & MOS%')->where('go_live', 'N')->where('populasi_non_drop', 'Y'),
-                'instalasi' => $q->where('UPPER(status_tomps_new)', 'LIKE', '%INSTALASI%')->where('go_live', 'N')->where('populasi_non_drop', 'Y'),
-                'fi_ogp_live' => $q->where('UPPER(status_tomps_new)', 'LIKE', '%FI - OGP GOLIVE%')->where('go_live', 'N')->where('populasi_non_drop', 'Y'),
+                'rev_all_lop' => $q->where('populasi_non_drop', 'Y'),
+                'initial' => $q->whereRaw("UPPER(status_tomps_new) LIKE '%INITIAL%'")->where('go_live', 'N')->where('populasi_non_drop', 'Y'),
+                'survey_drm' => $q->whereRaw("UPPER(status_tomps_new) LIKE '%SURVEY%'")->where('go_live', 'N')->where('populasi_non_drop', 'Y'),
+                'perizinan_mos' => $q->where(function ($sub) {
+                    $sub->whereRaw("UPPER(status_tomps_new) LIKE '%PERIZINAN%'")
+                        ->orWhereRaw("UPPER(status_tomps_new) LIKE '%MOS%'");
+                })->where('go_live', 'N')->where('populasi_non_drop', 'Y'),
+                'instalasi' => $q->whereRaw("UPPER(status_tomps_new) LIKE '%INSTALASI%'")->where('go_live', 'N')->where('populasi_non_drop', 'Y'),
+                'fi_ogp_live' => $q->where(function ($sub) {
+                    $sub->whereRaw("UPPER(status_tomps_new) LIKE '%FI%'")
+                        ->orWhereRaw("UPPER(status_tomps_new) LIKE '%OGP%'");
+                })->where('go_live', 'N')->where('populasi_non_drop', 'Y'),
                 'golive_jml_lop' => $q->where('go_live', 'Y')->where('populasi_non_drop', 'Y'),
                 'golive_rev_lop' => $q->where('go_live', 'Y')->where('populasi_non_drop', 'Y'),
                 'drop' => $q->where('populasi_non_drop', 'N'),
-                default => $q->whereRaw('1 = 0'), // Default (tidak mengembalikan apa-apa) jika key tidak cocok
+                default => $q->whereRaw('1 = 0'),
             };
         });
 
-        // 4. Ambil data
         $orders = $query->select(
             'id_i_hld as ihld',
             'uraian_kegiatan',
@@ -468,42 +442,34 @@ class ReportJTController extends Controller
         $witelName = $validated['witel'];
         $kpiKey = $validated['kpi_key'];
 
-        // 1. Tentukan target Witel (Induk, Anak, atau TOTAL)
-        $witelSegments = $this->getWitelSegments(); // Memanggil helper Anda yang sudah ada
+        $witelSegments = $this->getWitelSegments();
         $targetWitelList = [];
 
         if ($witelName === 'TOTAL') {
-             // Jika diklik 'TOTAL', ambil semua Witel Anak
-             $targetWitelList = array_merge(...array_values($witelSegments));
-        } else if (isset($witelSegments[$witelName])) {
-            // Jika yang diklik adalah Witel Induk (misal: 'WITEL BALI')
+            $targetWitelList = array_merge(...array_values($witelSegments));
+        } elseif (isset($witelSegments[$witelName])) {
             $targetWitelList = $witelSegments[$witelName];
         } else {
-            // Jika yang diklik adalah Witel Anak (misal: 'WITEL DENPASAR')
             $targetWitelList = [$witelName];
         }
 
-        // 2. Bangun Query Dasar (Semua project belum go live & non-drop)
-        // Logika ini diambil dari method getTocReportData() Anda
         $query = DB::table('spmk_mom')
             ->whereIn('witel_lama', $targetWitelList)
             ->where('go_live', 'N')
             ->where('populasi_non_drop', 'Y');
 
-        // 3. Terapkan filter KPI berdasarkan 'kpi_key'
         match ($kpiKey) {
-            'dalam_toc' => $query->whereRaw("UPPER(keterangan_toc) = 'DALAM TOC'"),
-            'lewat_toc' => $query->whereRaw("UPPER(keterangan_toc) = 'LEWAT TOC'"),
-            'jumlah_lop_on_progress' => $query, // Tidak perlu filter tambahan
-            default => $query->whereRaw('1 = 0'), // Failsafe
+            'dalam_toc' => $query->whereRaw("UPPER(keterangan_toc) LIKE '%DALAM TOC%'"),
+            'lewat_toc' => $query->whereRaw("UPPER(keterangan_toc) LIKE '%LEWAT TOC%'"),
+            'jumlah_lop_on_progress' => $query,
+            default => $query->whereRaw('1 = 0'),
         };
 
-        // 4. Ambil data
         $orders = $query->select(
             'id_i_hld as ihld',
             'uraian_kegiatan',
             'witel_lama',
-            'keterangan_toc', // Tambahkan kolom ini untuk info
+            'keterangan_toc',
             'status_tomps_new as status_tomps',
             'tanggal_mom as tgl_mom',
             'revenue_plan as revenue'
@@ -511,7 +477,6 @@ class ReportJTController extends Controller
         ->orderBy('tanggal_mom', 'desc')
         ->get();
 
-        // 5. RE-USE (Gunakan kembali) view 'ReportJT/Details.jsx' yang sudah ada
         return Inertia::render('ReportJT/Details', [
             'orders' => $orders,
             'pageTitle' => "Detail Laporan TOC: $witelName ($kpiKey)",

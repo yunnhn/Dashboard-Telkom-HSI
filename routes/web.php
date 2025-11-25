@@ -108,8 +108,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     Route::put('/qc-update/{documentData:order_id}/progress', 'updateQcStatusToProgress')->name('qc.update.progress');
                     Route::put('/qc-update/{documentData:order_id}/done', 'updateQcStatusToDone')->name('qc.update.done');
                     Route::put('/qc-update/{documentData:order_id}/cancel', 'updateQcStatusToCancel')->name('qc.update.cancel');
-
-                    // [DIHAPUS] Route DynamicRecordController yang salah tempat sudah dihapus dari sini.
                 });
 
             // Grup Controller untuk Analisis SOS
@@ -145,6 +143,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     Route::post('/upload-po-list', 'uploadPoList')->name('uploadPoList');
                     Route::post('/add-po', 'addPoManually')->name('addPo');
                     Route::post('/import/cancel', 'cancelImport')->name('import.cancel');
+
+                    // [PERBAIKAN PENTING] Route ini WAJIB ADA agar Polling Progress Bar berfungsi
+                    // URL Akhir: /admin/analysis-jt/progress/{batchId}
+                    // Nama Route: admin.analysisJT.getImportProgress
+                    Route::get('/progress/{batchId}', 'getImportProgress')->name('getImportProgress');
                 });
 
             // Rute Resource untuk Account Officer (hanya store dan update)
@@ -156,9 +159,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::get('/merge-excel/download', [ExcelMergeController::class, 'download'])->name('merge-excel.download');
             Route::get('/merge-excel/download-url', [ExcelMergeController::class, 'getDownloadUrl'])->name('merge-excel.download-url');
 
-            // [LOKASI BENAR] Route untuk Edit Record Dinamis
-            // Link di Details.jsx memanggil 'admin.record.edit'
-            // Pastikan file Edit.jsx memanggil 'admin.record.update'
+            // Route untuk Edit Record Dinamis
             Route::get('/record/{type}/{id}', [DynamicRecordController::class, 'edit'])->name('record.edit');
             Route::put('/record/{type}/{id}', [DynamicRecordController::class, 'update'])->name('record.update');
 
@@ -176,7 +177,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('superadmin.') // Prefix Nama Route superadmin...
         ->group(function () {
             // Resource Controller untuk User Management
-            Route::resource('users', UserController::class); // Akan menghasilkan superadmin.users.index, .create, .store, dll.
+            Route::resource('users', UserController::class);
 
             // Controller untuk Fitur Super Admin Lainnya (Termasuk Rollback)
             Route::controller(SuperAdminController::class)->group(function () {

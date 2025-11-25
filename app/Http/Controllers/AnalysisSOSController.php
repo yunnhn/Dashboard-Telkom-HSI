@@ -4,9 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Exports\GalaksiSosReportExport;
 use App\Exports\SosReportExport;
+use App\Imports\SOSDataImport;
 use App\Jobs\ProcessListPoImport;
 use App\Jobs\ProcessSOSImport;
-use App\Imports\SOSDataImport;
 use App\Models\CustomTarget;
 use App\Models\ListPo;
 use App\Models\SosData;
@@ -33,7 +33,17 @@ class AnalysisSOSController extends Controller
         $paginationCount = 15;
         $periodInput = now()->format('Y-m');
 
-        $reportData = $this->getSosReportData();
+        $reportDataAomo = $this->getSosReportData('AOMO');
+        $reportDataSodoro = $this->getSosReportData('SODORO');
+
+        $existingPoNames = ListPo::query()
+            ->select('po')
+            ->whereNotNull('po')
+            ->where('po', '!=', '')
+            ->whereNotIn('po', ['PO_TIDAK_TERDEFINISI', 'HOLD', 'LANDING', '#N/A']) // Filter nama invalid
+            ->distinct()
+            ->orderBy('po')
+            ->pluck('po');
 
         $provideOrderData = SosData::query()
             ->where('kategori', 'PROVIDE ORDER')
@@ -64,10 +74,9 @@ class AnalysisSOSController extends Controller
         $unmappedPoData = SosData::query()
             ->where('po_name', 'PO_TIDAK_TERDEFINISI')
             ->whereIn('bill_witel', $mainWitelList)
-            ->select('id', 'order_id', 'nipnas', 'standard_name', 'bill_witel', 'po_name', 'segmen', 'bill_city', 'witel_baru')
+            ->select('id', 'order_id', 'nipnas', 'standard_name', 'bill_witel', 'po_name', 'segmen', 'bill_city', 'witel_baru', 'cust_city', 'serv_city')
             ->latest('order_created_date')
             ->paginate($paginationCount, ['*'], 'unmapped_po_page')->withQueryString();
-
 
         // --- [PERBAIKAN DIMULAI DI SINI] ---
 
@@ -93,14 +102,14 @@ class AnalysisSOSController extends Controller
 
         // --- [PERBAIKAN SELESAI] ---
 
-
         $customTargets = CustomTarget::where('user_id', auth()->id())
             ->where('page_name', 'analysis_sos')
             ->where('period', Carbon::parse($periodInput)->startOfMonth()->format('Y-m-d'))
             ->get();
 
         return Inertia::render('Admin/AnalysisSOS', [
-            'reportData' => $reportData,
+            'reportDataAomo' => $reportDataAomo,
+            'reportDataSodoro' => $reportDataSodoro,
             'provideOrderData' => $provideOrderData,
             'inProcessData' => $inProcessData,
             'readyToBillData' => $readyToBillData,
@@ -113,6 +122,7 @@ class AnalysisSOSController extends Controller
             'galaksiData' => $galaksiData,
             'listPoData' => $listPoData,
             'unmappedPoData' => $unmappedPoData,
+            'poListOptions' => $existingPoNames,
         ]);
     }
 
@@ -130,7 +140,7 @@ class AnalysisSOSController extends Controller
             Log::info('File berhasil disimpan di: '.$path);
 
             $batch = Bus::batch([
-                new ProcessSOSImport($path)
+                new ProcessSOSImport($path),
             ])
             ->name('Import Data SOS')
             ->dispatch();
@@ -147,9 +157,9 @@ class AnalysisSOSController extends Controller
             return Inertia::location(
                 route('admin.analysisSOS.index', $queryParams)
             );
-
         } catch (\Throwable $e) {
             Log::error('Terjadi error saat upload: '.$e->getMessage());
+
             return Redirect::back()->with('error', 'Gagal memproses file. Cek log untuk detail.');
         }
     }
@@ -224,6 +234,7 @@ class AnalysisSOSController extends Controller
         $period = $lastUpdate ? strtoupper(Carbon::parse($lastUpdate)->isoFormat('D MMMM YYYY')) : 'OKTOBER 2025';
         $viewMode = $request->input('viewMode', 'AOMO');
         $fileName = 'SOS_Report_'.$viewMode.'_'.now()->format('Y-m-d').'.xlsx';
+
         return Excel::download(new SosReportExport($reportData, $cutoffDate, $period, $viewMode, $galaksiData), $fileName);
     }
 
@@ -233,31 +244,42 @@ class AnalysisSOSController extends Controller
         $lastUpdate = SosData::latest('updated_at')->value('updated_at');
         $cutoffDate = $lastUpdate ? Carbon::parse($lastUpdate)->format('d/m/Y H:i:s') : 'N/A';
         $fileName = 'Galaksi_SOS_Report_'.now()->format('Y-m-d').'.xlsx';
+
         return Excel::download(new GalaksiSosReportExport($galaksiData, $cutoffDate), $fileName);
     }
 
     public function importSosData(Request $request)
     {
-        $request->validate(['file' => 'required|file|mimes:csv,xlsx,xls']);
-        Log::info('Proses upload (metode baru/ToCollection) dimulai.');
-        $file = $request->file('file');
+        // 1. Validasi File
+        $request->validate([
+            'file' => 'required|file|mimes:csv,xlsx,xls',
+        ]);
+
+        Log::info('Proses upload (Sync/Direct) dimulai.');
+
         try {
-            $path = $file->store('excel-imports');
-            Log::info('File berhasil disimpan di: ' . $path);
-        } catch (\Exception $e) {
-            Log::error('Gagal menyimpan file: ' . $e->getMessage());
-            return Redirect::back()->withErrors(['file' => 'Gagal menyimpan file di server.']);
-        }
-        try {
-            Excel::import(new SOSDataImport, $path);
+            // 2. Simpan File Sementara
+            $file = $request->file('file');
+            // Menggunakan 'local' disk agar path-nya pasti
+            $path = $file->store('excel-imports', 'local');
+
+            Log::info('File berhasil disimpan di: '.$path);
+
+            // 3. Eksekusi Import
+            // Kita pass path file yang sudah disimpan
+            Excel::import(new SOSDataImport(), $path, 'local');
+
             Log::info('Proses impor (upsert) selesai.');
-            return Redirect::back()->with('success', 'Data SOS berhasil diimpor.');
+
+            return Redirect::back()->with('success', 'Data SOS berhasil diimpor dan kolom kosong otomatis dibersihkan.');
         } catch (\Maatwebsite\Excel\Validators\ValidationException $e) {
             Log::error('Error validasi Excel: ', $e->failures());
-            return Redirect::back()->withErrors(['file' => 'Gagal mengimpor: ' . $e->getMessage()]);
+
+            return Redirect::back()->withErrors(['file' => 'Gagal validasi data Excel: '.$e->getMessage()]);
         } catch (\Exception $e) {
-            Log::error('Proses impor GAGAL: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
-            return Redirect::back()->withErrors(['file' => 'Terjadi error saat impor: ' . $e->getMessage()]);
+            Log::error('Proses impor GAGAL: '.$e->getMessage(), ['trace' => $e->getTraceAsString()]);
+
+            return Redirect::back()->withErrors(['file' => 'Terjadi error sistem: '.$e->getMessage()]);
         }
     }
 
@@ -268,6 +290,7 @@ class AnalysisSOSController extends Controller
         $batch = Bus::batch([
             new ProcessListPoImport($path),
         ])->name('Import Daftar PO')->dispatch();
+
         return Redirect::route('admin.analysisSOS.index', ['po_batch_id' => $batch->id])
             ->with('info', 'File Daftar PO sedang diproses di latar belakang!');
     }
@@ -281,16 +304,25 @@ class AnalysisSOSController extends Controller
             'bill_city' => 'nullable|string|max:255',
             'witel' => 'nullable|string|max:255',
         ]);
+
+        // 1. Update Master Data (ListPo)
+        // Ini hanya menyimpan "Kamus Data" untuk file upload di MASA DEPAN.
         ListPo::updateOrCreate(
             ['nipnas' => $validated['nipnas']],
             [
                 'po' => $validated['po'],
-                'segment' => $validated['segment'] ?? '#N/A',
-                'bill_city' => $validated['bill_city'] ?? '#N/A',
-                'witel' => $validated['witel'] ?? '#N/A',
+                'segment' => $validated['segment'] ?? null,
+                'bill_city' => $validated['bill_city'] ?? null,
+                'witel' => $validated['witel'] ?? null,
             ]
         );
-        return Redirect::back()->with('success', 'Data PO berhasil ditambahkan/diperbarui.');
+
+        // [PERBAIKAN] HAPUS LOGIKA BULK UPDATE KE SOS_DATA
+        // Karena kita sepakat 1 NIPNAS bisa beda-beda PO, maka fitur "Tambah PO Manual"
+        // (yang basisnya NIPNAS) tidak boleh sembarangan menimpa data transaksi yang ada.
+        // Function ini sekarang murni hanya untuk "Menambah Master Data".
+
+        return Redirect::back()->with('success', 'Master Data PO disimpan untuk referensi upload mendatang. Data transaksi saat ini TIDAK diubah.');
     }
 
     public function cancelImport(Request $request)
@@ -301,13 +333,16 @@ class AnalysisSOSController extends Controller
             $batch->cancel();
             Cache::forget('import_progress_'.$validated['batch_id']);
             session()->forget('sos_active_batch_id'); // [TAMBAHAN] Bersihkan session juga
+
             return response()->json(['message' => 'Proses impor berhasil dibatalkan.']);
         }
+
         return response()->json(['message' => 'Batch tidak ditemukan.'], 404);
     }
 
     public function updatePoName(Request $request)
     {
+        // 1. Validasi Input
         $validated = $request->validate([
             'order_id' => 'required|string|exists:sos_data,order_id',
             'po_name' => 'required|string|max:255',
@@ -316,21 +351,91 @@ class AnalysisSOSController extends Controller
             'bill_city' => 'nullable|string',
             'witel_baru' => 'nullable|string',
         ]);
-        $sosData = SosData::where('order_id', $validated['order_id'])->first();
-        if ($sosData) {
-            $sosData->po_name = $validated['po_name'];
-            $sosData->save();
+
+        // Bersihkan input
+        $targetNipnas = trim($validated['nipnas']);
+        $poNameBaru = trim($validated['po_name']);
+
+        // 2. Persiapan Data Update (Logic Penentuan Witel & Segmen)
+        $cityMap = [
+            'DENPASAR' => 'BALI', 'BADUNG' => 'BALI', 'GIANYAR' => 'BALI',
+            'MATARAM' => 'NUSA TENGGARA', 'KUPANG' => 'NUSA TENGGARA',
+            'SURABAYA' => 'SURAMADU', 'BANGKALAN' => 'SURAMADU',
+            'MALANG' => 'JATIM TIMUR', 'JEMBER' => 'JATIM TIMUR', 'BANYUWANGI' => 'JATIM TIMUR',
+            'MADIUN' => 'JATIM BARAT', 'KEDIRI' => 'JATIM BARAT',
+        ];
+        $validWitels = ['BALI', 'JATIM BARAT', 'JATIM TIMUR', 'NUSA TENGGARA', 'SURAMADU'];
+        $validSegmens = ['1. SME', '2. GOV', '3. PRIVATE', '4. SOE'];
+
+        // Logic Witel
+        $finalWitel = null;
+        if (!empty($validated['witel_baru'])) {
+            $inputWitel = strtoupper(trim($validated['witel_baru']));
+            if (in_array($inputWitel, $validWitels)) {
+                $finalWitel = $inputWitel;
+            }
         }
+        if (!$finalWitel && !empty($validated['bill_city'])) {
+            $inputCity = strtoupper(trim($validated['bill_city']));
+            if (isset($cityMap[$inputCity])) {
+                $finalWitel = $cityMap[$inputCity];
+            }
+        }
+
+        // Logic Segmen
+        $finalSegmen = null;
+        if (!empty($validated['segmen'])) {
+            $inputSegmen = strtoupper(trim($validated['segmen']));
+            $segmenMap = ['SME' => '1. SME', 'GOV' => '2. GOV', 'PRIVATE' => '3. PRIVATE', 'SOE' => '4. SOE'];
+            if (in_array($inputSegmen, $validSegmens)) {
+                $finalSegmen = $inputSegmen;
+            } elseif (isset($segmenMap[$inputSegmen])) {
+                $finalSegmen = $segmenMap[$inputSegmen];
+            }
+        }
+
+        // =====================================================================
+        // [PERBAIKAN] UPDATE SPESIFIK (SINGLE ORDER ONLY)
+        // =====================================================================
+
+        $updateData = [
+            'po_name' => $poNameBaru,
+            'bill_city' => $validated['bill_city'], // Update kota sesuai input
+        ];
+
+        // Hanya update segmen jika logic menemukan segmen valid
+        if ($finalSegmen) {
+            $updateData['segmen'] = $finalSegmen;
+            $updateData['segmen_baru'] = $finalSegmen;
+        }
+
+        // Hanya update witel jika logic menemukan witel valid
+        if ($finalWitel) {
+            $updateData['bill_witel'] = $finalWitel;
+            $updateData['witel_baru'] = $finalWitel;
+        }
+
+        // EKSEKUSI: Hanya update berdasarkan ORDER_ID (Bukan NIPNAS)
+        SosData::where('order_id', $validated['order_id'])->update($updateData);
+
+        // =====================================================================
+        // 4. Update Master Data ListPo (Opsional: Sebagai default masa depan)
+        // =====================================================================
+        // Kita tetap simpan ke ListPo agar jika ada upload baru, dia punya default value.
+        // Tapi ini TIDAK mengubah order lain yang sudah ada di database saat ini.
+        $updatedOrder = SosData::where('order_id', $validated['order_id'])->first();
+
         ListPo::updateOrCreate(
-            ['nipnas' => $validated['nipnas']],
+            ['nipnas' => $targetNipnas],
             [
-                'po' => $validated['po_name'],
-                'segment' => $validated['segmen'] ?? $sosData->segmen ?? null,
-                'bill_city' => $validated['bill_city'] ?? $sosData->bill_city ?? null,
-                'witel' => $validated['witel_baru'] ?? $sosData->witel_baru ?? null,
+                'po' => $poNameBaru,
+                'segment' => $updatedOrder->segmen_baru ?? null,
+                'witel' => $updatedOrder->witel_baru ?? null,
+                'bill_city' => $validated['bill_city'] ?? null,
             ]
         );
-        return Redirect::back()->with('success', 'Nama PO berhasil diperbarui.');
+
+        return Redirect::back()->with('success', "Berhasil! Data untuk Order ID {$validated['order_id']} telah diperbarui.");
     }
 
     // =========================================================================
@@ -343,29 +448,31 @@ class AnalysisSOSController extends Controller
 
         // 2. Jika batch tidak ditemukan ATAU sudah selesai, paksa lapor 100%
         if (!$batch || $batch->finished()) {
-            Cache::forget('import_progress_' . $batchId); // Bersihkan cache
+            Cache::forget('import_progress_'.$batchId); // Bersihkan cache
+
             return response()->json([
                 'progress' => 100,
-                'status' => 'completed'
+                'status' => 'completed',
             ]);
         }
 
         // 3. Jika batch masih berjalan, cek progres dari Cache
-        $progress = Cache::get('import_progress_' . $batchId, 0);
+        $progress = Cache::get('import_progress_'.$batchId, 0);
 
         // 4. Jika Job gagal dan menulis -1 ke cache
         if ($progress == -1) {
-             Cache::forget('import_progress_' . $batchId);
-             return response()->json([
+            Cache::forget('import_progress_'.$batchId);
+
+            return response()->json([
                 'progress' => -1,
-                'status' => 'failed'
+                'status' => 'failed',
             ]);
         }
 
         // 5. Kirim progres normal
         return response()->json([
             'progress' => $progress,
-            'status' => 'processing'
+            'status' => 'processing',
         ]);
     }
 }

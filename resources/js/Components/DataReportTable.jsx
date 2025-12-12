@@ -94,7 +94,7 @@ export default function DataReportTable({ data, tableConfig, decimalPlaces, segm
             <>
                 {/* Baris Pertama (Group Title) */}
                 <tr className="text-xs text-white uppercase tracking-wider">
-                    <th rowSpan={3} className="py-3 px-4 bg-gray-700 sticky left-0 z-20 border-b border-gray-600 align-middle">WITEL</th>
+                    <th rowSpan={3} className="py-3 px-4 bg-gray-700  left-0 z-20 border-b border-gray-600 align-middle">WITEL</th>
                     {tableConfig.map((group, index) => (
                         <th
                             key={index}
@@ -158,7 +158,7 @@ export default function DataReportTable({ data, tableConfig, decimalPlaces, segm
     const renderBody = () => {
         return data.map((item, rowIndex) => (
             <tr key={item.nama_witel || rowIndex} className="border-b hover:bg-gray-50 text-sm">
-                <td className="py-2 px-4 whitespace-nowrap sticky left-0 z-10 bg-white font-medium border-r">
+                <td className="py-2 px-4 whitespace-nowrap  left-0 z-10 bg-white font-medium border-r">
                     {item.nama_witel}
                 </td>
                 {tableConfig.flatMap(group =>
@@ -223,7 +223,7 @@ export default function DataReportTable({ data, tableConfig, decimalPlaces, segm
 
         return (
             <tr className="font-bold text-white">
-                <td className="border-t border-gray-700 p-2 text-left sticky left-0 z-10 bg-gray-700">GRAND TOTAL</td>
+                <td className="border-t border-gray-700 p-2 text-left  left-0 z-10 bg-gray-700">GRAND TOTAL</td>
 
                 {tableConfig.flatMap(group =>
                     group.columns.map(col => {
@@ -267,7 +267,7 @@ export default function DataReportTable({ data, tableConfig, decimalPlaces, segm
     return (
         <div className="overflow-x-auto shadow-md rounded-lg">
             <table className="min-w-full bg-white border border-gray-200 text-sm">
-                <thead className="sticky top-0 z-30">
+                <thead className=" top-0 z-30">
                     {renderHeaders()}
                 </thead>
                 <tbody className="text-gray-700">

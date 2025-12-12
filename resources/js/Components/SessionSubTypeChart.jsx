@@ -1,79 +1,78 @@
-// resources/js/Components/SessionSubTypeChart.jsx
-
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Bar } from 'react-chartjs-2';
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
 
-// Opsi untuk mengonfigurasi chart
-const options = {
-    indexAxis: 'y', // <-- Ini yang membuat chart menjadi horizontal
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-        legend: {
-            display: false, // Menghilangkan legenda karena tidak diperlukan
-        },
-        tooltip: {
-            // [FUNGSI UTAMA] Mengaktifkan dan mengonfigurasi tooltip
-            enabled: true,
-            callbacks: {
-                // Mengubah teks di dalam tooltip agar lebih jelas
-                label: function (context) {
-                    return `Jumlah: ${context.raw}`;
-                }
-            }
-        }
-    },
-    scales: {
-        x: {
-            // Opsi untuk sumbu horizontal (jumlah)
-            grid: {
-                display: false, // Menghilangkan garis grid vertikal
-            },
-            ticks: {
-                display: false, // Menghilangkan label angka di bawah
-            },
-            border: {
-                display: false // Menghilangkan garis sumbu x
-            }
-        },
-        y: {
-            // Opsi untuk sumbu vertikal (AO, SO, DO)
-            grid: {
-                display: false, // Menghilangkan garis grid horizontal
-            },
-            border: {
-                display: false // Menghilangkan garis sumbu y
-            }
-        }
-    }
-};
+// Registrasi komponen ChartJS yang dibutuhkan
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 export default function SessionSubTypeChart({ data }) {
-    // Tampilkan pesan jika data tidak ada atau kosong
-    if (!data || data.length === 0) {
-        return <div className="flex items-center justify-center h-full text-gray-500">Tidak ada data untuk ditampilkan.</div>;
-    }
+    // Data yang diterima dari controller: [{product: 'A', segment: 'SME', total: 10}, ...]
 
-    const chartData = {
-        // Label untuk setiap bar (AO, SO, DO, dll.)
-        labels: data.map(item => item.sub_type),
-        datasets: [
-            {
-                label: 'Jumlah Order',
-                // Data (angka) untuk setiap bar
-                data: data.map(item => item.total),
-                // Fungsi untuk memberikan warna berbeda pada setiap bar
-                backgroundColor: (context) => {
-                    const subType = context.chart.data.labels[context.dataIndex];
-                    if (subType === 'MO') return '#ec4899'; // Pink
-                    if (subType === 'AO') return '#8b5cf6'; // Ungu
-                    return '#a5b4fc'; // Warna default jika ada sub-type lain
-                },
-                borderRadius: 10, // Membuat ujung bar menjadi bulat
-                barThickness: 20, // Mengatur ketebalan bar
+    const chartData = useMemo(() => {
+        if (!data || data.length === 0) return null;
+
+        // 1. Ambil list Product unik untuk Sumbu Y
+        const products = [...new Set(data.map(item => item.product))].sort();
+
+        // 2. Ambil list Segment unik untuk Legend (SME, LEGS, dll)
+        const segments = [...new Set(data.map(item => item.segment))].sort();
+
+        // 3. Warna untuk setiap segment
+        const colors = ['#8884d8', '#82ca9d', '#ffc658', '#ff8042', '#0088FE'];
+
+        // 4. Buat Datasets
+        const datasets = segments.map((segment, index) => {
+            return {
+                label: segment, // Legend
+                data: products.map(prod => {
+                    const found = data.find(d => d.product === prod && d.segment === segment);
+                    return found ? found.total : 0;
+                }),
+                backgroundColor: colors[index % colors.length],
+                barThickness: 25, // Ketebalan bar
+            };
+        });
+
+        return {
+            labels: products, // Sumbu Y
+            datasets: datasets
+        };
+    }, [data]);
+
+    const options = {
+        indexAxis: 'y', // Horizontal Chart
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom', // Legend di bawah
             },
-        ],
+            tooltip: {
+                mode: 'index',
+                intersect: false,
+            },
+        },
+        scales: {
+            x: {
+                stacked: true, // Stacked Bar
+                grid: { display: false },
+                title: { display: true, text: 'Jumlah' }
+            },
+            y: {
+                stacked: true, // Stacked Bar
+                grid: { display: false },
+                title: { display: true, text: 'Product' }
+            },
+        },
     };
 
-    return <Bar options={options} data={chartData} />;
+    if (!chartData) {
+        return <div className="flex items-center justify-center h-full text-gray-500">Tidak ada data segment.</div>;
+    }
+
+    return (
+        <div style={{ height: '350px' }}>
+            <Bar data={chartData} options={options} />
+        </div>
+    );
 }

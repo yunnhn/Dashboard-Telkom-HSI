@@ -75,6 +75,15 @@ export default function Edit({ auth, record, columns, type, pageTitle, flash }) 
                 <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
                     <div className="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                         <form onSubmit={handleSubmit} className="p-6 space-y-6">
+                            <div>
+                                <Link
+                                        href="#"
+                                        onClick={() => window.history.back()} // Cara kembali yang lebih aman
+                                        className="inline-flex items-center px-4 py-2 bg-gray-200 border border-transparent rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest hover:bg-gray-300"
+                                    >
+                                        Kembali
+                                </Link>
+                            </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 {columns.map((col) => (
@@ -95,13 +104,6 @@ export default function Edit({ auth, record, columns, type, pageTitle, flash }) 
                                         {processing ? 'Menyimpan...' : 'Simpan Perubahan'}
                                     </PrimaryButton>
                                 )}
-                                <Link
-                                    href="#"
-                                    onClick={() => window.history.back()} // Cara kembali yang lebih aman
-                                    className="inline-flex items-center px-4 py-2 bg-gray-200 border border-transparent rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest hover:bg-gray-300"
-                                >
-                                    Kembali
-                                </Link>
                             </div>
                         </form>
                     </div>

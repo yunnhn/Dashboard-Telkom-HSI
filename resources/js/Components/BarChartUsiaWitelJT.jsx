@@ -82,7 +82,7 @@ const BarChartUsiaWitelJT = ({ data }) => {
             legend: { display: true, position: 'bottom' },
             title: {
                 display: true,
-                text: 'Top 3 Usia Order Tertinggi per Witel (Stacked)',
+                text: 'Top 3 Usia Order Tertinggi per Witel',
                 font: { size: 16 }
             },
             tooltip: {

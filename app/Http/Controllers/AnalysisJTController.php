@@ -56,14 +56,14 @@ class AnalysisJTController extends Controller
                     DB::raw('TRIM(witel_baru) as witel_baru'), // Induk
 
                     DB::raw("SUM(CASE
-                    WHEN UPPER(keterangan_toc) = 'DALAM TOC'
+                    WHEN UPPER(status_tomps_last_activity) = 'DALAM TOC'
                     AND go_live = 'N'
                     AND populasi_non_drop = 'Y'
                     THEN 1 ELSE 0
                 END) as dalam_toc"),
 
                     DB::raw("SUM(CASE
-                    WHEN UPPER(keterangan_toc) = 'LEWAT TOC'
+                    WHEN UPPER(status_tomps_last_activity) = 'LEWAT TOC'
                     AND go_live = 'N'
                     AND populasi_non_drop = 'Y'
                     THEN 1 ELSE 0
@@ -170,7 +170,7 @@ class AnalysisJTController extends Controller
                 'spmk_mom.po_name',
                 DB::raw('DATEDIFF(NOW(), spmk_mom.tanggal_cb) as umur_project')
             )
-            ->whereNotIn('spmk_mom.status_proyek', ['Selesai', 'Dibatalkan', 'GO LIVE'])
+            ->whereNotIn('spmk_mom.keterangan_toc', ['Selesai', 'Dibatalkan', 'GO LIVE'])
             ->when($request->input('search'), function ($query, $search) {
                 // Logika pencarian disesuaikan untuk menggunakan kolom po_name
                 if (request()->input('tab', 'belum_go_live') === 'belum_go_live') {
@@ -196,14 +196,14 @@ class AnalysisJTController extends Controller
                 'id_i_hld as ihld',
                 'tanggal_mom as tgl_mom',
                 'revenue_plan as revenue',
-                'status_tomps_new as status_tomps',
+                'status_i_hld as status_tomps',
                 DB::raw('DATEDIFF(NOW(), tanggal_mom) as umur_project'),
                 DB::raw('ROW_NUMBER() OVER(PARTITION BY witel_baru ORDER BY DATEDIFF(NOW(), tanggal_mom) DESC) as rn')
             )
                ->from('spmk_mom')
                ->where(function ($q) {
-                   $q->where('status_tomps_last_activity', '!=', 'CLOSE - 100%')
-                     ->orWhereNull('status_tomps_last_activity');
+                   $q->where('status_i_hld', '!=', 'CLOSE - 100%')
+                     ->orWhereNull('status_i_hld');
                })
                ->whereNotNull('tanggal_mom')
                ->whereNotIn('witel_baru', $excludedWitel)
@@ -224,15 +224,15 @@ class AnalysisJTController extends Controller
                 'id_i_hld as ihld',
                 'tanggal_mom as tgl_mom',
                 'revenue_plan as revenue',
-                'status_tomps_new as status_tomps',
+                'status_i_hld as status_tomps',
                 'po_name', // [PERBAIKAN] Ambil kolom langsung
                 DB::raw('DATEDIFF(NOW(), tanggal_mom) as umur_project'),
                 DB::raw('ROW_NUMBER() OVER(PARTITION BY po_name ORDER BY DATEDIFF(NOW(), tanggal_mom) DESC) as rn')
             )
                ->from('spmk_mom')
                ->where(function ($q) {
-                   $q->where('status_tomps_last_activity', '!=', 'CLOSE - 100%')
-                     ->orWhereNull('status_tomps_last_activity');
+                   $q->where('status_tomps_new', '!=', 'CLOSE - 100%')
+                     ->orWhereNull('status_tomps_new');
                })
                ->whereNotNull('tanggal_mom')
                ->whereNotIn('witel_baru', $excludedWitel)
@@ -456,11 +456,11 @@ class AnalysisJTController extends Controller
     {
         // 1. Definisikan ekspresi COUNT dan SUM (Revenue)
         $selectExpressions = [
-            DB::raw("SUM(CASE WHEN UPPER(status_tomps_new) LIKE '%INITIAL%' AND go_live = 'N' AND populasi_non_drop = 'Y' THEN 1 ELSE 0 END) AS initial"),
-            DB::raw("SUM(CASE WHEN UPPER(status_tomps_new) LIKE '%SURVEY & DRM%' AND go_live = 'N' AND populasi_non_drop = 'Y' THEN 1 ELSE 0 END) AS survey_drm"),
-            DB::raw("SUM(CASE WHEN UPPER(status_tomps_new) LIKE '%PERIZINAN & MOS%' AND go_live = 'N' AND populasi_non_drop = 'Y' THEN 1 ELSE 0 END) AS perizinan_mos"),
-            DB::raw("SUM(CASE WHEN UPPER(status_tomps_new) LIKE '%INSTALASI%' AND go_live = 'N' AND populasi_non_drop = 'Y' THEN 1 ELSE 0 END) AS instalasi"),
-            DB::raw("SUM(CASE WHEN UPPER(status_tomps_new) LIKE '%FI - OGP GOLIVE%' AND go_live = 'N' AND populasi_non_drop = 'Y' THEN 1 ELSE 0 END) AS fi_ogp_live"),
+            DB::raw("SUM(CASE WHEN UPPER(status_i_hld) LIKE '%INITIAL%' AND go_live = 'N' AND populasi_non_drop = 'Y' THEN 1 ELSE 0 END) AS initial"),
+            DB::raw("SUM(CASE WHEN UPPER(status_i_hld) LIKE '%SURVEY & DRM%' AND go_live = 'N' AND populasi_non_drop = 'Y' THEN 1 ELSE 0 END) AS survey_drm"),
+            DB::raw("SUM(CASE WHEN UPPER(status_i_hld) LIKE '%PERIZINAN & MOS%' AND go_live = 'N' AND populasi_non_drop = 'Y' THEN 1 ELSE 0 END) AS perizinan_mos"),
+            DB::raw("SUM(CASE WHEN UPPER(status_i_hld) LIKE '%INSTALASI%' AND go_live = 'N' AND populasi_non_drop = 'Y' THEN 1 ELSE 0 END) AS instalasi"),
+            DB::raw("SUM(CASE WHEN UPPER(status_i_hld) LIKE '%FI - OGP GOLIVE%' AND go_live = 'N' AND populasi_non_drop = 'Y' THEN 1 ELSE 0 END) AS fi_ogp_live"),
 
             // GOLIVE (JML LOP): hanya melihat go_live = 'Y'
             DB::raw("SUM(CASE WHEN go_live = 'Y' AND populasi_non_drop = 'Y' THEN 1 ELSE 0 END) AS golive_jml_lop"),
@@ -469,14 +469,14 @@ class AnalysisJTController extends Controller
             DB::raw("SUM(CASE WHEN populasi_non_drop = 'N' THEN 1 ELSE 0 END) AS `drop`"),
 
             // REVENUE (dihitung terpisah berdasarkan status + filter)
-            DB::raw("SUM(CASE WHEN UPPER(status_tomps_new) LIKE '%INITIAL%' AND go_live = 'N' AND populasi_non_drop = 'Y' THEN COALESCE(revenue_plan, 0) ELSE 0 END) AS initial_rev"),
-            DB::raw("SUM(CASE WHEN UPPER(status_tomps_new) LIKE '%SURVEY & DRM%' AND go_live = 'N' AND populasi_non_drop = 'Y' THEN COALESCE(revenue_plan, 0) ELSE 0 END) AS survey_drm_rev"),
-            DB::raw("SUM(CASE WHEN UPPER(status_tomps_new) LIKE '%PERIZINAN & MOS%' AND go_live = 'N' AND populasi_non_drop = 'Y' THEN COALESCE(revenue_plan, 0) ELSE 0 END) AS perizinan_mos_rev"),
-            DB::raw("SUM(CASE WHEN UPPER(status_tomps_new) LIKE '%INSTALASI%' AND go_live = 'N' AND populasi_non_drop = 'Y' THEN COALESCE(revenue_plan, 0) ELSE 0 END) AS instalasi_rev"),
-            DB::raw("SUM(CASE WHEN UPPER(status_tomps_new) LIKE '%FI - OGP GOLIVE%' AND go_live = 'N' AND populasi_non_drop = 'Y' THEN COALESCE(revenue_plan, 0) ELSE 0 END) AS fi_ogp_live_rev"),
+            DB::raw("SUM(CASE WHEN UPPER(status_i_hld) LIKE '%INITIAL%' AND go_live = 'N' AND populasi_non_drop = 'Y' THEN COALESCE(revenue_plan, 0) ELSE 0 END) AS initial_rev"),
+            DB::raw("SUM(CASE WHEN UPPER(status_i_hld) LIKE '%SURVEY & DRM%' AND go_live = 'N' AND populasi_non_drop = 'Y' THEN COALESCE(revenue_plan, 0) ELSE 0 END) AS survey_drm_rev"),
+            DB::raw("SUM(CASE WHEN UPPER(status_i_hld) LIKE '%PERIZINAN & MOS%' AND go_live = 'N' AND populasi_non_drop = 'Y' THEN COALESCE(revenue_plan, 0) ELSE 0 END) AS perizinan_mos_rev"),
+            DB::raw("SUM(CASE WHEN UPPER(status_i_hld) LIKE '%INSTALASI%' AND go_live = 'N' AND populasi_non_drop = 'Y' THEN COALESCE(revenue_plan, 0) ELSE 0 END) AS instalasi_rev"),
+            DB::raw("SUM(CASE WHEN UPPER(status_i_hld) LIKE '%FI - OGP GOLIVE%' AND go_live = 'N' AND populasi_non_drop = 'Y' THEN COALESCE(revenue_plan, 0) ELSE 0 END) AS fi_ogp_live_rev"),
 
             // GOLIVE (REV LOP): hanya melihat go_live = 'Y'
-            DB::raw("SUM(CASE WHEN go_live = 'Y' AND populasi_non_drop = 'Y' THEN COALESCE(revenue_plan, 0) ELSE 0 END) AS golive_rev_lop"),
+            DB::raw("SUM(CASE WHEN UPPER(status_i_hld) LIKE '%GO LIVE%' THEN COALESCE(revenue_plan, 0) ELSE 0 END) AS golive_rev_lop"),
 
             // REV ALL LOP (Total revenue dari SEMUA KECUALI DROP)
             DB::raw("SUM(CASE WHEN populasi_non_drop = 'Y' THEN COALESCE(revenue_plan, 0) ELSE 0 END) AS rev_all_lop"),

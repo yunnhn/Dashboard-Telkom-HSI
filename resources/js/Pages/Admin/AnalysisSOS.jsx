@@ -256,24 +256,32 @@ const SosReportTable = ({ data, tableConfig, viewMode }) => {
     const grandTotalRowClass = isAOMOMode ? 'bg-blue-800 text-white' : 'bg-red-800 text-white';
     const segmentTotalRowClass = isAOMOMode ? 'bg-blue-900 font-bold text-white' : 'bg-red-900 font-bold text-white';
     return (
-        <div className="overflow-x-auto">
-            <table className="min-w-full bg-white border border-gray-200 text-sm">
-                <thead className="text-gray-600 uppercase text-xs">
+        <div className="w-full">
+            <table className="min-w-full w-full table-fixed divide-y divide-gray-200 border">
+                {/* PERUBAHAN 1: Atur font dasar header lebih kecil (10px) dan line-height rapat */}
+                <thead className="bg-gray-50 text-gray-600 uppercase text-[10px] sm:text-[11px] leading-tight">
                     <tr>
-                        <th rowSpan="2" className={`py-3 px-4 border text-left left-0 z-20 font-bold ${headerThemeClass}`}>
+                        {/* Header WITEL */}
+                        <th rowSpan="2" className={`py-2 px-1 border text-left left-0 z-20 font-bold whitespace-normal break-words ${headerThemeClass}`}>
                             WITEL
                         </th>
+
+                        {/* Header Group (misal: <3BLN, >3BLN) */}
                         <SortableContext items={tableConfig.filter(item => item.key !== 'witel').map(item => item.groupTitle || item.key)} strategy={horizontalListSortingStrategy}>
                             {tableConfig.map((item) => {
                                 if (item.type === 'fixed') return null;
                                 return (
                                     <SortableHeaderCell key={item.groupTitle || item.key} item={item}>
-                                        {item.groupTitle || item.title}
+                                        <span className="whitespace-normal break-words block text-center font-bold">
+                                            {item.groupTitle || item.title}
+                                        </span>
                                     </SortableHeaderCell>
                                 );
                             })}
                         </SortableContext>
                     </tr>
+
+                    {/* Sub-Header Kolom (misal: PROV ORDER, EST BC) */}
                     <tr>
                         {tableConfig.map((item) => {
                             if (!item.groupTitle) return null;
@@ -282,7 +290,10 @@ const SosReportTable = ({ data, tableConfig, viewMode }) => {
                                     {item.columns.map((col) =>
                                         col.visible ? (
                                             <SortableSubHeaderCell key={col.key} id={col.key} column={col} parent={item}>
-                                                {col.title}
+                                                {/* PERUBAHAN 2: Padding dikurangi (py-1 px-1) agar muat */}
+                                                <div className="py-1 px-1 text-center whitespace-normal break-words">
+                                                    {col.title}
+                                                </div>
                                             </SortableSubHeaderCell>
                                         ) : null
                                     )}
@@ -291,7 +302,9 @@ const SosReportTable = ({ data, tableConfig, viewMode }) => {
                         })}
                     </tr>
                 </thead>
-                <tbody className="text-gray-700">
+
+                {/* PERUBAHAN 3: Body font disesuaikan agar seimbang dengan header */}
+                <tbody className="text-gray-700 text-[12px] sm:text-xs">
                     {data.map((item, rowIndex) => {
                         if (item.isTotal) {
                             const isGrandTotal = item.witel === 'GRAND TOTAL';
@@ -307,17 +320,21 @@ const SosReportTable = ({ data, tableConfig, viewMode }) => {
                             }
                             return (
                                 <tr key={rowIndex} className={rowClass}>
-                                    <td className={`py-2 px-4 border text-left left-0 z-10 font-bold ${rowClass}`}>
+                                    <td className={`py-1 px-1 border text-left left-0 z-10 font-bold whitespace-normal break-words ${rowClass}`}>
                                         {item.witel}
                                     </td>
                                     {tableConfig.slice(1).flatMap(config => {
                                         if (config.columns) {
                                             return config.columns.map(col => (
-                                                <td key={`${item.witel}-${col.key}`} className="py-2 px-4 border text-center">{renderCell(item, col)}</td>
+                                                <td key={`${item.witel}-${col.key}`} className="py-1 px-1 border text-center whitespace-normal break-words">
+                                                    {renderCell(item, col)}
+                                                </td>
                                             ));
                                         } else if (config.key) {
                                             return (
-                                                <td key={`${item.witel}-${config.key}`} className="py-2 px-4 border text-center">{renderCell(item, config)}</td>
+                                                <td key={`${item.witel}-${config.key}`} className="py-1 px-1 border text-center whitespace-normal break-words">
+                                                    {renderCell(item, config)}
+                                                </td>
                                             );
                                         }
                                         return [];
@@ -327,14 +344,14 @@ const SosReportTable = ({ data, tableConfig, viewMode }) => {
                         }
                         return (
                             <tr key={rowIndex} className="border-b hover:bg-gray-50">
-                                <td className="py-3 px-4 border text-left left-0 z-10 bg-white">
+                                <td className="py-2 px-1 border text-left left-0 z-10 bg-white whitespace-normal break-words font-medium">
                                     {item.witel}
                                 </td>
                                 {tableConfig.slice(1).flatMap(configItem => {
                                     if (configItem.columns) {
                                         return configItem.columns.map(col =>
                                             col.visible ? (
-                                                <td key={`${item.witel}-${col.key}`} className="py-3 px-4 border text-center">
+                                                <td key={`${item.witel}-${col.key}`} className="py-2 px-1 border text-center whitespace-normal break-words">
                                                     {renderCell(item, col)}
                                                 </td>
                                             ) : null
@@ -342,7 +359,7 @@ const SosReportTable = ({ data, tableConfig, viewMode }) => {
                                     }
                                     if (configItem.key) {
                                         return (
-                                            <td key={`${item.witel}-${configItem.key}`} className="py-3 px-4 border text-center">
+                                            <td key={`${item.witel}-${configItem.key}`} className="py-2 px-1 border text-center whitespace-normal break-words">
                                                 {renderCell(item, configItem)}
                                             </td>
                                         );
@@ -765,75 +782,7 @@ export default function AnalysisSOS({
             >
                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                     {/* Kolom Utama */}
-                    <div className="lg:col-span-3 space-y-6">
-                        <TableConfiguratorSOS
-                            tableConfig={tableConfig}
-                            setTableConfig={setTableConfig}
-                            onSave={handleSaveConfig}
-                            viewMode={viewMode}
-                        />
-
-                        <div className="mb-4">
-                            <button onClick={() => setViewMode('AOMO')} className={viewMode === 'AOMO' ? 'font-bold' : ''}>Tampilan AO MO</button>
-                            <span className="mx-2">|</span>
-                            <button onClick={() => setViewMode('SODORO')} className={viewMode === 'SODORO' ? 'font-bold' : ''}>Tampilan SO DO RO</button>
-                        </div>
-
-                        <div className="bg-white p-6 rounded-lg shadow-md">
-                            <div className="flex justify-between items-center mb-4">
-                                <h3 className="font-semibold text-lg text-gray-800">
-                                    Data Report
-                                </h3>
-                                <a
-                                    href={`${route("admin.analysisSOS.export")}?viewMode=${viewMode}`}
-                                    className="px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-md hover:bg-green-700 transition-colors"
-                                >
-                                    Ekspor Excel
-                                </a>
-                            </div>
-                            <SosReportTable data={currentReportData} tableConfig={tableConfig} viewMode={viewMode} />
-                        </div>
-
-                        <div className="bg-white p-6 rounded-lg shadow-md">
-                            <div className="flex flex-wrap items-center gap-2 border-b pb-4 mb-4">
-                                <DetailTabButton viewName="provide_order" currentView={activeDetailView}>Provide Order</DetailTabButton>
-                                <DetailTabButton viewName="in_process" currentView={activeDetailView}>In Process</DetailTabButton>
-                                <DetailTabButton viewName="ready_to_bill" currentView={activeDetailView}>Ready to Bill</DetailTabButton>
-                                <DetailTabButton viewName="prov_complete" currentView={activeDetailView}>Prov Complete</DetailTabButton>
-                                <DetailTabButton viewName="galaksi" currentView={activeDetailView}>Galaksi</DetailTabButton>
-                            </div>
-
-                            {activeDetailView === 'provide_order' &&
-                                <DetailTable dataPaginator={provideOrderData} columns={provideOrderColumns} />
-                            }
-                            {activeDetailView === 'in_process' &&
-                                <DetailTable dataPaginator={inProcessData} columns={inProcessColumns} />
-                            }
-                            {activeDetailView === 'ready_to_bill' &&
-                                <DetailTable dataPaginator={readyToBillData} columns={readyToBillColumns} />
-                            }
-                            {activeDetailView === 'prov_complete' &&
-                                <DetailTable dataPaginator={provCompleteData} columns={provCompleteColumns} />
-                            }
-                            {activeDetailView === 'galaksi' &&
-                                <div>
-                                    <div className="flex justify-between items-center mb-4">
-                                        <h4 className="font-semibold text-md text-gray-700">Laporan Galaksi</h4>
-                                        <a
-                                            href={route("admin.analysisSOS.exportGalaksi")}
-                                            className="px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-md hover:bg-green-700 transition-colors"
-                                        >
-                                            Ekspor Laporan Galaksi
-                                        </a>
-                                    </div>
-                                    <GalaksiReportTable galaksiData={galaksiData} />
-                                </div>
-                            }
-                        </div>
-                    </div>
-
-                    {/* Sidebar */}
-                    <div className="lg:col-span-1 space-y-6">
+                    <div className="lg:col-span-4 space-y-6">
                         <DetailsCard totals={detailsTotals} />
 
                         <div className="bg-white p-6 rounded-lg shadow-md">
@@ -985,6 +934,70 @@ export default function AnalysisSOS({
                             initialData={customTargets}
                             period={period}
                         />
+                        <TableConfiguratorSOS
+                            tableConfig={tableConfig}
+                            setTableConfig={setTableConfig}
+                            onSave={handleSaveConfig}
+                            viewMode={viewMode}
+                        />
+
+                        <div className="mb-4">
+                            <button onClick={() => setViewMode('AOMO')} className={viewMode === 'AOMO' ? 'font-bold' : ''}>Tampilan AO MO</button>
+                            <span className="mx-2">|</span>
+                            <button onClick={() => setViewMode('SODORO')} className={viewMode === 'SODORO' ? 'font-bold' : ''}>Tampilan SO DO RO</button>
+                        </div>
+
+                        <div className="bg-white p-6 rounded-lg shadow-md">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="font-semibold text-lg text-gray-800">
+                                    Data Report
+                                </h3>
+                                <a
+                                    href={`${route("admin.analysisSOS.export")}?viewMode=${viewMode}`}
+                                    className="px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-md hover:bg-green-700 transition-colors"
+                                >
+                                    Ekspor Excel
+                                </a>
+                            </div>
+                            <SosReportTable data={currentReportData} tableConfig={tableConfig} viewMode={viewMode} />
+                        </div>
+
+                        <div className="bg-white p-6 rounded-lg shadow-md">
+                            <div className="flex flex-wrap items-center gap-2 border-b pb-4 mb-4">
+                                <DetailTabButton viewName="provide_order" currentView={activeDetailView}>Provide Order</DetailTabButton>
+                                <DetailTabButton viewName="in_process" currentView={activeDetailView}>In Process</DetailTabButton>
+                                <DetailTabButton viewName="ready_to_bill" currentView={activeDetailView}>Ready to Bill</DetailTabButton>
+                                <DetailTabButton viewName="prov_complete" currentView={activeDetailView}>Prov Complete</DetailTabButton>
+                            </div>
+
+                            {activeDetailView === 'provide_order' &&
+                                <DetailTable dataPaginator={provideOrderData} columns={provideOrderColumns} />
+                            }
+                            {activeDetailView === 'in_process' &&
+                                <DetailTable dataPaginator={inProcessData} columns={inProcessColumns} />
+                            }
+                            {activeDetailView === 'ready_to_bill' &&
+                                <DetailTable dataPaginator={readyToBillData} columns={readyToBillColumns} />
+                            }
+                            {activeDetailView === 'prov_complete' &&
+                                <DetailTable dataPaginator={provCompleteData} columns={provCompleteColumns} />
+                            }
+                        </div>
+
+                        <div className="bg-white p-6 rounded-lg shadow-md mt-6">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="font-semibold text-lg text-gray-800">
+                                    Laporan Galaksi
+                                </h3>
+                                <a
+                                    href={route("admin.analysisSOS.exportGalaksi")}
+                                    className="px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-md hover:bg-green-700 transition-colors"
+                                >
+                                    Ekspor Laporan Galaksi
+                                </a>
+                            </div>
+                            <GalaksiReportTable galaksiData={galaksiData} />
+                        </div>
                     </div>
                 </div>
             </DndContext>

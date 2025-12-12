@@ -59,7 +59,7 @@ const GroupedBarProgressWitelJT = ({ data }) => {
         plugins: {
             title: {
                 display: true,
-                text: 'Perbandingan Progress Deploy per Witel (Stacked)',
+                text: 'Perbandingan Progress Deploy per Witel',
                 font: { size: 16 },
                 padding: { bottom: 20 }
             },

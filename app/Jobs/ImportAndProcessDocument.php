@@ -46,6 +46,8 @@ class ImportAndProcessDocument implements ShouldQueue
         $originalFilePath = Storage::path($this->path);
         $extension = strtolower(pathinfo($originalFilePath, PATHINFO_EXTENSION));
         $csvPath = $originalFilePath;
+
+        // DEKLARASI VARIABEL PENTING (Memperbaiki error Undefined variable)
         $isConverted = false;
 
         try {
@@ -63,10 +65,9 @@ class ImportAndProcessDocument implements ShouldQueue
                 $writer = WriterEntityFactory::createWriterToFile($tempCsvFile);
                 $writer->openToFile($tempCsvFile);
 
-                // Streaming baris per baris (RAM tetap rendah)
+                // Streaming baris per baris
                 foreach ($reader->getSheetIterator() as $sheet) {
                     foreach ($sheet->getRowIterator() as $row) {
-                        // Tulis baris ke CSV (mengambil array cell)
                         $cells = $row->getCells();
                         $rowData = [];
                         foreach ($cells as $cell) {
@@ -92,19 +93,18 @@ class ImportAndProcessDocument implements ShouldQueue
 
             // 3. MAPPING HEADER
             $headerLine = fgets($handle);
-            // Hapus BOM dan karakter aneh
             $headerLine = trim(preg_replace('/\x{FEFF}/u', '', $headerLine));
             $header = str_getcsv($headerLine, ',');
-
-            // Normalisasi header: huruf kecil & hilangkan spasi kiri/kanan
             $header = array_map(fn ($h) => strtolower(trim($h)), $header);
             $idx = array_flip($header);
 
-            // Cek Kolom Wajib (Order Id)
             $idxOrderId = $idx['order id'] ?? $idx['order_id'] ?? null;
             if (is_null($idxOrderId)) {
                 throw new \Exception("Kolom 'Order Id' tidak ditemukan di file.");
             }
+
+            // Cek index untuk Filter Produk
+            $idxFilterProduct = $idx['filter product'] ?? $idx['filter_produk'] ?? -1;
 
             // 4. BERSIHKAN TEMP TABLES
             DB::table('temp_upload_data')->truncate();
@@ -116,54 +116,46 @@ class ImportAndProcessDocument implements ShouldQueue
 
             while (($row = fgetcsv($handle, 0, ',')) !== false) {
                 ++$processedRows;
-                // Skip baris kosong atau header berulang
-                if (empty($row) || count($row) < 1) {
-                    continue;
-                }
+                if (empty($row) || count($row) < 1) continue;
 
                 $rawOrderId = $row[$idxOrderId] ?? null;
-                if (!$rawOrderId || in_array(strtolower($rawOrderId), ['order id', 'order_id'])) {
-                    continue;
-                }
+                if (!$rawOrderId || in_array(strtolower($rawOrderId), ['order id', 'order_id'])) continue;
 
-                // Logic SC ID (Sesuai file import lama)
                 $orderId = (strtoupper(substr($rawOrderId, 0, 2)) === 'SC') ? substr($rawOrderId, 2) : $rawOrderId;
 
-                // --- MAPPING DATA SESUAI HEADER EXCEL DAN LOGIKA LAMA ---
+                // --- MAPPING DATA (LOGIKA BARU) ---
+                $rawFilterProduct = trim($row[$idxFilterProduct] ?? '');
+                $rawProductOld = $row[$idx['product + order id'] ?? $idx['product_order_id'] ?? -1]
+                                 ?? $row[$idx['product'] ?? -1]
+                                 ?? '';
+                $productNameOldFull = trim($rawProductOld);
 
-                // 1. Product: Prioritaskan 'Product + Order Id', lalu 'Product'
-                // Di file import lama: $rowAsArray['product_order_id'] ?? $rowAsArray['product']
-                $rawProduct = $row[$idx['product + order id'] ?? $idx['product_order_id'] ?? -1]
-                              ?? $row[$idx['product'] ?? -1]
-                              ?? '';
-                $productNameFull = trim($rawProduct);
+                $productValue = '';
+                $isFromFilterProduct = false;
 
-                // 2. Witel & Layanan
+                if (!empty($rawFilterProduct)) {
+                    $productValue = $rawFilterProduct;
+                    $isFromFilterProduct = true;
+                } else {
+                    if (!empty($productNameOldFull)) {
+                        $productValue = str_ends_with($productNameOldFull, (string) $orderId)
+                           ? trim(substr($productNameOldFull, 0, -strlen((string) $orderId)))
+                           : trim(str_replace((string) $orderId, '', $productNameOldFull));
+                    }
+                }
+
                 $witel = trim($row[$idx['nama witel'] ?? $idx['nama_witel'] ?? -1] ?? '');
                 $layanan = trim($row[$idx['layanan'] ?? -1] ?? '');
 
-                // FILTER: Kidi, Mahir, Jateng (Sesuai file import lama)
-                if (str_contains(strtolower($productNameFull), 'kidi')) {
-                    continue;
-                }
+                // FILTER
+                if (str_contains(strtolower($productValue), 'kidi')) continue;
+                if (stripos($witel, 'JATENG') !== false) continue;
+                if (!str_contains($productValue, '-') && stripos($productValue, 'pijar') !== false && stripos($layanan, 'mahir') !== false) continue;
 
-                if (stripos($witel, 'JATENG') !== false) {
-                    continue;
-                }
-
-                // 3. Pembersihan Nama Produk
-                $productValue = $productNameFull;
-                if (!empty($productNameFull)) {
-                    $productValue = str_ends_with($productNameFull, (string) $orderId)
-                       ? trim(substr($productNameFull, 0, -strlen((string) $orderId)))
-                       : trim(str_replace((string) $orderId, '', $productNameFull));
-                }
-
-                // 4. Segment (Mapping 'segmen_n' -> 'segment')
                 $segmentRaw = trim($row[$idx['segmen_n'] ?? -1] ?? '');
                 $segment = (in_array($segmentRaw, ['RBS', 'SME'])) ? 'SME' : 'LEGS';
 
-                // 5. Harga (Net Price)
+                // PRICE
                 $netPrice = 0;
                 $isTemplatePrice = 0;
                 $excelNetPrice = floatval(preg_replace('/[^0-9.]/', '', $row[$idx['net price'] ?? $idx['net_price'] ?? -1] ?? 0));
@@ -175,7 +167,6 @@ class ImportAndProcessDocument implements ShouldQueue
                     $isTemplatePrice = ($netPrice > 0) ? 1 : 0;
                 }
 
-                // 6. Status WFM & Milestone
                 $milestone = trim($row[$idx['milestone'] ?? -1] ?? '');
                 $statusWfm = 'in progress';
                 if (stripos($milestone, 'QC') !== false) {
@@ -184,15 +175,13 @@ class ImportAndProcessDocument implements ShouldQueue
                     $statusWfm = 'done close bima';
                 }
 
-                // 7. Channel (Mapping 'channel' -> 'channel', hsi -> SC-One)
                 $rawChannel = trim($row[$idx['channel'] ?? -1] ?? '');
                 $channel = (strtolower($rawChannel) === 'hsi') ? 'SC-One' : $rawChannel;
 
-                // 8. Parsing Tanggal
                 $orderDate = $this->parseDateFast($row[$idx['order date'] ?? $idx['order_date'] ?? -1] ?? null);
                 $orderCreatedDate = $this->parseDateFast($row[$idx['order created date'] ?? $idx['order_created_date'] ?? -1] ?? null);
 
-                // --- SIAPKAN DATA UNTUK TABEL UTAMA (PARENT) ---
+                // DATA UTAMA
                 $batchData[] = [
                     'batch_id' => $batchId,
                     'order_id' => $orderId,
@@ -206,7 +195,7 @@ class ImportAndProcessDocument implements ShouldQueue
                     'customer_name' => trim($row[$idx['customer name'] ?? $idx['customer_name'] ?? -1] ?? ''),
                     'channel' => $channel,
                     'layanan' => $layanan,
-                    'filter_produk' => trim($row[$idx['filter product'] ?? $idx['filter_product'] ?? -1] ?? ''),
+                    'filter_produk' => $rawFilterProduct,
                     'witel_lama' => trim($row[$idx['witel'] ?? -1] ?? ''),
                     'order_status' => trim($row[$idx['order status'] ?? $idx['order_status'] ?? -1] ?? ''),
                     'order_sub_type' => trim($row[$idx['order subtype'] ?? $idx['order_subtype'] ?? -1] ?? ''),
@@ -220,18 +209,14 @@ class ImportAndProcessDocument implements ShouldQueue
                     'updated_at' => now(),
                 ];
 
-                // --- SIAPKAN DATA PRODUK PECAHAN (CHILD) ---
-                if ($productValue && str_contains($productValue, '-')) {
+                // DATA PRODUCT
+                if (!$isFromFilterProduct && $productValue && str_contains($productValue, '-')) {
+                    // Bundling Logic Lama
                     $individualProducts = explode('-', $productValue);
                     foreach ($individualProducts as $pName) {
                         $pName = trim($pName);
-                        if (empty($pName)) {
-                            continue;
-                        }
-
-                        if (stripos($pName, 'pijar') !== false && stripos($layanan, 'mahir') !== false) {
-                            continue;
-                        }
+                        if (empty($pName)) continue;
+                        if (stripos($pName, 'pijar') !== false && stripos($layanan, 'mahir') !== false) continue;
 
                         $batchProducts[] = [
                             'batch_id' => $batchId,
@@ -245,11 +230,7 @@ class ImportAndProcessDocument implements ShouldQueue
                         ];
                     }
                 } else {
-                    if (stripos($productValue, 'pijar') !== false && stripos($layanan, 'mahir') !== false) {
-                        // Skip entry ke batchData jika ini single product pijar mahir
-                        continue;
-                    }
-
+                    // Single Logic (Termasuk Filter Product)
                     $batchProducts[] = [
                         'batch_id' => $batchId,
                         'order_id' => $orderId,
@@ -262,7 +243,7 @@ class ImportAndProcessDocument implements ShouldQueue
                     ];
                 }
 
-                // INSERT BATCH (500 Baris)
+                // INSERT BATCH
                 if (count($batchData) >= 500) {
                     DB::table('temp_upload_data')->insert($batchData);
                     $batchData = [];
@@ -275,7 +256,7 @@ class ImportAndProcessDocument implements ShouldQueue
                 }
             }
 
-            // INSERT SISA DATA
+            // INSERT SISA
             if (!empty($batchData)) {
                 DB::table('temp_upload_data')->insert($batchData);
             }
@@ -291,6 +272,7 @@ class ImportAndProcessDocument implements ShouldQueue
 
             Cache::put('import_progress_'.$batchId, 100, now()->addHour());
             Log::info("Batch [{$batchId}]: Import Selesai. Total: {$processedRows}");
+
         } catch (\Throwable $e) {
             $this->fail($e);
             if (isset($handle) && is_resource($handle)) {
@@ -298,6 +280,7 @@ class ImportAndProcessDocument implements ShouldQueue
             }
             throw $e;
         } finally {
+            // Error $isConverted sebelumnya terjadi di sini
             if ($isConverted && file_exists($csvPath)) {
                 @unlink($csvPath);
             }
@@ -307,7 +290,7 @@ class ImportAndProcessDocument implements ShouldQueue
     private function processSqlSync($batchId)
     {
         DB::transaction(function () use ($batchId) {
-            // 1. Cancel Logic (Update data yang hilang di file baru)
+            // 1. Cancel Logic (Tetap sama)
             DB::statement("
                 UPDATE document_data d
                 LEFT JOIN temp_upload_data t ON d.order_id = t.order_id
@@ -315,8 +298,9 @@ class ImportAndProcessDocument implements ShouldQueue
                 WHERE d.status_wfm = 'in progress' AND t.order_id IS NULL
             ");
 
-            // 2. Insert/Update Tabel Utama (Document Data)
-            // WAJIB dijalankan DULUAN sebelum tabel anak (Order Products)
+            // 2. Insert Tabel Utama (Document Data)
+            // PERUBAHAN: Menghapus bagian 'ON DUPLICATE KEY UPDATE'
+            // Sekarang query ini akan SELALU INSERT baris baru, meskipun Order ID sama.
             DB::statement('
                 INSERT INTO document_data (
                     batch_id, order_id, product, net_price, milestone, segment, nama_witel, status_wfm,
@@ -331,19 +315,18 @@ class ImportAndProcessDocument implements ShouldQueue
                     order_date, order_created_date, NOW(), NOW()
                 FROM temp_upload_data
                 WHERE batch_id = ?
-                ON DUPLICATE KEY UPDATE
-                    batch_id = VALUES(batch_id),
-                    product = VALUES(product),
-                    net_price = VALUES(net_price),
-                    milestone = VALUES(milestone),
-                    status_wfm = VALUES(status_wfm),
-                    segment = VALUES(segment),
-                    channel = VALUES(channel),
-                    updated_at = NOW()
             ', [$batchId]);
 
-            // 3. Insert/Update Tabel Anak (Order Products)
-            // Mengambil dari tabel transit temp_order_products
+            // 3. Hapus Produk Lama (Opsional - Tergantung kebutuhan)
+            // Jika Anda ingin produk menumpuk sesuai order_id induknya yang sekarang duplikat,
+            // logika ini mungkin perlu disesuaikan. Tapi untuk keamanan data bersih per batch:
+            DB::statement("
+                DELETE op FROM order_products op
+                INNER JOIN temp_upload_data t ON op.order_id = t.order_id
+                WHERE t.batch_id = ?
+            ", [$batchId]);
+
+            // 4. Insert Produk Baru
             DB::statement('
                 INSERT INTO order_products (
                     order_id, product_name, net_price, channel, status_wfm, created_at, updated_at
@@ -352,10 +335,6 @@ class ImportAndProcessDocument implements ShouldQueue
                     order_id, product_name, net_price, channel, status_wfm, NOW(), NOW()
                 FROM temp_order_products
                 WHERE batch_id = ?
-                ON DUPLICATE KEY UPDATE
-                    net_price = VALUES(net_price),
-                    status_wfm = VALUES(status_wfm),
-                    updated_at = NOW()
             ', [$batchId]);
         });
     }
@@ -366,16 +345,16 @@ class ImportAndProcessDocument implements ShouldQueue
         $witel = strtoupper(trim($witel));
         $segment = strtoupper(trim($segment));
 
-        if ($productName == 'netmonk') {
+        if (stripos($productName, 'netmonk') !== false) {
             return ($segment === 'LEGS') ? 26100 : (($witel === 'BALI') ? 26100 : 21600);
         }
-        if ($productName == 'oca') {
+        if (stripos($productName, 'oca') !== false) {
             return ($segment === 'LEGS') ? 104000 : (($witel === 'NUSA TENGGARA') ? 104000 : 103950);
         }
-        if ($productName == 'antares eazy') {
+        if (stripos($productName, 'antares') !== false) {
             return 35000;
         }
-        if ($productName == 'pijar sekolah') {
+        if (stripos($productName, 'pijar') !== false) {
             return 582750;
         }
 

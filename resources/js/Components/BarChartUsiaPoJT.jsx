@@ -86,7 +86,7 @@ const BarChartUsiaPoJT = ({ data }) => {
             legend: { display: true, position: 'bottom' },
             title: {
                 display: true,
-                text: 'Top 3 Usia Order Tertinggi per PO (Stacked)',
+                text: 'Top 3 Usia Order Tertinggi per PO',
                 font: { size: 16 }
             },
             tooltip: {

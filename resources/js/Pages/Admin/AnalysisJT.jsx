@@ -880,65 +880,7 @@ export default function AnalysisJT({
                     <div className="max-w-full mx-auto sm:px-6 lg:px-8">
                         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                             {/* Kolom Utama */}
-                            <div className="lg:col-span-3 space-y-6">
-
-                                <TableConfiguratorJT
-                                    tableConfig={tableConfig}
-                                    setTableConfig={setTableConfig}
-                                    onSave={handleSaveConfig}
-                                    defaultConfig={jtTableConfigTemplate} // Beri default config
-                                />
-
-                                {/* Tabel Laporan Utama (Gambar 1) */}
-                                <div className="bg-white p-6 rounded-lg shadow-md">
-                                    <div className="flex justify-between items-center mb-4">
-                                        <h3 className="font-semibold text-lg text-gray-800">
-                                            Data Report JT
-                                        </h3>
-                                        <a
-                                            href={route("admin.analysisJT.export")}
-                                            className="px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-md hover:bg-green-700 transition-colors"
-                                        >
-                                            Ekspor Excel
-                                        </a>
-                                    </div>
-                                    <JtReportTable data={jtReportData} tableConfig={tableConfig} />
-                                </div>
-
-                                {/* Kontainer Tab untuk Tabel Pendukung */}
-                                <div className="bg-white p-6 rounded-lg shadow-md">
-                                    <div className="flex flex-wrap items-center gap-2 border-b pb-4 mb-4">
-                                        <DetailTabButton viewName="belum_go_live" currentView={activeDetailView}>
-                                            Project Belum GO LIVE
-                                        </DetailTabButton>
-                                        <DetailTabButton viewName="top_3_witel" currentView={activeDetailView}>
-                                            Top 3 On Progress by Witel
-                                        </DetailTabButton>
-                                        <DetailTabButton viewName="top_3_po" currentView={activeDetailView}>
-                                            Top 3 On Progress by PO
-                                        </DetailTabButton>
-                                    </div>
-                                    {activeDetailView === 'belum_go_live' && (
-                                        <BelumGoLiveTable
-                                            data={tocReportData}
-                                            tableConfig={belumGoLiveTableConfig}
-                                        />
-                                    )}
-                                    {activeDetailView === 'top_3_witel' &&
-                                        <Top3WitelTable
-                                            data={top3ByWitel}
-                                        />
-                                    }
-                                    {activeDetailView === 'top_3_po' &&
-                                        <Top3PoTable
-                                            data={top3ByPO}
-                                        />
-                                    }
-                                </div>
-                            </div>
-
-                            {/* Sidebar */}
-                            <div className="lg:col-span-1 space-y-6">
+                            <div className="lg:col-span-4 space-y-6">
                                 <DetailsCardJT totals={jtSummaryData} />
 
                                 {/* KARTU UPLOAD DENGAN PROGRESS BAR */}
@@ -1015,6 +957,59 @@ export default function AnalysisJT({
                                     period={period}
                                     saveRouteName="admin.analysisJT.saveCustomTargets"
                                 />
+                                <TableConfiguratorJT
+                                    tableConfig={tableConfig}
+                                    setTableConfig={setTableConfig}
+                                    onSave={handleSaveConfig}
+                                    defaultConfig={jtTableConfigTemplate} // Beri default config
+                                />
+
+                                {/* Tabel Laporan Utama (Gambar 1) */}
+                                <div className="bg-white p-6 rounded-lg shadow-md">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h3 className="font-semibold text-lg text-gray-800">
+                                            Data Report JT
+                                        </h3>
+                                        <a
+                                            href={route("admin.analysisJT.export")}
+                                            className="px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-md hover:bg-green-700 transition-colors"
+                                        >
+                                            Ekspor Excel
+                                        </a>
+                                    </div>
+                                    <JtReportTable data={jtReportData} tableConfig={tableConfig} />
+                                </div>
+
+                                {/* Kontainer Tab untuk Tabel Pendukung */}
+                                <div className="bg-white p-6 rounded-lg shadow-md">
+                                    <div className="flex flex-wrap items-center gap-2 border-b pb-4 mb-4">
+                                        <DetailTabButton viewName="belum_go_live" currentView={activeDetailView}>
+                                            Project Belum GO LIVE
+                                        </DetailTabButton>
+                                        <DetailTabButton viewName="top_3_witel" currentView={activeDetailView}>
+                                            Top 3 On Progress by Witel
+                                        </DetailTabButton>
+                                        <DetailTabButton viewName="top_3_po" currentView={activeDetailView}>
+                                            Top 3 On Progress by PO
+                                        </DetailTabButton>
+                                    </div>
+                                    {activeDetailView === 'belum_go_live' && (
+                                        <BelumGoLiveTable
+                                            data={tocReportData}
+                                            tableConfig={belumGoLiveTableConfig}
+                                        />
+                                    )}
+                                    {activeDetailView === 'top_3_witel' &&
+                                        <Top3WitelTable
+                                            data={top3ByWitel}
+                                        />
+                                    }
+                                    {activeDetailView === 'top_3_po' &&
+                                        <Top3PoTable
+                                            data={top3ByPO}
+                                        />
+                                    }
+                                </div>
                             </div>
                         </div>
                     </div>

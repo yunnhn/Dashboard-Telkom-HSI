@@ -43,28 +43,39 @@ Route::middleware(['auth', 'verified'])->group(function () {
     | Rute Umum & Tampilan User/Admin Biasa
     |--------------------------------------------------------------------------
     */
-    Route::get('/dashboard', [DashboardDigitalProductController::class, 'index'])->name('dashboard');
+    // Dashboard (Dibersihkan dari duplikasi, prioritas MainDashboardController)
     Route::get('/dashboard', [MainDashboardController::class, 'show'])->name('dashboard');
     Route::get('/dashboardDigitalProduct', [DashboardDigitalProductController::class, 'index'])->name('dashboardDigitalProduct');
     Route::get('/dashboard-sos', [DashboardSOSController::class, 'index'])->name('dashboard.sos');
     Route::get('/dashboard-jt', [AnalysisJTDashboardController::class, 'index'])->name('dashboard.jt');
 
+    // Profile Routes
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    Route::post('/cms-mode/exit', [ProfileController::class, 'exitCmsMode'])->name('cms.exit');
+
+    // Data Report & Galaksi Routes
     Route::get('/data-report', [DataReportController::class, 'index'])->name('data-report.index');
-    Route::get('/data-report/details', [DataReportController::class, 'showDetails'])->name('data-report.details');
     Route::get('/data-report/export', [DataReportController::class, 'export'])->name('data-report.export');
     Route::get('/data-report/export/inprogress', [DataReportController::class, 'exportInProgress'])->name('data-report.exportInProgress');
+    
+    // [PERBAIKAN PENTING] 
+    // Mengarahkan detail galaksi ke DataReportController yang sudah diperbaiki logic-nya
+    Route::get('/galaksi', [GalaksiController::class, 'index'])->name('galaksi.index'); // Halaman utama galaksi tetap di GalaksiController (jika index-nya aman)
+    Route::get('/galaksi/details', [DataReportController::class, 'showDetails'])->name('galaksi.showDetails'); // Detail diganti ke DataReportController
     Route::get('/data-report/details', [DataReportController::class, 'showDetails'])->name('data-report.details');
-    Route::get('/galaksi', [GalaksiController::class, 'index'])->name('galaksi.index');
+
+    // Tools & Others
     Route::post('/run-traceroute', [TracerouteController::class, 'run'])->name('traceroute.run');
     Route::get('/tools/google-drive-test', fn () => Inertia::render('Tools/GoogleDriveTest'))->name('tools.google-drive-test');
-    Route::post('/cms-mode/exit', [ProfileController::class, 'exitCmsMode'])->name('cms.exit');
+    
+    // Report Datin & JT Routes
     Route::get('/report-datin', [ReportDatinController::class, 'index'])->name('report.datin');
     Route::get('/report-jt', [ReportJTController::class, 'index'])->name('report.jt');
     Route::get('/import-progress/{batchId}', [AnalysisSOSController::class, 'getImportProgress'])->name('import.progress');
-    Route::get('/galaksi/details', [GalaksiController::class, 'showDetails'])->name('galaksi.showDetails');
+    
+    // Detail Routes
     Route::get('/report-jt/details', [ReportJTController::class, 'showDetails'])->name('report.jt.details');
     Route::get('/report-jt/toc-details', [ReportJTController::class, 'showTocDetails'])->name('report.jt.tocDetails');
     Route::get('/report-datin/sos-details', [ReportDatinController::class, 'showSosDetails'])->name('report.datin.sosDetails');
@@ -129,7 +140,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     Route::post('/update-po-name', 'updatePoName')->name('updatePoName');
                 });
 
-            // [BARU] Grup Controller untuk Analisis JT
+            // Grup Controller untuk Analisis JT
             Route::controller(AnalysisJTController::class)
                 ->prefix('analysis-jt')
                 ->name('analysisJT.')
@@ -144,9 +155,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     Route::post('/add-po', 'addPoManually')->name('addPo');
                     Route::post('/import/cancel', 'cancelImport')->name('import.cancel');
 
-                    // [PERBAIKAN PENTING] Route ini WAJIB ADA agar Polling Progress Bar berfungsi
-                    // URL Akhir: /admin/analysis-jt/progress/{batchId}
-                    // Nama Route: admin.analysisJT.getImportProgress
+                    // Route Polling Progress
                     Route::get('/progress/{batchId}', 'getImportProgress')->name('getImportProgress');
                 });
 

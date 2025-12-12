@@ -975,217 +975,7 @@ export default function AnalysisDigitalProduct({
             <Head title="Analysis Digital Product" />
 
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                <div className="lg:col-span-3 space-y-6">
-                    <TableConfigurator
-                        tableConfig={tableConfig}
-                        setTableConfig={setTableConfig}
-                        currentSegment={currentSegment}
-                        onSave={handleSaveConfig}
-                    />
-
-                    <div className="bg-white p-6 rounded-lg shadow-md">
-                        <div className="flex flex-wrap justify-between items-center mb-4 gap-4">
-                            <h3 className="font-semibold text-lg text-gray-800">
-                                Data Report
-                            </h3>
-                            <div className="flex flex-wrap items-center justify-start sm:justify-end gap-4 w-full sm:w-auto">
-                                <button
-                                    onClick={handleExportReport}
-                                    className="px-4 py-2 text-sm font-bold text-white bg-green-600 rounded-md hover:bg-green-700 whitespace-nowrap"
-                                >
-                                    Ekspor Excel
-                                </button>
-                                <div className="flex items-center gap-2">
-                                    <label
-                                        htmlFor="decimal_places"
-                                        className="text-sm font-medium text-gray-600"
-                                    >
-                                        Desimal:
-                                    </label>
-                                    <input
-                                        id="decimal_places"
-                                        type="number"
-                                        min="0"
-                                        max="10"
-                                        value={decimalPlaces}
-                                        onChange={(e) =>
-                                            setDecimalPlaces(
-                                                Number(e.target.value),
-                                            )
-                                        }
-                                        className="border border-gray-300 rounded-md text-sm p-2 w-20"
-                                    />
-                                </div>
-                                <select
-                                    value={filters.period || ''} // Gunakan filters dari props
-                                    onChange={(e) => router.get(route('admin.analysisDigitalProduct.index'), {
-                                        ...filters, // Pertahankan filter yang sudah ada
-                                        period: e.target.value, // Set nilai baru
-                                        page: 1 // Wajib reset ke halaman 1 saat filter berubah
-                                    }, { preserveState: true, replace: true })}
-                                    className="border border-gray-300 rounded-md text-sm p-2"
-                                >
-                                    {generatePeriodOptions()}
-                                </select>
-                                <select
-                                    value={filters.segment || 'SME'} // Gunakan filters dari props
-                                    onChange={(e) => router.get(route('admin.analysisDigitalProduct.index'), {
-                                        ...filters, // Pertahankan filter yang sudah ada
-                                        segment: e.target.value, // Set nilai baru
-                                        page: 1 // Wajib reset ke halaman 1 saat filter berubah
-                                    }, { preserveState: true, replace: true })}
-                                    className="border border-gray-300 rounded-md text-sm p-2"
-                                >
-                                    <option value="LEGS">LEGS</option>
-                                    <option value="SME">SME</option>
-                                </select>
-                            </div>
-                        </div>
-                        <SmeReportTable
-                            data={reportData}
-                            decimalPlaces={decimalPlaces}
-                            tableConfig={tableConfig}
-                            setTableConfig={setTableConfig}
-                        />
-                    </div>
-
-                    <div className="bg-white p-6 rounded-lg shadow-md">
-                        <div className="flex flex-wrap justify-between items-center mb-4 gap-4">
-                            <div className="flex flex-wrap items-center gap-2 border p-1 rounded-lg bg-gray-50">
-                                <DetailTabButton viewName="inprogress" currentView={activeDetailView}>In Progress ({tabCounts.inprogress})</DetailTabButton>
-                                <DetailTabButton viewName="complete" currentView={activeDetailView}>Complete ({tabCounts.complete})</DetailTabButton>
-                                <DetailTabButton viewName="qc" currentView={activeDetailView}>QC ({tabCounts.qc})</DetailTabButton>
-                                <DetailTabButton viewName="history" currentView={activeDetailView}>History ({tabCounts.history})</DetailTabButton>
-                                <DetailTabButton viewName="netprice" currentView={activeDetailView}>Net Price ({tabCounts.netprice})</DetailTabButton>
-                                <DetailTabButton viewName="kpi" currentView={activeDetailView}>KPI PO</DetailTabButton>
-                            </div>
-
-                            {activeDetailView === "netprice" && (
-                                <select
-                                    value={filters.net_price_status || ''}
-                                    onChange={(e) => router.get(route('admin.analysisDigitalProduct.index'), {
-                                        ...filters, // Pertahankan filter yang ada
-                                        net_price_status: e.target.value, // Set nilai filter baru
-                                        tab: activeDetailView, // <-- INI KUNCINYA: pastikan tab tetap 'netprice'
-                                        page: 1 // Selalu kembali ke halaman 1 saat filter diubah
-                                    }, { preserveState: true, replace: true })}
-                                    className="border border-gray-300 rounded-md text-sm p-2"
-                                >
-                                    <option value="">Semua Harga</option>
-                                    <option value="template">Harga Template</option>
-                                    <option value="pasti">Harga Pasti</option>
-                                </select>
-                            )}
-                            {(activeDetailView === "inprogress" ||
-                                activeDetailView === "complete" ||
-                                activeDetailView === "qc" ||
-                                activeDetailView === "netprice") && (
-                                    <div className="flex items-center gap-4 flex-wrap">
-                                        <form
-                                            onSubmit={(e) => {
-                                                e.preventDefault();
-                                                router.get(route('admin.analysisDigitalProduct.index'), {
-                                                    ...filters, // Pertahankan semua filter yang sudah ada
-                                                    search: search, // Tambahkan/update kata kunci pencarian
-                                                    tab: activeDetailView, // <-- INI KUNCINYA: pastikan tab tetap sama
-                                                    page: 1 // Selalu kembali ke halaman 1 saat melakukan pencarian baru
-                                                }, { preserveState: true, replace: true, preserveScroll: true });
-                                            }}
-                                            className="flex items-center gap-2"
-                                        >
-                                            <input
-                                                type="text"
-                                                value={search}
-                                                onChange={(e) => setSearch(e.target.value)}
-                                                placeholder="Cari Order ID..."
-                                                className="border border-gray-300 rounded-md text-sm p-2 w-48"
-                                            />
-                                            <PrimaryButton type="submit">
-                                                Cari
-                                            </PrimaryButton>
-                                        </form>
-                                    </div>
-                                )}
-                            {activeDetailView === "inprogress" && (
-                                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
-                                    <select
-                                        value={selectedWitel}
-                                        onChange={handleWitelChange}
-                                        className="border border-gray-300 rounded-md text-sm p-2"
-                                    >
-                                        <option value="">Semua Witel</option>
-                                        {witelList.map((w) => (
-                                            <option key={w} value={w}>
-                                                {w}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <select
-                                        value={currentInProgressYear}
-                                        onChange={handleInProgressYearChange}
-                                        className="border border-gray-300 rounded-md text-sm p-2"
-                                    >
-                                        {generateYearOptions()}
-                                    </select>
-                                    <a
-                                        href={exportUrl}
-                                        className="px-3 py-2 text-sm font-bold text-white bg-green-600 rounded-md hover:bg-green-700"
-                                    >
-                                        Export Excel
-                                    </a>
-                                </div>
-                            )}
-                            {activeDetailView === "history" && (
-                                <div className="w-full md:w-auto flex items-center gap-2">
-                                    <a
-                                        href={route("admin.analysisDigitalProduct.export.history")}
-                                        className="w-full px-4 py-2 text-sm font-bold text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none"
-                                    >
-                                        Export Excel
-                                    </a>
-                                    <button onClick={handleClearHistory} className="w-full px-4 py-2 text-sm font-bold text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none">
-                                        Clear History
-                                    </button>
-                                </div>
-                            )}
-                            {activeDetailView === "kpi" && (
-                                <div className="w-full md:w-auto">
-                                    <a
-                                        href={route("admin.analysisDigitalProduct.export.kpiPo")}
-                                        className="inline-block px-4 py-2 text-sm font-bold text-white bg-green-600 rounded-md hover:bg-green-700"
-                                    >
-                                        Ekspor Excel
-                                    </a>
-                                </div>
-                            )}
-                        </div>
-
-                        {activeDetailView === "inprogress" && (
-                            <InProgressAnalysisTable dataPaginator={inProgressData} activeView={activeDetailView} />
-                        )}
-                        {activeDetailView === "complete" && (
-                            <CompleteTable dataPaginator={completeData} activeView={activeDetailView} />
-                        )}
-                        {activeDetailView === "history" && (
-                            <HistoryTable historyData={historyData} activeView={activeDetailView} />
-                        )}
-                        {activeDetailView === "qc" && (
-                            <QcTable dataPaginator={qcData} activeView={activeDetailView} />
-                        )}
-                        {activeDetailView === "netprice" && (
-                            <NetPriceTable dataPaginator={netPriceData} activeView={activeDetailView} />
-                        )}
-                        {activeDetailView === "kpi" && (
-                            <KPIPOAnalysisTable
-                                data={kpiData}
-                                accountOfficers={accountOfficers}
-                                openModal={openModal}
-                            />
-                        )}
-                    </div>
-                </div>
-
-                <div className="lg:col-span-1 space-y-6">
+                <div className="lg:col-span-4 space-y-6">
                     <DetailsCard
                         totals={detailsTotals}
                         segment={currentSegment}
@@ -1405,6 +1195,255 @@ export default function AnalysisDigitalProduct({
                             </form>
                         </div>
                     </CollapsibleCard>
+                    <TableConfigurator
+                        tableConfig={tableConfig}
+                        setTableConfig={setTableConfig}
+                        currentSegment={currentSegment}
+                        onSave={handleSaveConfig}
+                    />
+
+                    <div className="bg-white p-6 rounded-lg shadow-md">
+                        <div className="flex flex-wrap justify-between items-center mb-4 gap-4">
+                            <h3 className="font-semibold text-lg text-gray-800">
+                                Data Report
+                            </h3>
+                            <div className="flex flex-wrap items-center justify-start sm:justify-end gap-4 w-full sm:w-auto">
+                                <button
+                                    onClick={handleExportReport}
+                                    className="px-4 py-2 text-sm font-bold text-white bg-green-600 rounded-md hover:bg-green-700 whitespace-nowrap"
+                                >
+                                    Ekspor Excel
+                                </button>
+                                <div className="flex items-center gap-2">
+                                    <label
+                                        htmlFor="decimal_places"
+                                        className="text-sm font-medium text-gray-600"
+                                    >
+                                        Desimal:
+                                    </label>
+                                    <input
+                                        id="decimal_places"
+                                        type="number"
+                                        min="0"
+                                        max="10"
+                                        value={decimalPlaces}
+                                        onChange={(e) =>
+                                            setDecimalPlaces(
+                                                Number(e.target.value),
+                                            )
+                                        }
+                                        className="border border-gray-300 rounded-md text-sm p-2 w-20"
+                                    />
+                                </div>
+                                <select
+                                    value={filters.period || ''} // Gunakan filters dari props
+                                    onChange={(e) => router.get(route('admin.analysisDigitalProduct.index'), {
+                                        ...filters, // Pertahankan filter yang sudah ada
+                                        period: e.target.value, // Set nilai baru
+                                        page: 1 // Wajib reset ke halaman 1 saat filter berubah
+                                    }, { preserveState: true, replace: true })}
+                                    className="border border-gray-300 rounded-md text-sm p-2"
+                                >
+                                    {generatePeriodOptions()}
+                                </select>
+                                <select
+                                    value={filters.segment || 'SME'} // Gunakan filters dari props
+                                    onChange={(e) => router.get(route('admin.analysisDigitalProduct.index'), {
+                                        ...filters, // Pertahankan filter yang sudah ada
+                                        segment: e.target.value, // Set nilai baru
+                                        page: 1 // Wajib reset ke halaman 1 saat filter berubah
+                                    }, { preserveState: true, replace: true })}
+                                    className="border border-gray-300 rounded-md text-sm p-2"
+                                >
+                                    <option value="LEGS">LEGS</option>
+                                    <option value="SME">SME</option>
+                                </select>
+                            </div>
+                        </div>
+                        <SmeReportTable
+                            data={reportData}
+                            decimalPlaces={decimalPlaces}
+                            tableConfig={tableConfig}
+                            setTableConfig={setTableConfig}
+                        />
+                    </div>
+
+                    <div className="bg-white p-6 rounded-lg shadow-md">
+                        <div className="flex flex-wrap justify-between items-center mb-4 gap-4">
+                            <div className="flex flex-wrap items-center gap-2 border p-1 rounded-lg bg-gray-50">
+                                <DetailTabButton viewName="inprogress" currentView={activeDetailView}>In Progress ({tabCounts.inprogress})</DetailTabButton>
+                                <DetailTabButton viewName="complete" currentView={activeDetailView}>Complete ({tabCounts.complete})</DetailTabButton>
+                                <DetailTabButton viewName="qc" currentView={activeDetailView}>QC ({tabCounts.qc})</DetailTabButton>
+                                <DetailTabButton viewName="history" currentView={activeDetailView}>History ({tabCounts.history})</DetailTabButton>
+                                {/* Tombol Net Price & KPI PO DIHAPUS dari sini */}
+                            </div>
+
+                            {/* Search Bar untuk In Progress, Complete, QC */}
+                            {(activeDetailView === "inprogress" ||
+                                activeDetailView === "complete" ||
+                                activeDetailView === "qc") && (
+                                    <div className="flex items-center gap-4 flex-wrap">
+                                        <form
+                                            onSubmit={(e) => {
+                                                e.preventDefault();
+                                                router.get(route('admin.analysisDigitalProduct.index'), {
+                                                    ...filters,
+                                                    search: search,
+                                                    tab: activeDetailView,
+                                                    page: 1
+                                                }, { preserveState: true, replace: true, preserveScroll: true });
+                                            }}
+                                            className="flex items-center gap-2"
+                                        >
+                                            <input
+                                                type="text"
+                                                value={search}
+                                                onChange={(e) => setSearch(e.target.value)}
+                                                placeholder="Cari Order ID..."
+                                                className="border border-gray-300 rounded-md text-sm p-2 w-48"
+                                            />
+                                            <PrimaryButton type="submit">
+                                                Cari
+                                            </PrimaryButton>
+                                        </form>
+                                    </div>
+                                )}
+
+                            {/* Filter khusus In Progress */}
+                            {activeDetailView === "inprogress" && (
+                                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+                                    <select
+                                        value={selectedWitel}
+                                        onChange={handleWitelChange}
+                                        className="border border-gray-300 rounded-md text-sm p-2"
+                                    >
+                                        <option value="">Semua Witel</option>
+                                        {witelList.map((w) => (
+                                            <option key={w} value={w}>
+                                                {w}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <select
+                                        value={currentInProgressYear}
+                                        onChange={handleInProgressYearChange}
+                                        className="border border-gray-300 rounded-md text-sm p-2"
+                                    >
+                                        {generateYearOptions()}
+                                    </select>
+                                    <a
+                                        href={exportUrl}
+                                        className="px-3 py-2 text-sm font-bold text-white bg-green-600 rounded-md hover:bg-green-700"
+                                    >
+                                        Export Excel
+                                    </a>
+                                </div>
+                            )}
+
+                            {/* Filter khusus History */}
+                            {activeDetailView === "history" && (
+                                <div className="w-full md:w-auto flex items-center gap-2">
+                                    <a
+                                        href={route("admin.analysisDigitalProduct.export.history")}
+                                        className="w-full px-4 py-2 text-sm font-bold text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none"
+                                    >
+                                        Export Excel
+                                    </a>
+                                    <button onClick={handleClearHistory} className="w-full px-4 py-2 text-sm font-bold text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none">
+                                        Clear History
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Table Renders */}
+                        {activeDetailView === "inprogress" && (
+                            <InProgressAnalysisTable dataPaginator={inProgressData} activeView={activeDetailView} />
+                        )}
+                        {activeDetailView === "complete" && (
+                            <CompleteTable dataPaginator={completeData} activeView={activeDetailView} />
+                        )}
+                        {activeDetailView === "history" && (
+                            <HistoryTable historyData={historyData} activeView={activeDetailView} />
+                        )}
+                        {activeDetailView === "qc" && (
+                            <QcTable dataPaginator={qcData} activeView={activeDetailView} />
+                        )}
+                    </div>
+                    <div className="bg-white p-6 rounded-lg shadow-md mt-6">
+                        <div className="flex flex-wrap justify-between items-center mb-4 gap-4">
+                            <h3 className="font-semibold text-lg text-gray-800">
+                                Net Price Analysis ({tabCounts.netprice || 0})
+                            </h3>
+
+                            <div className="flex flex-wrap items-center gap-4">
+                                {/* Form Search khusus Net Price */}
+                                <form
+                                    onSubmit={(e) => {
+                                        e.preventDefault();
+                                        router.get(route('admin.analysisDigitalProduct.index'), {
+                                            ...filters,
+                                            search: search,
+                                            tab: 'netprice', // Memaksa tab context ke netprice jika backend membutuhkannya
+                                            page: 1
+                                        }, { preserveState: true, replace: true, preserveScroll: true });
+                                    }}
+                                    className="flex items-center gap-2"
+                                >
+                                    <input
+                                        type="text"
+                                        value={search}
+                                        onChange={(e) => setSearch(e.target.value)}
+                                        placeholder="Cari di Net Price..."
+                                        className="border border-gray-300 rounded-md text-sm p-2 w-48"
+                                    />
+                                    <PrimaryButton type="submit">
+                                        Cari
+                                    </PrimaryButton>
+                                </form>
+
+                                {/* Dropdown Filter Harga */}
+                                <select
+                                    value={filters.net_price_status || ''}
+                                    onChange={(e) => router.get(route('admin.analysisDigitalProduct.index'), {
+                                        ...filters,
+                                        net_price_status: e.target.value,
+                                        tab: 'netprice', // Hardcode tab agar backend memproses data netprice
+                                        page: 1
+                                    }, { preserveState: true, replace: true })}
+                                    className="border border-gray-300 rounded-md text-sm p-2"
+                                >
+                                    <option value="">Semua Harga</option>
+                                    <option value="template">Harga Template</option>
+                                    <option value="pasti">Harga Pasti</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <NetPriceTable dataPaginator={netPriceData} activeView="netprice" />
+                    </div>
+
+                    <div className="bg-white p-6 rounded-lg shadow-md mt-6">
+                        <div className="flex flex-wrap justify-between items-center mb-4 gap-4">
+                            <h3 className="font-semibold text-lg text-gray-800">
+                                KPI PO Analysis
+                            </h3>
+                            <div className="w-full md:w-auto">
+                                <a
+                                    href={route("admin.analysisDigitalProduct.export.kpiPo")}
+                                    className="inline-block px-4 py-2 text-sm font-bold text-white bg-green-600 rounded-md hover:bg-green-700"
+                                >
+                                    Ekspor Excel
+                                </a>
+                            </div>
+                        </div>
+
+                        <KPIPOAnalysisTable
+                            data={kpiData}
+                            accountOfficers={accountOfficers}
+                            openModal={openModal}
+                        />
+                    </div>
                 </div>
             </div>
             <AgentFormModal

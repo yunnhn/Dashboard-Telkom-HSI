@@ -9,10 +9,12 @@ use Inertia\Inertia;
 
 class AnalysisJTDashboardController extends Controller
 {
-    // ===================================================================
-    // 1. DEFINISI & HELPER
-    // ===================================================================
+    // ... (Fungsi Helper getWitelSegments, getPoCaseStatementString, applyStrictFilters, getWitelPoMap TETAP SAMA, tidak perlu diubah) ...
+    // HANYA BAGIAN handleRequest YANG BERUBAH DI BAWAH INI
 
+    // ===================================================================
+    // 1. DEFINISI & HELPER (Salin ulang bagian ini dari kode lama anda)
+    // ===================================================================
     private function getWitelSegments()
     {
         return [
@@ -50,7 +52,6 @@ class AnalysisJTDashboardController extends Controller
         ";
     }
 
-    // Helper Filter Ketat Terpusat
     private function applyStrictFilters($query)
     {
         $excludedWitel = ['WITEL SEMARANG JATENG UTARA', 'WITEL SOLO JATENG TIMUR', 'WITEL YOGYA JATENG SELATAN'];
@@ -70,12 +71,10 @@ class AnalysisJTDashboardController extends Controller
               });
     }
 
-    // [FIXED] Mapping Witel -> PO (Robust & Dynamic)
     private function getWitelPoMap($parentWitelList)
     {
+        // ... (Kode sama persis seperti sebelumnya) ...
         $poCase = $this->getPoCaseStatementString();
-
-        // 1. Ambil Raw Data dengan perhitungan nama PO
         $rawMap = DB::table('spmk_mom')
             ->select(
                 'witel_baru',
@@ -84,54 +83,36 @@ class AnalysisJTDashboardController extends Controller
             ->whereNotNull('witel_baru')
             ->distinct()
             ->get();
-
         $mapping = [];
-
-        // 2. Buat Kamus Normalisasi (Untuk mencocokkan Witel DB yang mungkin ada spasi)
         $validParents = [];
         foreach ($parentWitelList as $p) {
             $validParents[strtoupper(trim($p))] = $p;
         }
-
-        // 3. Lakukan Mapping Manual
         foreach ($rawMap as $row) {
-            // Bersihkan Witel dari DB (Hapus spasi & Uppercase)
             $dbWitelClean = strtoupper(trim($row->witel_baru));
             $po = $row->fixed_po_name;
-
             if (empty($po) || $po == 'Belum Terdefinisi') {
                 continue;
             }
-
-            // Jika Witel DB cocok dengan daftar Witel Induk kita
             if (isset($validParents[$dbWitelClean])) {
-                $realKey = $validParents[$dbWitelClean]; // Gunakan Key Asli (misal: "WITEL BALI")
-
+                $realKey = $validParents[$dbWitelClean];
                 if (!isset($mapping[$realKey])) {
                     $mapping[$realKey] = [];
                 }
-
-                // Masukkan PO jika belum ada di list witel tersebut
                 if (!in_array($po, $mapping[$realKey])) {
                     $mapping[$realKey][] = $po;
                 }
             }
         }
-
-        // 4. Sortir Nama PO
         foreach ($mapping as $key => $pos) {
             sort($mapping[$key]);
         }
-
         return $mapping;
     }
 
-    // ===================================================================
-    // 2. ENTRY POINTS
-    // ===================================================================
-
     public function index(Request $request)
     {
+        // ... (Kode sama) ...
         $settings = Cache::get('granular_embed_settings', []);
         if (isset($settings['jt']) && $settings['jt']['enabled'] && !empty($settings['jt']['url'])) {
             return Inertia::render('Dashboard/ExternalEmbed', [
@@ -139,7 +120,6 @@ class AnalysisJTDashboardController extends Controller
                 'headerTitle' => 'Dashboard Analysis JT',
             ]);
         }
-
         return $this->handleRequest($request, false);
     }
 
@@ -149,7 +129,7 @@ class AnalysisJTDashboardController extends Controller
     }
 
     // ===================================================================
-    // 3. LOGIC UTAMA (HANDLE REQUEST)
+    // 3. LOGIC UTAMA (UPDATED)
     // ===================================================================
 
     private function handleRequest(Request $request, $isEmbed)
@@ -157,54 +137,61 @@ class AnalysisJTDashboardController extends Controller
         // A. Validasi
         $validated = $request->validate([
             'startDate' => 'nullable|date_format:Y-m-d',
-            'endDate' => 'nullable|date_format:Y-m-d|after_or_equal:startDate',
-            'witels' => 'nullable|array', 'witels.*' => 'string|max:255',
-            'pos' => 'nullable|array', 'pos.*' => 'string|max:255',
-            'limit' => 'nullable|in:10,50,100,500',
+            'endDate'   => 'nullable|date_format:Y-m-d|after_or_equal:startDate',
+            // ... validasi lain tetap ...
+            'witels'    => 'nullable|array',
+            'pos'       => 'nullable|array',
+            'limit'     => 'nullable|in:10,50,100,500',
+            'search'    => 'nullable|string|max:255',
         ]);
-        $limit = $validated['limit'] ?? '10';
+        
+        $limit  = $validated['limit'] ?? '10';
+        $search = $validated['search'] ?? null;
 
-        // B. Setup Tanggal UI
-        $firstOrderDate = DB::table('spmk_mom')->min('tanggal_mom');
-        $latestOrderDate = DB::table('spmk_mom')->max('tanggal_mom');
-        $startDateForUI = $request->input('startDate', $firstOrderDate ? \Carbon\Carbon::parse($firstOrderDate)->format('Y-m-d') : now()->startOfYear()->format('Y-m-d'));
-        $endDateForUI = $request->input('endDate', $latestOrderDate ? \Carbon\Carbon::parse($latestOrderDate)->format('Y-m-d') : now()->format('Y-m-d'));
+        // --- [PERBAIKAN LOGIC TANGGAL DEFAULT] ---
+        
+        // 1. Cari Tanggal Terakhir di Database
+        $latestMomDate = DB::table('spmk_mom')->max('tanggal_mom');
 
-        // C. Setup Struktur Witel & Map
+        // 2. Tentukan Default: Awal Tahun s/d Tanggal Terakhir DB
+        $defaultStartDate = now()->startOfYear()->format('Y-m-d'); 
+        $defaultEndDate   = $latestMomDate ? \Carbon\Carbon::parse($latestMomDate)->format('Y-m-d') : now()->format('Y-m-d');
+
+        // 3. Gunakan Input User jika ada, jika tidak gunakan Default
+        $startDateToUse = $request->input('startDate', $defaultStartDate);
+        $endDateToUse   = $request->input('endDate', $defaultEndDate);
+
+        // --- [END PERBAIKAN LOGIC TANGGAL] ---
+
+        // C. Setup Struktur Witel & Map (TETAP)
         $witelSegments = $this->getWitelSegments();
         $parentWitelList = array_keys($witelSegments);
         $childWitelList = array_merge(...array_values($witelSegments));
-
-        // [FIX] Ambil Mapping Menggunakan Fungsi Robust
         $witelPoMap = $this->getWitelPoMap($parentWitelList);
-
         $poCaseString = $this->getPoCaseStatementString();
 
-        // D. Filter Logic
-        $applyUserFilters = function ($query) use ($validated, $parentWitelList, $childWitelList, $poCaseString) {
-            // 1. Filter Tanggal
-            if (isset($validated['startDate']) && isset($validated['endDate'])) {
-                $query->whereBetween('tanggal_mom', [$validated['startDate'], $validated['endDate']]);
-            }
+        // D. Filter Logic (UPDATE: Gunakan variabel $startDateToUse)
+        $applyUserFilters = function ($query) use ($validated, $startDateToUse, $endDateToUse, $parentWitelList, $childWitelList, $poCaseString) {
+            
+            // 1. Filter Tanggal (SELALU TERAPKAN FILTER TANGGAL)
+            // Karena sekarang sudah ada default value, kita tidak perlu cek isset($validated) lagi untuk tanggal
+            $query->whereBetween('tanggal_mom', [$startDateToUse, $endDateToUse]);
 
-            // 2. Filter Witel (Gunakan TRIM untuk keamanan pencocokan)
+            // 2. Filter Witel
             if (isset($validated['witels']) && !empty($validated['witels'])) {
                 $query->whereIn(DB::raw('TRIM(witel_baru)'), $validated['witels']);
             } else {
                 $query->whereIn(DB::raw('TRIM(witel_baru)'), $parentWitelList);
             }
-
             // 3. Filter Child Witel
             $query->whereIn(DB::raw('TRIM(witel_lama)'), $childWitelList);
-
-            // 4. Filter PO Global (Fix Empty State)
+            // 4. Filter PO
             if (array_key_exists('pos', $validated)) {
                 if (!empty($validated['pos'])) {
                     $poListString = implode("','", $validated['pos']);
-                    // Filter berdasarkan nama PO yang sudah dikalkulasi
                     $query->whereRaw("COALESCE(NULLIF(po_name, ''), ({$poCaseString})) IN ('{$poListString}')");
                 } else {
-                    $query->whereRaw('1 = 0'); // Paksa kosong jika filter dipilih tapi kosong
+                    $query->whereRaw('1 = 0');
                 }
             }
         };
@@ -213,9 +200,9 @@ class AnalysisJTDashboardController extends Controller
             $this->applyStrictFilters($query);
         };
 
-        // --- E. BUILD QUERIES (Dengan Fix Strict Mode SQL) ---
+        // --- E. BUILD QUERIES ---
 
-        // 1. Chart Status
+        // 1. Status Data (Pie & Stacked)
         $statusData = DB::table('spmk_mom')
             ->select(
                 DB::raw('TRIM(witel_baru) as witel_induk'),
@@ -225,19 +212,14 @@ class AnalysisJTDashboardController extends Controller
             )
             ->whereIn(DB::raw('TRIM(witel_baru)'), $parentWitelList)
             ->tap($applyUserFilters)
-            ->groupBy(DB::raw('TRIM(witel_baru)')) // [FIX] Strict SQL
+            ->groupBy(DB::raw('TRIM(witel_baru)'))
             ->orderBy(DB::raw('TRIM(witel_baru)'))
             ->get();
 
         $pieChartData = ['doneGolive' => $statusData->sum('golive'), 'blmGolive' => $statusData->sum('blm_golive'), 'drop' => $statusData->sum('drop')];
         $stackedBarData = $statusData->map(fn ($item) => ['witel' => $item->witel_induk, 'golive' => $item->golive, 'blmGolive' => $item->blm_golive, 'drop' => $item->drop]);
 
-        // ==========================================================================
-        // 2 & 3. Chart Usia (Ranking Logic PHP-Side) - MENGHINDARI ROW_NUMBER()
-        // ==========================================================================
-
-        // Ambil semua data mentah yang diperlukan (Project name, usia, witel, po)
-        // Ini aman di semua versi MySQL karena hanya SELECT biasa
+        // 2 & 3. Chart Usia
         $rawRankingData = DB::table('spmk_mom')
             ->select(
                 'uraian_kegiatan',
@@ -249,32 +231,12 @@ class AnalysisJTDashboardController extends Controller
             ->tap($applyStrictReportFilters)
             ->get();
 
-        // Proses Ranking WITEL di PHP
         $usiaWitelData = $rawRankingData
             ->groupBy('witel_induk')
             ->flatMap(function ($items, $witel) {
-                // Sortir berdasarkan usia tertinggi, ambil 3 teratas
                 return $items->sortByDesc('usia')->values()->take(3)->map(function ($item, $index) {
                     return [
                         'witel_induk' => $item->witel_induk,
-                        'po_name' => $item->fixed_po_name,
-                        'uraian_kegiatan' => $item->uraian_kegiatan,
-                        'usia' => $item->usia,
-                        'rank' => $index + 1, // Ranking manual di PHP
-                    ];
-                });
-            })->values()->all();
-
-        // Proses Ranking PO di PHP
-        $usiaPoData = $rawRankingData
-            ->where('fixed_po_name', '!=', '')
-            ->where('fixed_po_name', '!=', 'Belum Terdefinisi')
-            ->groupBy('fixed_po_name')
-            ->flatMap(function ($items, $poName) {
-                // Sortir berdasarkan usia tertinggi, ambil 3 teratas
-                return $items->sortByDesc('usia')->values()->take(3)->map(function ($item, $index) {
-                    return [
-                        'fixed_po_name' => $item->fixed_po_name, // Pastikan key ini ada untuk frontend
                         'po_name' => $item->fixed_po_name,
                         'uraian_kegiatan' => $item->uraian_kegiatan,
                         'usia' => $item->usia,
@@ -283,7 +245,21 @@ class AnalysisJTDashboardController extends Controller
                 });
             })->values()->all();
 
-        // ==========================================================================
+        $usiaPoData = $rawRankingData
+            ->where('fixed_po_name', '!=', '')
+            ->where('fixed_po_name', '!=', 'Belum Terdefinisi')
+            ->groupBy('fixed_po_name')
+            ->flatMap(function ($items, $poName) {
+                return $items->sortByDesc('usia')->values()->take(3)->map(function ($item, $index) {
+                    return [
+                        'fixed_po_name' => $item->fixed_po_name,
+                        'po_name' => $item->fixed_po_name,
+                        'uraian_kegiatan' => $item->uraian_kegiatan,
+                        'usia' => $item->usia,
+                        'rank' => $index + 1,
+                    ];
+                });
+            })->values()->all();
 
         // 4. Radar Chart
         $radarData = DB::table('spmk_mom')
@@ -296,7 +272,7 @@ class AnalysisJTDashboardController extends Controller
                 DB::raw("SUM(CASE WHEN ((UPPER(status_tomps_new) LIKE '%FI%' OR UPPER(status_tomps_new) LIKE '%OGP%') AND go_live = 'N' AND populasi_non_drop = 'Y') THEN 1 ELSE 0 END) AS fi_ogp_live")
             )
             ->tap($applyUserFilters)
-            ->groupBy(DB::raw('TRIM(witel_baru)')) // [FIX] Strict SQL
+            ->groupBy(DB::raw('TRIM(witel_baru)'))
             ->orderBy(DB::raw('TRIM(witel_baru)'))
             ->get()
             ->map(fn ($item) => [
@@ -304,22 +280,66 @@ class AnalysisJTDashboardController extends Controller
                 'perizinan_mos' => $item->perizinan_mos, 'instalasi' => $item->instalasi, 'fi_ogp_live' => $item->fi_ogp_live,
             ]);
 
-        // 5. Data Preview
+        // 5. Data Preview [UPDATED]
+        // Kolom disesuaikan dengan DB spmk_mom + Search Logic
         $dataPreview = DB::table('spmk_mom')
             ->select(
-                'uraian_kegiatan', 'status_proyek', 'tanggal_mom', 'witel_baru',
+                // Pilih kolom-kolom utama
+                'id',
+                'id_i_hld',
+                'no_nde_spmk',
+                'uraian_kegiatan',
+                'segmen', // New
+                // Logic PO Name tetap dipertahankan
                 DB::raw("COALESCE(NULLIF(po_name, ''), ({$poCaseString})) as po_name"),
-                DB::raw('TRIM(witel_baru) as witel_induk'),
-                DB::raw('DATEDIFF(NOW(), tanggal_mom) as usia')
+                'witel_baru',
+                'witel_lama', // New
+                'region', // New
+                'status_proyek',
+                'tanggal_cb', // New
+                'jenis_kegiatan', // New
+                'revenue_plan', // New
+                'go_live', // New
+                'keterangan_toc', // New
+                'perihal_nde_spmk', // New
+                'mom', // New
+                'ba_drop', // New
+                'populasi_non_drop', // New
+                'tanggal_mom',
+                'usia', // New (tapi biasanya calculated by DATEDIFF, pastikan DB anda ada kolom usia atau gunakan DATEDIFF spt sebelumnya)
+                // Jika di DB kolom 'usia' itu kosong dan harus dihitung live:
+                // DB::raw('DATEDIFF(NOW(), tanggal_mom) as usia_hitung'), 
+                
+                'rab', // New
+                'total_port', // New
+                'template_durasi', // New
+                'toc', // New
+                'umur_pekerjaan', // New
+                'kategori_umur_pekerjaan', // New
+                'status_tomps_last_activity', // New
+                'status_tomps_new', // New
+                'status_i_hld', // New
+                'nama_odp_go_live', // New
+                'bak', // New
+                'keterangan_pelimpahan', // New
+                'mitra_lokal' // New
             )
             ->tap($applyUserFilters)
             ->tap($applyStrictReportFilters)
-            ->orderBy('usia', 'desc')
+            ->when($search, function ($query, $search) use ($poCaseString) {
+                $query->where(function ($q) use ($search, $poCaseString) {
+                    $q->where('id_i_hld', 'like', "%{$search}%")
+                      ->orWhere('no_nde_spmk', 'like', "%{$search}%")
+                      ->orWhere('uraian_kegiatan', 'like', "%{$search}%")
+                      ->orWhereRaw("COALESCE(NULLIF(po_name, ''), ({$poCaseString})) LIKE ?", ["%{$search}%"]);
+                });
+            })
+            // Gunakan kolom usia dari DB jika ada, atau hitung manual untuk sorting
+            ->orderBy('usia', 'desc') 
             ->paginate($limit)
             ->withQueryString();
 
-        // F. Opsi Filter (Dropdown)
-        // Ambil semua opsi PO (termasuk yang dihitung via CASE) untuk dropdown
+        // F. Opsi Filter
         $allPoList = DB::table('spmk_mom')
             ->select(DB::raw("COALESCE(NULLIF(po_name, ''), ({$poCaseString})) as fixed_po_name"))
             ->whereIn(DB::raw('TRIM(witel_baru)'), $parentWitelList)
@@ -333,13 +353,20 @@ class AnalysisJTDashboardController extends Controller
             'pieChartData' => $pieChartData, 'stackedBarData' => $stackedBarData,
             'usiaWitelData' => $usiaWitelData, 'usiaPoData' => $usiaPoData, 'radarData' => $radarData,
             'dataPreview' => $dataPreview,
-            'filters' => ['startDate' => $validated['startDate'] ?? null, 'endDate' => $validated['endDate'] ?? null, 'witels' => $validated['witels'] ?? null, 'pos' => $validated['pos'] ?? null, 'limit' => $limit],
+            'filters' => [
+                'startDate' => $startDateToUse, 
+                'endDate'   => $endDateToUse,
+                'witels'    => $validated['witels'] ?? null,
+                'pos'       => $validated['pos'] ?? null,
+                'limit'     => $limit,
+                'search'    => $search
+            ],
             'filterOptions' => [
                 'witelIndukList' => $parentWitelList,
                 'poList' => $allPoList,
                 'witelPoMap' => $witelPoMap,
-                'initialStartDate' => $startDateForUI,
-                'initialEndDate' => $endDateForUI,
+                'defaultStartDate' => $defaultStartDate,
+                'defaultEndDate'   => $defaultEndDate,
             ],
             'isEmbed' => $isEmbed,
         ]);

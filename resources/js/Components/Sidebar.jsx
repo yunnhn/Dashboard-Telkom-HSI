@@ -317,16 +317,7 @@ export default function Sidebar({ user, isSidebarOpen, toggleSidebar, isCmsMode,
                             {isSidebarOpen && isReportsOpen && (
                                 <div className="pl-8 pr-4 py-2 flex flex-col space-y-1 bg-gray-50 border-t border-b">
                                     <div>
-                                        <button onClick={() => setIsDigitalProductOpen(!isDigitalProductOpen)} className="w-full flex items-center justify-between px-4 py-2 text-sm rounded-md text-gray-700 hover:bg-gray-200 text-left">
-                                            <span>Report Digital Product</span>
-                                            <MdKeyboardArrowDown size={18} className={`transition-transform duration-300 ${isDigitalProductOpen ? 'rotate-180' : ''}`} />
-                                        </button>
-                                        {isDigitalProductOpen && (
-                                            <div className="pl-6 mt-1 space-y-1">
-                                                <Link href={route('data-report.index')} className={`block px-4 py-2 text-sm rounded-md text-left ${route().current('data-report.index') ? 'bg-blue-100 text-blue-700 font-semibold' : 'hover:bg-gray-100'}`}>Data Report</Link>
-                                                <Link href={route('galaksi.index')} className={`block px-4 py-2 text-sm rounded-md text-left ${route().current('galaksi.index') ? 'bg-blue-100 text-blue-700 font-semibold' : 'hover:bg-gray-100'}`}>Galaksi</Link>
-                                            </div>
-                                        )}
+                                        <Link href={route('data-report.index')} className={`block px-4 py-2 text-sm rounded-md text-left ${route().current('data-report.index') ? 'bg-blue-100 text-blue-700 font-semibold' : 'hover:bg-gray-100'}`}>Report Digital Product</Link>
                                     </div>
                                     <div>
                                         <button onClick={() => setIsSosOpen(!isSosOpen)} className="w-full flex items-center justify-between px-4 py-2 text-sm rounded-md text-gray-700 hover:bg-gray-200 text-left">

@@ -58,7 +58,7 @@ const StackedBarStatusWitelJT = ({ data }) => {
             },
             title: {
                 display: true,
-                text: 'Status LOP per Witel Induk',
+                text: 'Status LOP per Witel',
                 font: { size: 16 }
             },
             tooltip: {

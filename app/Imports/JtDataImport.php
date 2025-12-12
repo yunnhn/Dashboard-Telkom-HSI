@@ -40,8 +40,8 @@ class JtDataImport implements ToModel, WithHeadingRow, WithBatchInserts
         // 3. Bersihkan Data (TETAP)
         $witelLama = trim($row['witel_lama'] ?? '');
         $segmen = trim($row['segmen'] ?? '');
-        $statusTompsNew = strtolower($row['status_tomps_new'] ?? '');
-        $statusProyek = strtolower($row['status_proyek'] ?? '');
+        $status_i_hld = strtolower($row['status_i_hld'] ?? '');
+        $keterangan_toc = strtolower($row['keterangan_toc'] ?? '');
         $baDrop = strtolower($row['ba_drop'] ?? '');
         $idIHld = trim($row['id_i_hld'] ?? '');
         $noNdeSpmk = trim($row['no_nde_spmk'] ?? '');
@@ -52,7 +52,10 @@ class JtDataImport implements ToModel, WithHeadingRow, WithBatchInserts
 
         // 4. Logika Bisnis (TETAP)
         $poName = $this->determinePoName($witelLama, $segmen);
-        $goLive = (str_contains($statusTompsNew, 'go live') || str_contains($statusProyek, 'go live')) ? 'Y' : 'N';
+        $isGoLive =
+            str_contains($keterangan_toc, 'go live') || str_contains($status_i_hld, 'go live');
+
+        $goLive = $isGoLive ? 'Y' : 'N';
         $populasiNonDrop = str_contains($baDrop, 'drop') ? 'N' : 'Y';
 
         $tahunRaw = $row['tahun'] ?? '';

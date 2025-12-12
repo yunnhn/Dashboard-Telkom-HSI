@@ -30,10 +30,10 @@ export default function ShowDetails({ auth, orders, pageTitle }) {
                     <div className="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                         <div className="p-6">
                             <Link
-                                href={route('galaksi.index')} // Asumsi nama route Anda
+                                href={route('data-report.index')} // Asumsi nama route Anda
                                 className="mb-4 inline-flex items-center px-4 py-2 bg-gray-200 border border-transparent rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest hover:bg-gray-300"
                             >
-                                &larr; Kembali ke Galaksi
+                                &larr; Kembali ke Report
                             </Link>
 
                             <table className="min-w-full divide-y divide-gray-200 border text-sm mt-4">

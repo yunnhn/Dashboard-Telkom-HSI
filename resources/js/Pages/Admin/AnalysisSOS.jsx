@@ -866,68 +866,6 @@ export default function AnalysisSOS({
                             )}
                         </div>
 
-                        <div className="bg-white p-6 rounded-lg shadow-md">
-                            {/* ... (Form Master Data PO tidak berubah) ... */}
-                            <div
-                                className="flex justify-between items-center cursor-pointer"
-                                onClick={() => setIsPoFormVisible(!isPoFormVisible)}
-                            >
-                                <h3 className="font-semibold text-lg text-gray-800">Master Data PO</h3>
-                                <button className="text-blue-600 hover:text-blue-800 text-sm font-semibold flex items-center gap-2">
-                                    {isPoFormVisible ? 'Tutup' : 'Tambah PO'}
-                                    <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 transition-transform ${isPoFormVisible ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                    </svg>
-                                </button>
-                            </div>
-
-                            {isPoFormVisible && (
-                                <div className="mt-6 pt-6 border-t animate-fade-in-down">
-                                    <h4 className="font-semibold text-md text-gray-800">Unggah File PO</h4>
-                                    <p className="text-gray-500 mt-1 mb-4 text-sm">Perbarui master data PO melalui file Excel.</p>
-                                    <form onSubmit={handlePoUploadSubmit} className="space-y-4">
-                                        <div>
-                                            <input
-                                                type="file"
-                                                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100"
-                                                onChange={(e) => setPoUploadData("po_document", e.target.files[0])}
-                                                disabled={processingPo || poProgress !== null}
-                                            />
-                                            <InputError message={errorsPo.po_document} className="mt-2" />
-                                        </div>
-
-                                        {poProgress !== null && (
-                                            <ProgressBar progress={poProgress} text="Memperbarui Daftar PO..." />
-                                        )}
-
-                                        <button
-                                            type="submit"
-                                            disabled={processingPo || poProgress !== null}
-                                            className="px-4 py-2 bg-green-600 text-white font-semibold rounded-md hover:bg-green-700 disabled:bg-green-400"
-                                        >
-                                            {poProgress !== null ? 'Memproses...' : (processingPo ? "Mengunggah..." : "Unggah Daftar PO")}
-                                        </button>
-                                    </form>
-                                    <hr className="my-6 border-dashed" />
-                                </div>
-                            )}
-                            <hr className="my-6" />
-                            <ListPoPreviewTable dataPaginator={listPoData} />
-                        </div>
-
-                        <div className="bg-white p-6 rounded-lg shadow-md mt-6">
-                            <h3 className="font-semibold text-lg text-gray-800 mb-4">
-                                Daftar PO Belum di Mapping
-                            </h3>
-                            <p className="text-sm text-gray-600 mb-4">
-                                Berikut adalah daftar order yang belum memiliki PO Name, namun berasal dari 5 Witel utama. Anda dapat mengedit PO Name secara manual.
-                            </p>
-                            <UnmappedPoList
-                                dataPaginator={unmappedPoData}
-                                poOptions={poListOptions} // <--- [2] Oper ke Child Component
-                            />
-                        </div>
-
                         <CustomTargetFormSOS
                             tableConfig={tableConfig}
                             witelList={witelList}

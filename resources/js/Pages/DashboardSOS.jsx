@@ -59,9 +59,9 @@ const OrdersByCategoryChart = ({ data = [] }) => {
             ],
         };
     }, [data]);
-    const options = { 
-        responsive: true, 
-        maintainAspectRatio: false, 
+    const options = {
+        responsive: true,
+        maintainAspectRatio: false,
         scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
         plugins: { datalabels: { display: false } } // Disable global datalabels for this chart
     };
@@ -87,11 +87,11 @@ const RevenueByCategoryChart = ({ data = [] }) => {
             ],
         };
     }, [data]);
-    const options = { 
-        responsive: true, 
-        maintainAspectRatio: false, 
+    const options = {
+        responsive: true,
+        maintainAspectRatio: false,
         scales: { y: { beginAtZero: true } },
-        plugins: { datalabels: { display: false } } 
+        plugins: { datalabels: { display: false } }
     };
     return <Bar options={options} data={chartData} />;
 };
@@ -139,7 +139,7 @@ const WitelPieChart = ({ data = [] }) => {
                 formatter: (value, ctx) => {
                     // Hanya tampilkan jika nilai > 0 agar tidak menumpuk
                     if (value > 0) {
-                        return value; 
+                        return value;
                     }
                     return null;
                 },
@@ -170,8 +170,8 @@ const WitelBarChart = ({ data = [] }) => {
     const options = {
         indexAxis: 'y',
         responsive: true, maintainAspectRatio: false,
-        plugins: { 
-            legend: { display: false }, 
+        plugins: {
+            legend: { display: false },
             title: { display: false },
             datalabels: { // Tampilkan angka di ujung bar juga agar bagus
                 display: true,
@@ -181,9 +181,9 @@ const WitelBarChart = ({ data = [] }) => {
                 formatter: (value) => value > 0 ? value : ''
             }
         },
-        scales: { 
-            x: { beginAtZero: true, title: { display: true, text: 'Jumlah Order' } }, 
-            y: { ticks: { autoSkip: false } } 
+        scales: {
+            x: { beginAtZero: true, title: { display: true, text: 'Jumlah Order' } },
+            y: { ticks: { autoSkip: false } }
         }
     };
     return <Bar options={options} data={chartData} />;
@@ -329,7 +329,7 @@ export default function DashboardSOS({
             <div className="bg-white p-6 rounded-lg shadow-md">
                 <div className="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
                     <h3 className="font-semibold text-lg text-gray-800">Data Preview</h3>
-                    
+
                     <div className="flex items-center gap-2">
                         {/* INPUT SEARCH */}
                         <div className="relative">
@@ -341,7 +341,7 @@ export default function DashboardSOS({
                                 onKeyDown={handleSearchKeyDown}
                                 className="border border-gray-300 rounded-md text-sm pl-3 pr-8 py-2 w-64 focus:ring-blue-500 focus:border-blue-500"
                             />
-                            <button 
+                            <button
                                 onClick={applyFilters}
                                 className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-blue-600"
                             >

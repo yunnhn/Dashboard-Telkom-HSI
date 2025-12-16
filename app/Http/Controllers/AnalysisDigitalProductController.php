@@ -176,8 +176,8 @@ class AnalysisDigitalProductController extends Controller
     // ===================================================================
     public function index(Request $request)
     {
-        // [1] FILTER DASAR (TIDAK BERUBAH)
-        $filters = $request->only(['search', 'period', 'segment', 'witel', 'in_progress_year', 'net_price_status', 'tab']);
+        // [1] FILTER DASAR
+        $filters = $request->only(['search', 'period', 'segment', 'witel', 'in_progress_year', 'net_price_status', 'channel', 'price_status', 'tab']);
         $activeTab = $request->input('tab', 'inprogress');
         $search = $request->input('search');
 
@@ -186,161 +186,147 @@ class AnalysisDigitalProductController extends Controller
         $reportPeriod = \Carbon\Carbon::parse($periodInput)->startOfMonth();
         $paginationCount = 15;
 
-        // [2] LOAD REPORT DATA UTAMA (TIDAK BERUBAH)
+        // [2] LOAD REPORT DATA UTAMA
         $reportData = $this->getReportDataForSegment($selectedSegment, $reportPeriod);
         $reportData = collect($reportData)->map(fn ($item) => (object) $item);
 
-        // [3] QUERY DASAR UNTUK TAB (TIDAK BERUBAH - DISINGKAT UNTUK FOKUS PERBAIKAN)
-        // ... (Kode query $inProgressQuery, $completeQuery, dll biarkan seperti kode asli Anda) ...
+        // [3] QUERY DASAR UNTUK TAB
         $inProgressQuery = DocumentData::query()
             ->where('status_wfm', 'in progress')
             ->where('segment', $selectedSegment)
             ->whereYear('order_created_date', $request->input('in_progress_year', now()->year))
             ->when($request->input('witel'), fn ($q, $w) => $q->where('nama_witel', $w))
-            ->when($search, fn ($q, $s) => $q->where('order_id', 'like', '%'.$s.'%'));
+            ->when($search, fn ($q, $s) => $q->where('order_id', 'like', '%' . $s . '%'));
 
         $completeQuery = DocumentData::query()
             ->where('status_wfm', 'done close bima')
             ->where('segment', $selectedSegment)
-            ->when($search, fn ($q, $s) => $q->where('order_id', 'like', '%'.$s.'%'));
+            ->when($search, fn ($q, $s) => $q->where('order_id', 'like', '%' . $s . '%'));
 
         $qcQuery = DocumentData::query()
             ->where('status_wfm', '')
             ->where('segment', $selectedSegment)
-            ->when($search, fn ($q, $s) => $q->where('order_id', 'like', '%'.$s.'%'));
+            ->when($search, fn ($q, $s) => $q->where('order_id', 'like', '%' . $s . '%'));
 
         $historyQuery = UpdateLog::query()
-            ->when($search, fn ($q, $s) => $q->where('order_id', 'like', '%'.$s.'%'))
+            ->when($search, fn ($q, $s) => $q->where('order_id', 'like', '%' . $s . '%'))
             ->latest();
 
-        // Query Net Price (Logic Existing)
-        $singleProductsQuery = DB::table('document_data')
-            ->select('order_id as uid', 'order_id', 'product as product_name', 'net_price', 'nama_witel', 'customer_name', 'order_created_date', 'is_template_price')
-            ->where('product', 'NOT LIKE', '%-%')
-            ->when($search, fn ($q, $s) => $q->where('document_data.order_id', 'like', '%'.$s.'%'));
+        // ===================================================================
+        // QUERY NET PRICE (LOGIKA BARU - PINDAH KE ATAS)
+        // ===================================================================
 
+        // Ambil input filter
+        $channelFilter = $request->input('channel');
+        $priceStatusFilter = $request->input('price_status');
+
+        // Helper Closure untuk Filter
+        $applyFilters = function ($query, $tablePrefix) use ($search, $channelFilter, $priceStatusFilter) {
+            $query->when($search, fn ($q, $s) => $q->where($tablePrefix . '.order_id', 'like', '%' . $s . '%'));
+
+            // Filter Channel
+            if ($channelFilter === 'sc-one') {
+                $query->where($tablePrefix . '.channel', 'SC-One');
+            } elseif ($channelFilter === 'ncx') {
+                $query->where(function($q) use ($tablePrefix) {
+                    $q->where($tablePrefix . '.channel', '!=', 'SC-One')
+                      ->orWhereNull($tablePrefix . '.channel');
+                });
+            }
+
+            // Filter Status Harga
+            if ($priceStatusFilter === 'priced') {
+                $query->where($tablePrefix . '.net_price', '>', 0);
+            } elseif ($priceStatusFilter === 'unpriced') {
+                $query->where(function($q) use ($tablePrefix) {
+                    $q->where($tablePrefix . '.net_price', '=', 0)
+                      ->orWhereNull($tablePrefix . '.net_price');
+                });
+            }
+        };
+
+        // 1. Single Products
+        $singleProductsQuery = DB::table('document_data')
+            ->select('order_id as uid', 'order_id', 'product as product_name', 'net_price', 'nama_witel', 'customer_name', 'order_created_date', 'channel', DB::raw('0 as is_bundle'))
+            ->where('product', 'NOT LIKE', '%-%');
+        $applyFilters($singleProductsQuery, 'document_data');
+
+        // 2. Bundle Products
         $bundleProductsQuery = DB::table('order_products')
             ->join('document_data', 'order_products.order_id', '=', 'document_data.order_id')
-            ->select('order_products.id as uid', 'order_products.order_id', 'order_products.product_name', 'order_products.net_price', 'document_data.nama_witel', 'document_data.customer_name', 'document_data.order_created_date', DB::raw('1 as is_template_price'))
-            ->when($search, fn ($q, $s) => $q->where('order_products.order_id', 'like', '%'.$s.'%'));
+            ->select('order_products.id as uid', 'order_products.order_id', 'order_products.product_name', 'order_products.net_price', 'document_data.nama_witel', 'document_data.customer_name', 'document_data.order_created_date', 'order_products.channel', DB::raw('1 as is_bundle'));
+        $applyFilters($bundleProductsQuery, 'order_products');
 
-        $netPriceStatus = $request->input('net_price_status');
-        if ($netPriceStatus === 'pasti') {
-            $netPriceQuery = $singleProductsQuery->where('is_template_price', false);
-        } elseif ($netPriceStatus === 'template') {
-            $netPriceQuery = $singleProductsQuery->where('is_template_price', true)->union($bundleProductsQuery);
-        } else {
-            $netPriceQuery = $singleProductsQuery->union($bundleProductsQuery);
-        }
+        // Gabungkan Query
+        $netPriceQuery = $singleProductsQuery->union($bundleProductsQuery);
 
-        // [4] TAB COUNTS (TIDAK BERUBAH)
+        // [FIX ERROR] HITUNG TOTAL NET PRICE SEBELUM ARRAY $tabCounts
+        // Menggunakan subquery count untuk akurasi UNION
+        $netPriceTotalCount = DB::table(DB::raw("({$netPriceQuery->toSql()}) as sub"))
+            ->mergeBindings($netPriceQuery)
+            ->count();
+
+        // [4] TAB COUNTS
         $tabCounts = [
             'inprogress' => (clone $inProgressQuery)->count(),
             'complete' => (clone $completeQuery)->count(),
             'qc' => (clone $qcQuery)->count(),
             'history' => (clone $historyQuery)->count(),
-            'netprice' => DB::table(DB::raw("({$netPriceQuery->toSql()}) as sub"))->mergeBindings($netPriceQuery)->count(),
+            'netprice' => $netPriceTotalCount, // Variabel ini sekarang sudah aman
         ];
 
-        // [5] PAGINASI (TIDAK BERUBAH)
+        // [5] PAGINASI
         $emptyPaginator = fn () => new LengthAwarePaginator([], 0, $paginationCount);
         $inProgressData = $emptyPaginator();
         $completeData = $emptyPaginator();
         $qcData = $emptyPaginator();
         $historyData = $emptyPaginator();
-        $netPriceData = $emptyPaginator();
 
         switch ($activeTab) {
             case 'inprogress': $inProgressData = $inProgressQuery->orderBy('order_created_date', 'desc')->paginate($paginationCount)->withQueryString(); break;
             case 'complete': $completeData = $completeQuery->orderBy('updated_at', 'desc')->paginate($paginationCount)->withQueryString(); break;
             case 'qc': $qcData = $qcQuery->orderBy('updated_at', 'desc')->paginate($paginationCount)->withQueryString(); break;
             case 'history': $historyData = $historyQuery->paginate(10)->withQueryString(); break;
-            case 'netprice': $netPriceData = DB::table(DB::raw("({$netPriceQuery->toSql()}) as sub"))->mergeBindings($netPriceQuery)->orderBy('order_created_date', 'desc')->paginate($paginationCount)->withQueryString(); break;
         }
 
-        // [6] LOAD AUX DATA (TIDAK BERUBAH)
-        $pageName = 'analysis_digital_'.strtolower($selectedSegment);
+        // Pagination Net Price (Selalu di-load)
+        $netPriceData = DB::table(DB::raw("({$netPriceQuery->toSql()}) as sub"))
+            ->mergeBindings($netPriceQuery)
+            ->orderBy('order_created_date', 'desc')
+            ->paginate($paginationCount, ['*'], 'net_price_page')
+            ->withQueryString();
+
+        // [6] LOAD AUX DATA
+        $pageName = 'analysis_digital_' . strtolower($selectedSegment);
         $configRecord = UserTableConfiguration::where('page_name', $pageName)->first();
         $savedTableConfig = $configRecord ? $configRecord->configuration : null;
         $customTargets = CustomTarget::where('user_id', auth()->id())->where('page_name', $pageName)->where('period', $reportPeriod->format('Y-m-d'))->get();
 
-
-        // =====================================================================
-        // [PERBAIKAN UTAMA] LOGIKA KPI PO (FIXED DOUBLE COUNTING)
-        // =====================================================================
+        // [7] KPI DATA
         $officers = AccountOfficer::orderBy('name')->get();
-
         $kpiData = $officers->map(function ($officer) {
-            // 1. Query Utama ke tabel 'order_products' (Source of Truth item satuan)
-            // 2. Join ke 'document_data' untuk mengambil 'witel_lama', 'segment', dan 'order_created_date'
             $query = DB::table('order_products')
                 ->join('document_data', 'order_products.order_id', '=', 'document_data.order_id')
-                ->where('document_data.witel_lama', $officer->filter_witel_lama);
+                ->where('document_data.witel_lama', $officer->filter_witel_lama)
+                ->whereNotNull('order_products.product_name');
 
-            // Terapkan Filter Khusus (Contoh: Segment SME vs LEGS untuk Suramadu)
             if ($officer->special_filter_column && $officer->special_filter_value) {
                 $query->where('document_data.' . $officer->special_filter_column, $officer->special_filter_value);
             }
 
-            // Pastikan tidak menghitung baris kosong
-            $query->whereNotNull('order_products.product_name');
-
-            // --- HITUNG YTD (Year to Date) ---
-            // Menggunakan query cloning agar filter witel/segment tetap terbawa
-
-            // PRODIGI DONE (Status: done close bima)
-            $done_ncx = (clone $query)
-                ->where('order_products.status_wfm', 'done close bima')
-                ->where('order_products.channel', '!=', 'SC-One')
-                ->count();
-
-            $done_scone = (clone $query)
-                ->where('order_products.status_wfm', 'done close bima')
-                ->where('order_products.channel', 'SC-One')
-                ->count();
-
-            // PRODIGI OGP (Status: in progress)
-            $ogp_ncx = (clone $query)
-                ->where('order_products.status_wfm', 'in progress')
-                ->where('order_products.channel', '!=', 'SC-One')
-                ->count();
-
-            $ogp_scone = (clone $query)
-                ->where('order_products.status_wfm', 'in progress')
-                ->where('order_products.channel', 'SC-One')
-                ->count();
-
+            // YTD
+            $done_ncx = (clone $query)->where('order_products.status_wfm', 'done close bima')->where('order_products.channel', '!=', 'SC-One')->count();
+            $done_scone = (clone $query)->where('order_products.status_wfm', 'done close bima')->where('order_products.channel', 'SC-One')->count();
+            $ogp_ncx = (clone $query)->where('order_products.status_wfm', 'in progress')->where('order_products.channel', '!=', 'SC-One')->count();
+            $ogp_scone = (clone $query)->where('order_products.status_wfm', 'in progress')->where('order_products.channel', 'SC-One')->count();
             $total_ytd = $done_ncx + $done_scone + $ogp_ncx + $ogp_scone;
 
-            // --- HITUNG Q3 (Juli, Agustus, September 2025) ---
-            $q3Months = [7, 8, 9];
-            $q3Year = 2025; // Bisa diganti dynamic: now()->year
-
-            // Filter Tanggal pada Parent (Document Data)
-            $queryQ3 = (clone $query)
-                ->whereYear('document_data.order_created_date', $q3Year)
-                ->whereIn(DB::raw('MONTH(document_data.order_created_date)'), $q3Months);
-
-            $done_ncx_q3 = (clone $queryQ3)
-                ->where('order_products.status_wfm', 'done close bima')
-                ->where('order_products.channel', '!=', 'SC-One')
-                ->count();
-
-            $done_scone_q3 = (clone $queryQ3)
-                ->where('order_products.status_wfm', 'done close bima')
-                ->where('order_products.channel', 'SC-One')
-                ->count();
-
-            $ogp_ncx_q3 = (clone $queryQ3)
-                ->where('order_products.status_wfm', 'in progress')
-                ->where('order_products.channel', '!=', 'SC-One')
-                ->count();
-
-            $ogp_scone_q3 = (clone $queryQ3)
-                ->where('order_products.status_wfm', 'in progress')
-                ->where('order_products.channel', 'SC-One')
-                ->count();
-
+            // Q3
+            $queryQ3 = (clone $query)->whereYear('document_data.order_created_date', 2025)->whereIn(DB::raw('MONTH(document_data.order_created_date)'), [7, 8, 9]);
+            $done_ncx_q3 = (clone $queryQ3)->where('order_products.status_wfm', 'done close bima')->where('order_products.channel', '!=', 'SC-One')->count();
+            $done_scone_q3 = (clone $queryQ3)->where('order_products.status_wfm', 'done close bima')->where('order_products.channel', 'SC-One')->count();
+            $ogp_ncx_q3 = (clone $queryQ3)->where('order_products.status_wfm', 'in progress')->where('order_products.channel', '!=', 'SC-One')->count();
+            $ogp_scone_q3 = (clone $queryQ3)->where('order_products.status_wfm', 'in progress')->where('order_products.channel', 'SC-One')->count();
             $total_q3 = $done_ncx_q3 + $done_scone_q3 + $ogp_ncx_q3 + $ogp_scone_q3;
 
             return [
@@ -352,11 +338,10 @@ class AnalysisDigitalProductController extends Controller
                 'ogp_ncx' => $ogp_ncx,
                 'ogp_scone' => $ogp_scone,
                 'total' => $total_ytd,
-                'ach_ytd' => $total_ytd > 0 ? number_format((($done_ncx + $done_scone) / $total_ytd) * 100, 1).'%' : '0.0%',
-                'ach_q3' => $total_q3 > 0 ? number_format((($done_ncx_q3 + $done_scone_q3) / $total_q3) * 100, 1).'%' : '0.0%',
+                'ach_ytd' => $total_ytd > 0 ? number_format((($done_ncx + $done_scone) / $total_ytd) * 100, 1) . '%' : '0.0%',
+                'ach_q3' => $total_q3 > 0 ? number_format((($done_ncx_q3 + $done_scone_q3) / $total_q3) * 100, 1) . '%' : '0.0%',
             ];
         });
-        // =====================================================================
 
         return Inertia::render('Admin/AnalysisDigitalProduct', [
             'tabCounts' => $tabCounts,
@@ -749,7 +734,7 @@ class AnalysisDigitalProductController extends Controller
 
             // 2. Filter Spesial (Segment dll)
             if ($officer->special_filter_column && $officer->special_filter_value) {
-                $query->where('document_data.' . $officer->special_filter_column, $officer->special_filter_value);
+                $query->where('document_data.'.$officer->special_filter_column, $officer->special_filter_value);
             }
 
             // 3. Pastikan produk valid

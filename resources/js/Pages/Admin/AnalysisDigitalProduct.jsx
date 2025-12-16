@@ -1275,10 +1275,8 @@ export default function AnalysisDigitalProduct({
                                 <DetailTabButton viewName="complete" currentView={activeDetailView}>Complete ({tabCounts.complete})</DetailTabButton>
                                 <DetailTabButton viewName="qc" currentView={activeDetailView}>QC ({tabCounts.qc})</DetailTabButton>
                                 <DetailTabButton viewName="history" currentView={activeDetailView}>History ({tabCounts.history})</DetailTabButton>
-                                {/* Tombol Net Price & KPI PO DIHAPUS dari sini */}
                             </div>
 
-                            {/* Search Bar untuk In Progress, Complete, QC */}
                             {(activeDetailView === "inprogress" ||
                                 activeDetailView === "complete" ||
                                 activeDetailView === "qc") && (
@@ -1402,20 +1400,34 @@ export default function AnalysisDigitalProduct({
                                     </PrimaryButton>
                                 </form>
 
-                                {/* Dropdown Filter Harga */}
+                                {/* [BARU] Filter Channel */}
                                 <select
-                                    value={filters.net_price_status || ''}
+                                    value={filters.channel || ''}
                                     onChange={(e) => router.get(route('admin.analysisDigitalProduct.index'), {
                                         ...filters,
-                                        net_price_status: e.target.value,
-                                        tab: 'netprice', // Hardcode tab agar backend memproses data netprice
-                                        page: 1
-                                    }, { preserveState: true, replace: true })}
+                                        channel: e.target.value,
+                                        page: 1 // Reset page saat filter berubah
+                                    }, { preserveState: true, replace: true, preserveScroll: true })}
+                                    className="border border-gray-300 rounded-md text-sm p-2"
+                                >
+                                    <option value="">Semua Channel</option>
+                                    <option value="sc-one">SC-One</option>
+                                    <option value="ncx">NCX</option>
+                                </select>
+
+                                {/* [UPDATE] Filter Status Harga */}
+                                <select
+                                    value={filters.price_status || ''}
+                                    onChange={(e) => router.get(route('admin.analysisDigitalProduct.index'), {
+                                        ...filters,
+                                        price_status: e.target.value,
+                                        page: 1 // Reset page saat filter berubah
+                                    }, { preserveState: true, replace: true, preserveScroll: true })}
                                     className="border border-gray-300 rounded-md text-sm p-2"
                                 >
                                     <option value="">Semua Harga</option>
-                                    <option value="template">Harga Template</option>
-                                    <option value="pasti">Harga Pasti</option>
+                                    <option value="priced">Sudah Ada Harga</option>
+                                    <option value="unpriced">Belum Ada Harga</option>
                                 </select>
                             </div>
                         </div>

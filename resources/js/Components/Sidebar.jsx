@@ -264,6 +264,14 @@ export default function Sidebar({ user, isSidebarOpen, toggleSidebar, isCmsMode,
                                     </div>
                                 </div>
                             )}
+                            <div className={`px-6 w-full items-center py-4 text-gray-600 hover:bg-gray-100 transition duration-300 text-left`}>
+                                <Link
+                                    href={route('admin.masterDataPO.index')} // <-- UPDATE KE ROUTE BARU
+                                    className={`block px-4 py-2 text-sm rounded-md ${route().current('admin.masterDataPO.index') ? 'bg-blue-100 text-blue-700 font-semibold' : 'hover:bg-gray-100'}`}
+                                >
+                                    Master Data PO
+                                </Link>
+                            </div>
                         </div>
                     </>
                 )}

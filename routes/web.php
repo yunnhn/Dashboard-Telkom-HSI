@@ -10,6 +10,7 @@ use App\Http\Controllers\AnalysisSOSController;
 use App\Http\Controllers\DashboardDigitalProductController;
 use App\Http\Controllers\DynamicRecordController;
 use App\Http\Controllers\DashboardSOSController;
+use App\Http\Controllers\MasterDataPOController;
 use App\Http\Controllers\DataReportController;
 use App\Http\Controllers\GalaksiController;
 use App\Http\Controllers\ProfileController;
@@ -59,8 +60,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/data-report', [DataReportController::class, 'index'])->name('data-report.index');
     Route::get('/data-report/export', [DataReportController::class, 'export'])->name('data-report.export');
     Route::get('/data-report/export/inprogress', [DataReportController::class, 'exportInProgress'])->name('data-report.exportInProgress');
-    
-    // [PERBAIKAN PENTING] 
+
+    // [PERBAIKAN PENTING]
     // Mengarahkan detail galaksi ke DataReportController yang sudah diperbaiki logic-nya
     Route::get('/galaksi', [GalaksiController::class, 'index'])->name('galaksi.index'); // Halaman utama galaksi tetap di GalaksiController (jika index-nya aman)
     Route::get('/galaksi/details', [DataReportController::class, 'showDetails'])->name('galaksi.showDetails'); // Detail diganti ke DataReportController
@@ -69,12 +70,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Tools & Others
     Route::post('/run-traceroute', [TracerouteController::class, 'run'])->name('traceroute.run');
     Route::get('/tools/google-drive-test', fn () => Inertia::render('Tools/GoogleDriveTest'))->name('tools.google-drive-test');
-    
+
     // Report Datin & JT Routes
     Route::get('/report-datin', [ReportDatinController::class, 'index'])->name('report.datin');
     Route::get('/report-jt', [ReportJTController::class, 'index'])->name('report.jt');
     Route::get('/import-progress/{batchId}', [AnalysisSOSController::class, 'getImportProgress'])->name('import.progress');
-    
+
     // Detail Routes
     Route::get('/report-jt/details', [ReportJTController::class, 'showDetails'])->name('report.jt.details');
     Route::get('/report-jt/toc-details', [ReportJTController::class, 'showTocDetails'])->name('report.jt.tocDetails');
@@ -157,6 +158,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
                     // Route Polling Progress
                     Route::get('/progress/{batchId}', 'getImportProgress')->name('getImportProgress');
+                });
+
+            Route::controller(MasterDataPOController::class)
+                ->prefix('master-data-po')
+                ->name('masterDataPO.')
+                ->group(function () {
+                    Route::get('/', 'index')->name('index');
+                    Route::post('/upload', 'upload')->name('upload');
+                    Route::post('/store', 'store')->name('store'); // Manual Add
+                    Route::post('/update-mapping', 'updateMapping')->name('updateMapping'); // Mapping Action
                 });
 
             // Rute Resource untuk Account Officer (hanya store dan update)

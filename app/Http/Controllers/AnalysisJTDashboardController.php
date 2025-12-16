@@ -56,18 +56,18 @@ class AnalysisJTDashboardController extends Controller
     {
         $excludedWitel = ['WITEL SEMARANG JATENG UTARA', 'WITEL SOLO JATENG TIMUR', 'WITEL YOGYA JATENG SELATAN'];
 
-        $query->whereNotIn('status_proyek', ['Selesai', 'Dibatalkan', 'GO LIVE'])
-              ->whereRaw("UPPER(status_tomps_new) NOT LIKE '%DROP%'")
-              ->whereRaw("UPPER(status_tomps_new) NOT LIKE '%GO LIVE%'")
+        $query->whereNotIn('keterangan_toc', ['Selesai', 'Dibatalkan', 'GO LIVE'])
+              ->whereRaw("UPPER(status_i_hld) NOT LIKE '%DROP%'")
+              ->whereRaw("UPPER(status_i_hld) NOT LIKE '%GO LIVE%'")
               ->where(function ($q) {
-                  $q->where('status_tomps_last_activity', '!=', 'CLOSE - 100%')->orWhereNull('status_tomps_last_activity');
+                  $q->where('status_tomps_new', '!=', 'CLOSE - 100%')->orWhereNull('status_tomps_new');
               })
               ->whereNotNull('tanggal_mom')
               ->whereNotIn('witel_baru', $excludedWitel)
               ->where('go_live', '=', 'N')
               ->where('populasi_non_drop', '=', 'Y')
               ->where(function ($q) {
-                  $q->where('bak', '=', '-')->orWhereNull('bak');
+                  $q->where('keterangan_pelimpahan', '=', '-')->orWhereNull('keterangan_pelimpahan');
               });
     }
 
@@ -144,17 +144,17 @@ class AnalysisJTDashboardController extends Controller
             'limit'     => 'nullable|in:10,50,100,500',
             'search'    => 'nullable|string|max:255',
         ]);
-        
+
         $limit  = $validated['limit'] ?? '10';
         $search = $validated['search'] ?? null;
 
         // --- [PERBAIKAN LOGIC TANGGAL DEFAULT] ---
-        
+
         // 1. Cari Tanggal Terakhir di Database
         $latestMomDate = DB::table('spmk_mom')->max('tanggal_mom');
 
         // 2. Tentukan Default: Awal Tahun s/d Tanggal Terakhir DB
-        $defaultStartDate = now()->startOfYear()->format('Y-m-d'); 
+        $defaultStartDate = now()->startOfYear()->format('Y-m-d');
         $defaultEndDate   = $latestMomDate ? \Carbon\Carbon::parse($latestMomDate)->format('Y-m-d') : now()->format('Y-m-d');
 
         // 3. Gunakan Input User jika ada, jika tidak gunakan Default
@@ -172,7 +172,7 @@ class AnalysisJTDashboardController extends Controller
 
         // D. Filter Logic (UPDATE: Gunakan variabel $startDateToUse)
         $applyUserFilters = function ($query) use ($validated, $startDateToUse, $endDateToUse, $parentWitelList, $childWitelList, $poCaseString) {
-            
+
             // 1. Filter Tanggal (SELALU TERAPKAN FILTER TANGGAL)
             // Karena sekarang sudah ada default value, kita tidak perlu cek isset($validated) lagi untuk tanggal
             $query->whereBetween('tanggal_mom', [$startDateToUse, $endDateToUse]);
@@ -206,8 +206,8 @@ class AnalysisJTDashboardController extends Controller
         $statusData = DB::table('spmk_mom')
             ->select(
                 DB::raw('TRIM(witel_baru) as witel_induk'),
-                DB::raw("SUM(CASE WHEN (UPPER(status_tomps_new) LIKE '%GO LIVE%' AND populasi_non_drop = 'Y') THEN 1 ELSE 0 END) as golive"),
-                DB::raw("SUM(CASE WHEN status_proyek NOT IN ('Selesai', 'Dibatalkan', 'GO LIVE') THEN 1 ELSE 0 END) as blm_golive"),
+                DB::raw("SUM(CASE WHEN (UPPER(status_i_hld) LIKE '%GO LIVE%' AND populasi_non_drop = 'Y') THEN 1 ELSE 0 END) as golive"),
+                DB::raw("SUM(CASE WHEN keterangan_toc NOT IN ('Selesai', 'Dibatalkan', 'GO LIVE') THEN 1 ELSE 0 END) as blm_golive"),
                 DB::raw("SUM(CASE WHEN populasi_non_drop = 'N' THEN 1 ELSE 0 END) as `drop`")
             )
             ->whereIn(DB::raw('TRIM(witel_baru)'), $parentWitelList)
@@ -265,11 +265,11 @@ class AnalysisJTDashboardController extends Controller
         $radarData = DB::table('spmk_mom')
             ->select(
                 DB::raw('TRIM(witel_baru) as witel_induk'),
-                DB::raw("SUM(CASE WHEN (UPPER(status_tomps_new) LIKE '%INITIAL%' AND go_live = 'N' AND populasi_non_drop = 'Y') THEN 1 ELSE 0 END) AS initial"),
-                DB::raw("SUM(CASE WHEN (UPPER(status_tomps_new) LIKE '%SURVEY%' AND go_live = 'N' AND populasi_non_drop = 'Y') THEN 1 ELSE 0 END) AS survey_drm"),
-                DB::raw("SUM(CASE WHEN ((UPPER(status_tomps_new) LIKE '%PERIZINAN%' OR UPPER(status_tomps_new) LIKE '%MOS%') AND go_live = 'N' AND populasi_non_drop = 'Y') THEN 1 ELSE 0 END) AS perizinan_mos"),
-                DB::raw("SUM(CASE WHEN (UPPER(status_tomps_new) LIKE '%INSTALASI%' AND go_live = 'N' AND populasi_non_drop = 'Y') THEN 1 ELSE 0 END) AS instalasi"),
-                DB::raw("SUM(CASE WHEN ((UPPER(status_tomps_new) LIKE '%FI%' OR UPPER(status_tomps_new) LIKE '%OGP%') AND go_live = 'N' AND populasi_non_drop = 'Y') THEN 1 ELSE 0 END) AS fi_ogp_live")
+                DB::raw("SUM(CASE WHEN (UPPER(status_i_hld) LIKE '%INITIAL%' AND go_live = 'N' AND populasi_non_drop = 'Y') THEN 1 ELSE 0 END) AS initial"),
+                DB::raw("SUM(CASE WHEN (UPPER(status_i_hld) LIKE '%SURVEY%' AND go_live = 'N' AND populasi_non_drop = 'Y') THEN 1 ELSE 0 END) AS survey_drm"),
+                DB::raw("SUM(CASE WHEN ((UPPER(status_i_hld) LIKE '%PERIZINAN%' OR UPPER(status_i_hld) LIKE '%MOS%') AND go_live = 'N' AND populasi_non_drop = 'Y') THEN 1 ELSE 0 END) AS perizinan_mos"),
+                DB::raw("SUM(CASE WHEN (UPPER(status_i_hld) LIKE '%INSTALASI%' AND go_live = 'N' AND populasi_non_drop = 'Y') THEN 1 ELSE 0 END) AS instalasi"),
+                DB::raw("SUM(CASE WHEN ((UPPER(status_i_hld) LIKE '%FI%' OR UPPER(status_i_hld) LIKE '%OGP%') AND go_live = 'N' AND populasi_non_drop = 'Y') THEN 1 ELSE 0 END) AS fi_ogp_live")
             )
             ->tap($applyUserFilters)
             ->groupBy(DB::raw('TRIM(witel_baru)'))
@@ -284,48 +284,18 @@ class AnalysisJTDashboardController extends Controller
         // Kolom disesuaikan dengan DB spmk_mom + Search Logic
         $dataPreview = DB::table('spmk_mom')
             ->select(
-                // Pilih kolom-kolom utama
-                'id',
-                'id_i_hld',
-                'no_nde_spmk',
-                'uraian_kegiatan',
-                'segmen', // New
-                // Logic PO Name tetap dipertahankan
-                DB::raw("COALESCE(NULLIF(po_name, ''), ({$poCaseString})) as po_name"),
-                'witel_baru',
-                'witel_lama', // New
-                'region', // New
-                'status_proyek',
-                'tanggal_cb', // New
-                'jenis_kegiatan', // New
-                'revenue_plan', // New
-                'go_live', // New
-                'keterangan_toc', // New
-                'perihal_nde_spmk', // New
-                'mom', // New
-                'ba_drop', // New
-                'populasi_non_drop', // New
-                'tanggal_mom',
-                'usia', // New (tapi biasanya calculated by DATEDIFF, pastikan DB anda ada kolom usia atau gunakan DATEDIFF spt sebelumnya)
-                // Jika di DB kolom 'usia' itu kosong dan harus dihitung live:
-                // DB::raw('DATEDIFF(NOW(), tanggal_mom) as usia_hitung'), 
-                
-                'rab', // New
-                'total_port', // New
-                'template_durasi', // New
-                'toc', // New
-                'umur_pekerjaan', // New
-                'kategori_umur_pekerjaan', // New
-                'status_tomps_last_activity', // New
-                'status_tomps_new', // New
-                'status_i_hld', // New
-                'nama_odp_go_live', // New
-                'bak', // New
-                'keterangan_pelimpahan', // New
-                'mitra_lokal' // New
+                'spmk_mom.*',
+                DB::raw("COALESCE(NULLIF(po_name, ''), ({$poCaseString})) as po_name")
             )
-            ->tap($applyUserFilters)
-            ->tap($applyStrictReportFilters)
+            ->tap($applyUserFilters) // Tetap pakai filter User (Tanggal, Witel, dll)
+
+            // -----------------------------------------------------------
+            // HAPUS ATAU KOMENTARI BARIS DI BAWAH INI
+            // ->tap($applyStrictReportFilters)
+            // -----------------------------------------------------------
+            // Penjelasan: Baris di atas adalah yang memaksa data harus
+            // statusnya "Belum Go Live". Dengan menghapusnya, semua status akan muncul.
+
             ->when($search, function ($query, $search) use ($poCaseString) {
                 $query->where(function ($q) use ($search, $poCaseString) {
                     $q->where('id_i_hld', 'like', "%{$search}%")
@@ -334,8 +304,7 @@ class AnalysisJTDashboardController extends Controller
                       ->orWhereRaw("COALESCE(NULLIF(po_name, ''), ({$poCaseString})) LIKE ?", ["%{$search}%"]);
                 });
             })
-            // Gunakan kolom usia dari DB jika ada, atau hitung manual untuk sorting
-            ->orderBy('usia', 'desc') 
+            ->orderBy('usia', 'desc')
             ->paginate($limit)
             ->withQueryString();
 
@@ -354,7 +323,7 @@ class AnalysisJTDashboardController extends Controller
             'usiaWitelData' => $usiaWitelData, 'usiaPoData' => $usiaPoData, 'radarData' => $radarData,
             'dataPreview' => $dataPreview,
             'filters' => [
-                'startDate' => $startDateToUse, 
+                'startDate' => $startDateToUse,
                 'endDate'   => $endDateToUse,
                 'witels'    => $validated['witels'] ?? null,
                 'pos'       => $validated['pos'] ?? null,

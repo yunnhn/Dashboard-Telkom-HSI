@@ -12,7 +12,7 @@ use Maatwebsite\Excel\Facades\Excel;
 class DashboardHsiController extends Controller
 {
     // =================================================================
-    // HALAMAN 1: DASHBOARD GRAFIK (KEMBALI KE ASAL)
+    // HALAMAN 1: DASHBOARD GRAFIK (OVERVIEW) - EXISTING
     // =================================================================
     public function index(Request $request)
     {
@@ -27,13 +27,13 @@ class DashboardHsiController extends Controller
                       ->whereDate('order_date', '<=', $endDate);
         }
 
-        // --- CHART 1: PIE REGIONAL ---
+        // Chart 1: Pie Regional
         $chart1 = (clone $baseQuery)
             ->select('witel as nama_witel', DB::raw("'Total' as product"), DB::raw('count(*) as total_amount'))
             ->groupBy('witel')->orderBy('total_amount', 'desc')->get()
             ->map(fn($item) => ['product' => $item->nama_witel, 'value' => $item->total_amount]);
 
-        // --- CHART 2: PIE STATUS ---
+        // Chart 2: Pie Status
         $queryChart2 = (clone $baseQuery);
         if ($request->has('witel_status') && $request->witel_status != '') {
             $queryChart2->where('witel', $request->witel_status);
@@ -48,7 +48,7 @@ class DashboardHsiController extends Controller
             "), DB::raw('count(*) as value'))
             ->groupBy('status_group')->get()->map(fn($i) => ['product' => $i->status_group, 'value' => $i->value]);
 
-        // --- CHART 3: LAYANAN ---
+        // Chart 3: Layanan
         $queryChart3 = (clone $baseQuery);
         if ($request->has('witel_layanan') && $request->witel_layanan != '') {
             $queryChart3->where('witel', $request->witel_layanan);
@@ -57,7 +57,7 @@ class DashboardHsiController extends Controller
             ->select('type_layanan as sub_type', DB::raw("'Total' as product"), DB::raw('count(*) as total_amount'))
             ->groupBy('type_layanan')->orderBy('total_amount', 'desc')->limit(10)->get();
 
-        // --- CHART 4: SEBARAN PS ---
+        // Chart 4: Sebaran PS
         $chart4 = (clone $baseQuery)
             ->where(function($q) {
                 $q->where('type_trans', 'not like', '%REVOKE%')
@@ -66,7 +66,7 @@ class DashboardHsiController extends Controller
             ->select('witel', DB::raw('count(*) as value'))
             ->groupBy('witel')->get()->map(fn($i) => ['product' => $i->witel, 'value' => $i->value]);
 
-        // --- CHART 5 & 6: PIVOT CANCEL ---
+        // Helper Pivot Data
         $getPivotData = function ($filterCallback) use ($allowedWitels, $startDate, $endDate) {
             $query = HsiData::query()->whereIn('witel', $allowedWitels);
             if ($startDate && $endDate) {
@@ -102,103 +102,126 @@ class DashboardHsiController extends Controller
         ];
 
         return Inertia::render('DashboardHSI', [
-            'stats'         => $stats,
-            'chart1'        => $chart1,
-            'chart2'        => $chart2,
-            'chart3'        => $chart3,
-            'chart4'        => $chart4,
-            'chart5Data'    => $chart5['data'],
-            'chart5Keys'    => $chart5['keys'],
-            'chart6Data'    => $chart6['data'],
-            'chart6Keys'    => $chart6['keys'],
-            'witels'        => $allowedWitels,
-            'filters'       => $request->only(['start_date', 'end_date', 'witel_status', 'witel_layanan']),
+            'stats' => $stats, 'chart1' => $chart1, 'chart2' => $chart2, 'chart3' => $chart3, 'chart4' => $chart4, 'chart5Data' => $chart5['data'], 'chart5Keys' => $chart5['keys'], 'chart6Data' => $chart6['data'], 'chart6Keys' => $chart6['keys'], 'witels' => $allowedWitels, 'filters' => $request->only(['start_date', 'end_date', 'witel_status', 'witel_layanan']),
         ]);
     }
 
-    // ... (kode atas tetap sama) ...
-
     // =================================================================
-    // HALAMAN 2: FLOW PROCESS HSI (MODIFIKASI FILTER WITEL)
+    // HALAMAN 2: FLOW PROCESS HSI (FULL LOGIC REVISED)
     // =================================================================
     public function flow(Request $request)
     {
-        // 1. Ambil Input Filter Witel
         $selectedWitel = $request->input('witel');
         $allowedWitels = ['BALI', 'JATIM BARAT', 'JATIM TIMUR', 'SURAMADU', 'NUSA TENGGARA'];
 
-        // 2. Base Query
         $flowQuery = HsiData::query()->whereIn('witel', $allowedWitels);
 
-        // 3. Terapkan Filter Witel (Jika user memilih witel tertentu)
         if ($selectedWitel) {
             $flowQuery->where('witel', $selectedWitel);
         }
 
-        // --- CALCULATE FLOW STATS ---
         $flowStats = $flowQuery->select(
+            // --- 1. RE (Offering) ---
             DB::raw("COUNT(*) as re"),
+
+            // --- 2. VERIFICATION & VALIDATION ---
             DB::raw("SUM(CASE WHEN data_proses = 'OGP VERIFIKASI DAN VALID' THEN 1 ELSE 0 END) as ogp_verif"),
             DB::raw("SUM(CASE WHEN data_proses = 'CANCEL QC1' THEN 1 ELSE 0 END) as cancel_qc1"),
             DB::raw("SUM(CASE WHEN data_proses = 'CANCEL FCC' THEN 1 ELSE 0 END) as cancel_fcc"),
-            DB::raw("SUM(CASE WHEN data_proses != 'CANCEL QC1' AND data_proses != 'CANCEL FCC' AND data_proses != 'OGP VERIFIKASI DAN VALID' THEN 1 ELSE 0 END) as valid_re"),
-            DB::raw("SUM(CASE WHEN data_proses = 'OGP SURVEY' OR status_resume = 'MIA - INVALID SURVEY' THEN 1 ELSE 0 END) as cancel_wo"),
+            DB::raw("SUM(CASE WHEN data_proses NOT IN ('CANCEL QC1', 'CANCEL FCC', 'OGP VERIFIKASI DAN VALID') THEN 1 ELSE 0 END) as valid_re"),
+
+            // --- 3. FEASIBILITY ---
+            DB::raw("SUM(CASE WHEN data_proses = 'OGP SURVEY' AND status_resume = 'MIA - INVALID SURVEY' THEN 1 ELSE 0 END) as cancel_wo"),
             DB::raw("SUM(CASE WHEN data_proses = 'UNSC' THEN 1 ELSE 0 END) as unsc"),
-            DB::raw("SUM(CASE WHEN data_proses = 'OGP SURVEY' OR status_message = 'MIE - SEND SURVEY' THEN 1 ELSE 0 END) as ogp_survey_count"),
-            DB::raw("SUM(CASE WHEN data_proses != 'CANCEL QC1' AND data_proses != 'CANCEL FCC' AND data_proses != 'OGP VERIFIKASI DAN VALID' AND status_resume != 'MIA - INVALID SURVEY' AND data_proses != 'UNSC' AND data_proses != 'OGP SURVEY' THEN 1 ELSE 0 END) as valid_wo"),
+            DB::raw("SUM(CASE WHEN data_proses = 'OGP SURVEY' AND status_message = 'MIE - SEND SURVEY' THEN 1 ELSE 0 END) as ogp_survey_count"),
+            
+            // Valid WO: Valid RE - (Cancel WO + UNSC + OGP Survey)
+            DB::raw("SUM(CASE WHEN 
+                data_proses NOT IN ('CANCEL QC1', 'CANCEL FCC', 'OGP VERIFIKASI DAN VALID', 'UNSC') AND
+                NOT (data_proses = 'OGP SURVEY' AND status_resume = 'MIA - INVALID SURVEY') AND
+                NOT (data_proses = 'OGP SURVEY' AND status_message = 'MIE - SEND SURVEY')
+            THEN 1 ELSE 0 END) as valid_wo"),
+
+            // --- 4. INSTALASI & AKTIVASI ---
             DB::raw("SUM(CASE WHEN data_proses = 'CANCEL' THEN 1 ELSE 0 END) as cancel_instalasi"),
             DB::raw("SUM(CASE WHEN data_proses = 'FALLOUT' THEN 1 ELSE 0 END) as fallout"),
-            
-            // FIX: Alias revoke_count
             DB::raw("SUM(CASE WHEN data_proses = 'REVOKE' THEN 1 ELSE 0 END) as revoke_count"),
 
-            DB::raw("SUM(CASE WHEN data_proses != 'CANCEL QC1' AND data_proses != 'CANCEL FCC' AND data_proses != 'OGP VERIFIKASI DAN VALID' AND status_resume != 'MIA - INVALID SURVEY' AND data_proses != 'UNSC' AND data_proses != 'OGP SURVEY' AND data_proses != 'CANCEL' AND data_proses != 'FALLOUT' AND data_proses != 'REVOKE' THEN 1 ELSE 0 END) as valid_pi"),
+            // Valid PI: Valid WO - (Cancel + Fallout + Revoke + OGP Survey harusnya bersih)
+            // Metadata Gabungan 147: KECUALI OGP SURVEY (Artinya semua OGP SURVEY dibuang)
+            DB::raw("SUM(CASE WHEN 
+                data_proses NOT IN (
+                    'CANCEL QC1', 'CANCEL FCC', 'OGP VERIFIKASI DAN VALID', 
+                    'UNSC', 'OGP SURVEY', -- EXCLUDE ALL OGP SURVEY
+                    'CANCEL', 'FALLOUT', 'REVOKE'
+                ) 
+                AND status_resume != 'MIA - INVALID SURVEY'
+            THEN 1 ELSE 0 END) as valid_pi"),
+
+            // --- 5. PS (PROVISIONING DONE) ---
             DB::raw("SUM(CASE WHEN data_proses = 'OGP PROVI' THEN 1 ELSE 0 END) as ogp_provi"),
-            DB::raw("SUM(CASE WHEN data_proses != 'CANCEL QC1' AND data_proses != 'CANCEL FCC' AND data_proses != 'OGP VERIFIKASI DAN VALID' AND status_resume != 'MIA - INVALID SURVEY' AND data_proses != 'UNSC' AND data_proses != 'OGP SURVEY' AND data_proses != 'CANCEL' AND data_proses != 'FALLOUT' AND data_proses != 'REVOKE' AND data_proses != 'OGP PROVI' THEN 1 ELSE 0 END) as ps_count"),
+
+            // PS Final: Valid PI - OGP PROVI
+            // Metadata Gabungan 148: KECUALI OGP SURVEY (Artinya semua OGP SURVEY dibuang)
+            DB::raw("SUM(CASE WHEN 
+                data_proses NOT IN (
+                    'CANCEL QC1', 'CANCEL FCC', 'OGP VERIFIKASI DAN VALID', 
+                    'UNSC', 'OGP SURVEY', -- EXCLUDE ALL OGP SURVEY
+                    'CANCEL', 'FALLOUT', 'REVOKE', 'OGP PROVI'
+                ) 
+                AND status_resume != 'MIA - INVALID SURVEY'
+            THEN 1 ELSE 0 END) as ps_count"),
+
+
+            // ============================================================
+            // === LOGIKA BARU: RASIO PS/RE & PS/PI (DENOMINATOR) ===
+            // ============================================================
+            
+            // PS/RE Denominator (Pembagi)
+            // Gabungan 143: Kecuali Cancel FCC, UNSC, Revoke, WMS
+            DB::raw("SUM(CASE WHEN 
+                data_proses NOT IN ('CANCEL FCC', 'UNSC', 'REVOKE') AND
+                (group_paket != 'WMS' OR group_paket IS NULL)
+            THEN 1 ELSE 0 END) as ps_re_denominator"),
+
+            // PS/PI Denominator (Pembagi)
+            // Menggunakan Logic Valid PI (Data Gabungan 147) sebagai proxy
+            // Metadata: KECUALI OGP SURVEY (Exclude Total OGP SURVEY)
+            DB::raw("SUM(CASE WHEN 
+                data_proses NOT IN (
+                    'CANCEL QC1', 'CANCEL FCC', 'OGP VERIFIKASI DAN VALID', 
+                    'UNSC', 'OGP SURVEY', -- EXCLUDE ALL OGP SURVEY
+                    'CANCEL', 'FALLOUT', 'REVOKE'
+                ) 
+                AND status_resume != 'MIA - INVALID SURVEY'
+            THEN 1 ELSE 0 END) as ps_pi_denominator"),
+
+
+            // ============================================================
+            // === REVOKE FLOW DETAIL (TREE DIAGRAM) ===
+            // ============================================================
+            
+            // Parent
             DB::raw("SUM(CASE WHEN data_proses = 'REVOKE' AND status_resume = '102 | FOLLOW UP COMPLETED' THEN 1 ELSE 0 END) as followup_completed"),
-
-        // 3. Revoke Completed
-        // Logic: RSO 2, REVOKE, REVOKE COMP (100 | REVOKE COMPLETED)
             DB::raw("SUM(CASE WHEN data_proses = 'REVOKE' AND status_resume = '100 | REVOKE COMPLETED' THEN 1 ELSE 0 END) as revoke_completed"),
-
-        // 4. Revoke Order
-        // Logic: RSO 2, REVOKE, REVOKE ORDER DETAIL (REVOKE ORDER)
             DB::raw("SUM(CASE WHEN data_proses = 'REVOKE' AND status_resume = 'REVOKE ORDER' THEN 1 ELSE 0 END) as revoke_order"),
 
-        // --- CHILDREN OF FOLLOW UP COMPLETED ---
-        // (Assuming these are subsets of Follow Up Completed, based on the diagram tree structure)
-        // Base Condition for all below: data_proses = 'REVOKE' AND status_resume = '102 | FOLLOW UP COMPLETED'
-
-        // 5. PS (Revoke Flow)
-        // Logic: ... AND REVOKE PS (data_ps_revoke = PS)
+            // Children (Using data_ps_revoke)
             DB::raw("SUM(CASE WHEN data_proses = 'REVOKE' AND status_resume = '102 | FOLLOW UP COMPLETED' AND data_ps_revoke = 'PS' THEN 1 ELSE 0 END) as ps_revoke"),
-
-        // 6. OGP PROVI (Revoke Flow)
-        // Logic: ... AND ACT COM PI REVOKE (data_ps_revoke = PI OR ACT_COM)
             DB::raw("SUM(CASE WHEN data_proses = 'REVOKE' AND status_resume = '102 | FOLLOW UP COMPLETED' AND (data_ps_revoke = 'PI' OR data_ps_revoke = 'ACT_COM') THEN 1 ELSE 0 END) as ogp_provi_revoke"),
-
-        // 7. FALLOUT (Revoke Flow)
-        // Logic: ... AND FALLOUT REVOKE (data_ps_revoke = FO_WFM OR FO_UIM OR FO_ASAP)
             DB::raw("SUM(CASE WHEN data_proses = 'REVOKE' AND status_resume = '102 | FOLLOW UP COMPLETED' AND (data_ps_revoke = 'FO_WFM' OR data_ps_revoke = 'FO_UIM' OR data_ps_revoke = 'FO_ASAP') THEN 1 ELSE 0 END) as fallout_revoke"),
-        // 8. CANCEL (Revoke Flow)
-        // Logic: ... AND CANCEL REVOKE (data_ps_revoke = CANCEL)
             DB::raw("SUM(CASE WHEN data_proses = 'REVOKE' AND status_resume = '102 | FOLLOW UP COMPLETED' AND data_ps_revoke = 'CANCEL' THEN 1 ELSE 0 END) as cancel_revoke"),
-        // 9. LAIN LAIN (Revoke Flow)
-        // Logic: ... AND LAIN-LAIN (data_ps_revoke = #N/A OR INPROGESS_SC OR REVOKE or NULL)
-        // Note: 'INPROGESS_SC' spelling from metadata. Assuming case sensitive or clean data.
             DB::raw("SUM(CASE WHEN data_proses = 'REVOKE' AND status_resume = '102 | FOLLOW UP COMPLETED' AND (data_ps_revoke IS NULL OR data_ps_revoke = '#N/A' OR data_ps_revoke = 'INPROGESS_SC' OR data_ps_revoke = 'REVOKE') THEN 1 ELSE 0 END) as lain_lain_revoke")
+
         )->first();
 
         return Inertia::render('FlowProcessHSI', [
             'flowStats' => $flowStats,
-            'witels'    => $allowedWitels, // Kirim daftar witel ke frontend
+            'witels'    => $allowedWitels,
             'filters'   => $request->only(['witel']),
         ]);
     }
 
-    // ... (sisanya tetap sama) ...
-
-    // Function Import (Tetap)
     public function import(Request $request)
     {
         $request->validate(['file' => 'required|mimes:xlsx,xls,csv', 'date_format' => 'required|in:m/d/Y,d/m/Y,Y-m-d']);

@@ -23,6 +23,9 @@ use App\Http\Controllers\EmbedController;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
+use App\Http\Controllers\DashboardHsiController; // Cukup satu kali saja
+use App\Http\Controllers\ReportHsiController;
+use App\Http\Controllers\Admin\ReportHsiAdminController;
 
 /*
 |--------------------------------------------------------------------------
@@ -44,7 +47,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     | Rute Umum & Tampilan User/Admin Biasa
     |--------------------------------------------------------------------------
     */
-    // Dashboard (Dibersihkan dari duplikasi, prioritas MainDashboardController)
+    // Dashboard
     Route::get('/dashboard', [MainDashboardController::class, 'show'])->name('dashboard');
     Route::get('/dashboardDigitalProduct', [DashboardDigitalProductController::class, 'index'])->name('dashboardDigitalProduct');
     Route::get('/dashboard-sos', [DashboardSOSController::class, 'index'])->name('dashboard.sos');
@@ -61,10 +64,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/data-report/export', [DataReportController::class, 'export'])->name('data-report.export');
     Route::get('/data-report/export/inprogress', [DataReportController::class, 'exportInProgress'])->name('data-report.exportInProgress');
 
-    // [PERBAIKAN PENTING]
-    // Mengarahkan detail galaksi ke DataReportController yang sudah diperbaiki logic-nya
-    Route::get('/galaksi', [GalaksiController::class, 'index'])->name('galaksi.index'); // Halaman utama galaksi tetap di GalaksiController (jika index-nya aman)
-    Route::get('/galaksi/details', [DataReportController::class, 'showDetails'])->name('galaksi.showDetails'); // Detail diganti ke DataReportController
+    Route::get('/galaksi', [GalaksiController::class, 'index'])->name('galaksi.index'); 
+    Route::get('/galaksi/details', [DataReportController::class, 'showDetails'])->name('galaksi.showDetails'); 
     Route::get('/data-report/details', [DataReportController::class, 'showDetails'])->name('data-report.details');
 
     // Tools & Others
@@ -82,12 +83,30 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/report-datin/sos-details', [ReportDatinController::class, 'showSosDetails'])->name('report.datin.sosDetails');
     Route::get('/report-datin/galaksi-details', [ReportDatinController::class, 'showGalaksiDetails'])->name('report.datin.galaksiDetails');
 
+    // --- RUTE HSI (MODUL BARU) ---
+    
+    // 1. Dashboard HSI
+    Route::get('/dashboard-hsi', [DashboardHsiController::class, 'index'])->name('dashboard.hsi');
+
+    // 2. Import Excel HSI (INI YANG DITAMBAHKAN)
+    Route::post('/dashboard/hsi/import', [DashboardHsiController::class, 'import'])->name('dashboard.import');
+    
+    // 3. Report HSI
+    Route::get('/report-hsi', [ReportHsiController::class, 'index'])->name('report.hsi');
+
+    // 4. Admin Report HSI
+    Route::get('/admin/report-hsi', [ReportHsiAdminController::class, 'index'])->name('admin.report.hsi.index');
+    Route::post('/admin/report-hsi/import', [ReportHsiAdminController::class, 'store'])->name('admin.report.hsi.import');
+    Route::delete('/admin/report-hsi/{id}', [ReportHsiAdminController::class, 'destroy'])->name('admin.report.hsi.destroy');
+    Route::delete('/admin/reset-hsi-data', [ReportHsiAdminController::class, 'destroyAll'])->name('admin.report.hsi.reset');
+
+
     /*
     |--------------------------------------------------------------------------
     | Rute Khusus Admin (Area CMS) - Bisa diakses Admin & Superadmin
     |--------------------------------------------------------------------------
     */
-    Route::middleware(['role:admin,superadmin']) // Middleware ini berlaku untuk SEMUA route di dalam grup ini
+    Route::middleware(['role:admin,superadmin']) 
         ->prefix('admin')
         ->name('admin.')
         ->group(function () {
@@ -155,8 +174,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     Route::post('/upload-po-list', 'uploadPoList')->name('uploadPoList');
                     Route::post('/add-po', 'addPoManually')->name('addPo');
                     Route::post('/import/cancel', 'cancelImport')->name('import.cancel');
-
-                    // Route Polling Progress
                     Route::get('/progress/{batchId}', 'getImportProgress')->name('getImportProgress');
                 });
 
@@ -166,11 +183,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 ->group(function () {
                     Route::get('/', 'index')->name('index');
                     Route::post('/upload', 'upload')->name('upload');
-                    Route::post('/store', 'store')->name('store'); // Manual Add
-                    Route::post('/update-mapping', 'updateMapping')->name('updateMapping'); // Mapping Action
+                    Route::post('/store', 'store')->name('store'); 
+                    Route::post('/update-mapping', 'updateMapping')->name('updateMapping'); 
                 });
 
-            // Rute Resource untuk Account Officer (hanya store dan update)
+            // Rute Resource untuk Account Officer
             Route::resource('account-officers', AccountOfficerController::class)->only(['store', 'update']);
 
             // Rute untuk Excel Merge
@@ -192,19 +209,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
     | Rute HANYA untuk Superadmin
     |--------------------------------------------------------------------------
     */
-    Route::middleware(['role:superadmin']) // Middleware HANYA untuk Superadmin
-        ->prefix('superadmin') // Prefix URL /superadmin/...
-        ->name('superadmin.') // Prefix Nama Route superadmin...
+    Route::middleware(['role:superadmin']) 
+        ->prefix('superadmin') 
+        ->name('superadmin.') 
         ->group(function () {
-            // Resource Controller untuk User Management
             Route::resource('users', UserController::class);
 
-            // Controller untuk Fitur Super Admin Lainnya (Termasuk Rollback)
             Route::controller(SuperAdminController::class)->group(function () {
                 Route::get('/rollback', 'showRollbackPage')->name('rollback.show');
-                Route::post('/rollback', 'executeRollback')->name('rollback.execute'); // Rollback Digital Product
-                Route::post('/rollback-jt', 'executeRollbackJT')->name('rollback.executeJT'); // Rollback JT
-                Route::post('/rollback-datin', 'executeRollbackDatin')->name('rollback.executeDatin'); // Rollback Datin
+                Route::post('/rollback', 'executeRollback')->name('rollback.execute'); 
+                Route::post('/rollback-jt', 'executeRollbackJT')->name('rollback.executeJT'); 
+                Route::post('/rollback-datin', 'executeRollbackDatin')->name('rollback.executeDatin'); 
             });
         });
 });

@@ -170,10 +170,10 @@ export default function Sidebar({ user, isSidebarOpen, toggleSidebar, isCmsMode,
     const [isAnalysisOpen, setIsAnalysisOpen] = useState(true); // Default open untuk admin
 
     // Cek route aktif menggunakan Inertia
-    const isDashboardActive = route().current('dashboardDigitalProduct') || route().current('dashboard.sos') || route().current('dashboard.jt');
+    const isDashboardActive = route().current('dashboardDigitalProduct') || route().current('dashboard.sos') || route().current('dashboard.jt') || route().current('dashboard.hsi');
 
     // [PERBAIKAN] Tambahkan 'report.datin' ke pengecekan route aktif
-    const isReportsActive = route().current('data-report.index') || route().current('galaksi.index') || route().current('report.datin') || route().current('report.jt');
+    const isReportsActive = route().current('data-report.index') || route().current('galaksi.index') || route().current('report.datin') || route().current('report.jt') || route().current('dashboard.hsi');
 
     const isAdminAnalysisActive = route().current('admin.analysisDigitalProduct.index') || route().current('admin.analysisSOS.index');
     const isUserManagementActive = route().current('superadmin.users.*');
@@ -183,7 +183,7 @@ export default function Sidebar({ user, isSidebarOpen, toggleSidebar, isCmsMode,
         if (isSidebarOpen && isAdminAnalysisActive) setIsAnalysisOpen(true);
         if (isSidebarOpen && isReportsActive) {
             setIsReportsOpen(true);
-            if (route().current('data-report.index') || route().current('galaksi.index')) {
+            if (route().current('data-report.index') || route().current('galaksi.index') || route().current('report.hsi'))  {
                 setIsDigitalProductOpen(true);
             }
             // [PERBAIKAN] Otomatis buka dropdown 'Report Connectivity' jika 'report.datin' aktif
@@ -258,7 +258,7 @@ export default function Sidebar({ user, isSidebarOpen, toggleSidebar, isCmsMode,
                                             <div className="pl-6 mt-1 space-y-1">
                                                 <Link href={route('admin.analysisJT.index')} className={`block px-4 py-2 text-sm rounded-md ${route().current('admin.analysisJT.index') ? 'bg-blue-100 text-blue-700 font-semibold' : 'hover:bg-gray-100'}`}>Report Jaringan Tambahan</Link>
                                                 <Link href={route('admin.analysisSOS.index')} className={`block px-4 py-2 text-sm rounded-md ${route().current('admin.analysisSOS.index') ? 'bg-blue-100 text-blue-700 font-semibold' : 'hover:bg-gray-100'}`}>Report Datin</Link>
-                                                <Link href="#" className="block px-4 py-2 text-sm text-gray-400 cursor-not-allowed rounded-md">Report HSI</Link>
+                                                <Link href={route('admin.report.hsi.index')} className={`block px-4 py-2 text-sm rounded-md ${route().current('admin.report.hsi.index') ? 'bg-blue-100 text-blue-700 font-semibold' : 'hover:bg-gray-100'}`}> Report HSI</Link>
                                             </div>
                                         )}
                                     </div>
@@ -308,7 +308,12 @@ export default function Sidebar({ user, isSidebarOpen, toggleSidebar, isCmsMode,
                                                 >
                                                     Dashboard Datin
                                                 </Link>
-                                                <Link href="#" className="block px-4 py-2 text-sm text-gray-400 cursor-not-allowed rounded-md text-left">Dashboard HSI</Link>
+                                                <Link
+                                                    href={route('dashboard.hsi')}
+                                                    className={`block px-4 py-2 text-sm rounded-md text-left ${route().current('dashboard.hsi') ? 'bg-blue-100 text-blue-700 font-semibold' : 'text-gray-700 hover:bg-gray-100'}`}
+                                                >
+                                                    Dashboard HSI
+                                                </Link>
                                             </div>
                                         )}
                                     </div>
@@ -348,7 +353,12 @@ export default function Sidebar({ user, isSidebarOpen, toggleSidebar, isCmsMode,
                                                     Report Datin
                                                 </Link>
 
-                                                <Link href="#" className="block px-4 py-2 text-sm text-gray-400 cursor-not-allowed rounded-md text-left">Report HSI</Link>
+                                                <Link
+                                                    href={route('report.hsi')}
+                                                    className={`block px-4 py-2 text-sm rounded-md text-left ${route().current('report.hsi') ? 'bg-blue-100 text-blue-700 font-semibold' : 'text-gray-700 hover:bg-gray-100'}`}
+                                                >
+                                                    Report HSI
+                                                </Link>
                                             </div>
                                         )}
                                     </div>

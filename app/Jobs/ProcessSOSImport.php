@@ -13,6 +13,8 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Carbon\Carbon;
+use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 
 class ProcessSOSImport implements ShouldQueue
 {
@@ -45,6 +47,61 @@ class ProcessSOSImport implements ShouldQueue
         'VPN FR',
         'NeuCentrIX Interconnect Node',
     ];
+
+    private static array $dateColumns = [
+    'li_status_date',
+    'li_billing_start_date',
+    'order_created_date',
+    'agree_start_date',
+    'agree_end_date',
+    'li_created_date',
+
+    // Opsional (kalau ada di header Anda)
+    'li_billdate',
+    'billcom_date',
+    'product_activation_date',
+];
+
+    private function normalizeExcelDateSmart($value): ?string
+{
+        if ($value === null) return null;
+
+        $raw = trim((string) $value);
+
+        if ($raw === '' || $raw === '-' || strtoupper($raw) === '#N/A') {
+        return null;
+        }
+
+    // 1) Buang semua titik & koma, meniru Python Anda
+        $clean = preg_replace('/[.,]/', '', $raw);
+
+    // 2) Jika numerik → smart scale + excel date
+        if (is_numeric($clean)) {
+            $num = (float) $clean;
+
+        // Smart scale: angka excel date normal itu 36k–55k; jika "jutaan" → bagi 10000
+            if ($num > 300000) {
+                $num = $num / 10000;
+                }
+
+        // Batas aman excel date
+            if ($num > 0 && $num < 100000) {
+                try {
+                    return ExcelDate::excelToDateTimeObject($num)->format('Y-m-d H:i:s');
+                } catch (\Throwable $e) {
+                // lanjut coba parse biasa
+                }
+            }
+        }
+
+    // 3) Jika bukan excel numeric, coba parse string tanggal
+        try {
+            return Carbon::parse($raw)->format('Y-m-d H:i:s');
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
 
     public function __construct($path)
     {

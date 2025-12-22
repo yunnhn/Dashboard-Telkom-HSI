@@ -1,43 +1,96 @@
 import React, { useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, router } from '@inertiajs/react';
+import { Filter, RotateCcw } from 'lucide-react';
 
-export default function FlowProcessHSI({ auth, flowStats, witels, filters }) {
-
+export default function FlowProcessHSI({ auth, flowStats, witels, filters = {} }) {
+    // State untuk filter
     const [selectedWitel, setSelectedWitel] = useState(filters.witel || '');
 
-    const applyFilter = () => {
-        router.get(route('flow.hsi'), { witel: selectedWitel }, { preserveState: true, preserveScroll: true });
+    // Logika Filter: Trigger saat select berubah
+    const handleWitelChange = (e) => {
+        const val = e.target.value;
+        setSelectedWitel(val);
+        router.get(route('flow.hsi'), { witel: val }, { preserveState: true, preserveScroll: true });
     };
 
+    // Logika Reset Filter
     const resetFilter = () => {
         setSelectedWitel('');
-        router.get(route('flow.hsi'));
+        router.get(route('flow.hsi'), {}, { preserveState: true, preserveScroll: true });
     };
 
-    // Helper: Flow Card (Atas)
-    const FlowCard = ({ title, count, totalForPercent, color = "bg-gray-100", borderColor="border-gray-400" }) => {
-        const percent = totalForPercent > 0 ? ((count / totalForPercent) * 100).toFixed(2) : 0;
+    // Hitung Rasio (Safe calculation)
+    const psRePercent = flowStats?.ps_re_denominator > 0 
+        ? ((flowStats.ps_count / flowStats.ps_re_denominator) * 100).toFixed(2) 
+        : 0;
+    const psPiPercent = flowStats?.ps_pi_denominator > 0 
+        ? ((flowStats.ps_count / flowStats.ps_pi_denominator) * 100).toFixed(2) 
+        : 0;
+
+    // --- SUB-KOMPONEN UI ---
+
+    // 1. Header Panah (Chevron)
+    const HeaderStep = ({ title, color = "bg-gray-800", isLast = false, stepNumber }) => (
+        <div className="relative flex-1 min-w-[120px]">
+             <div 
+                className={`${color} text-white font-bold h-12 flex items-center justify-center px-4 md:px-8 text-xs md:text-sm text-center relative z-10 shadow-md transition-all hover:brightness-110`}
+                style={{
+                    clipPath: isLast 
+                        ? 'polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%, 100% 100%, 0% 100%, 15px 50%)' 
+                        : 'polygon(0% 0%, calc(100% - 15px) 0%, 100% 50%, calc(100% - 15px) 100%, 0% 100%, 15px 50%)', 
+                    marginLeft: stepNumber === 0 ? '0' : '-12px', 
+                    paddingLeft: stepNumber === 0 ? '1rem' : '2rem'
+                }}
+            >
+                {title}
+            </div>
+        </div>
+    );
+
+    // 2. Kartu Utama (Main Grid) - Updated: bg-slate-50, border-2
+    const MainCard = ({ title, count, total, colorClass = "bg-slate-50 border-2 border-gray-300" }) => {
+        const percent = total > 0 ? ((count / total) * 100).toFixed(2) + '%' : '';
         return (
-            <div className={`p-4 rounded-lg border-l-4 ${borderColor} ${color} shadow-sm flex flex-col items-center justify-center min-h-[100px]`}>
-                <div className="text-xs font-bold text-gray-600 uppercase text-center mb-1">{title}</div>
+            <div className={`${colorClass} rounded-lg p-3 text-center shadow-sm flex flex-col justify-center min-h-[120px] hover:shadow-md transition-shadow`}>
+                <div className="text-xs md:text-sm font-bold text-gray-500 uppercase tracking-wide mb-2">{title}</div>
                 <div className="flex flex-col items-center">
-                    <span className="text-2xl font-bold text-gray-800">{count?.toLocaleString()}</span>
-                    {totalForPercent && <span className="text-sm font-semibold text-gray-500">({percent}%)</span>}
+                    <div className="text-2xl md:text-3xl font-extrabold text-gray-800 leading-none">{count?.toLocaleString() || 0}</div>
+                    {percent && <div className="text-xl md:text-2xl font-bold text-green-600 mt-1">{percent}</div>}
                 </div>
             </div>
         );
     };
 
-    // Helper: Revoke Card (Bawah)
-    const RevokeCard = ({ title, count, totalForPercent, bgColor="bg-gray-200", textColor="text-gray-800", className="" }) => {
-        const percent = totalForPercent > 0 ? ((count / totalForPercent) * 100).toFixed(2) : 0;
+    // 3. Kartu Detail - Updated Style logic
+    const DetailCard = ({ title, count, totalForPercent, highlight = false }) => {
+        const percent = totalForPercent > 0 ? ((count / totalForPercent) * 100).toFixed(2) + '%' : '';
         return (
-            <div className={`relative z-10 flex flex-col items-center justify-center p-3 rounded-xl shadow-md border border-gray-300 ${bgColor} w-full min-h-[80px] ${className}`}>
-                <div className={`text-xs font-extrabold uppercase mb-1 text-center ${title === 'REVOKE' ? 'text-xl' : 'text-red-600'}`}>{title}</div>
-                <div className="flex items-baseline gap-2">
-                    <span className={`text-xl font-bold ${textColor}`}>{count?.toLocaleString()}</span>
-                    {totalForPercent && <span className="text-sm font-bold text-gray-600">{percent}%</span>}
+            <div className={`
+                relative overflow-hidden rounded-lg p-3 shadow-sm border
+                flex flex-col justify-center min-h-[80px] transition-all hover:translate-y-[-2px]
+                ${highlight ? 'bg-red-50 border-red-200' : 'bg-blue-50 border-blue-100'}
+            `}>
+                <div className="text-[10px] md:text-[11px] font-bold text-gray-500 uppercase leading-tight mb-1">{title}</div>
+                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0">
+                    <span className={`text-lg md:text-xl font-bold ${highlight ? 'text-red-700' : 'text-blue-900'}`}>
+                        {count?.toLocaleString() || 0}
+                    </span>
+                    {percent && <span className={`text-lg md:text-xl font-bold ${highlight ? 'text-red-500' : 'text-blue-500'}`}>({percent})</span>}
+                </div>
+            </div>
+        );
+    };
+
+    // 4. Kartu Tree Diagram - Updated: rounded-3xl
+    const TreeCard = ({ title, count, total, color = "bg-white", borderColor = "border-gray-300", textColor = "text-gray-800" }) => {
+        const percent = total > 0 ? ((count / total) * 100).toFixed(2) + '%' : '';
+        return (
+            <div className={`p-3 rounded-3xl border-2 ${borderColor} ${color} shadow-sm text-center w-full min-w-[110px] z-20 relative`}>
+                <div className={`text-[10px] font-bold uppercase mb-2 ${textColor} opacity-80`}>{title}</div>
+                <div className="flex flex-col items-center">
+                    <div className={`text-xl font-extrabold ${textColor} leading-tight`}>{count?.toLocaleString() || 0}</div>
+                    {percent && <div className={`text-lg font-bold ${textColor} opacity-90 mt-1`}>{percent}</div>}
                 </div>
             </div>
         );
@@ -50,177 +103,207 @@ export default function FlowProcessHSI({ auth, flowStats, witels, filters }) {
         >
             <Head title="Flow Process HSI" />
 
-            <div className="py-8">
-                <div className="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-8">
-                    
-                    {/* FILTER */}
-                    <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-                        <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-                            <div className="w-full md:w-1/3">
-                                <label className="block text-sm font-bold text-gray-700 mb-1">Filter Witel</label>
-                                <select className="w-full border-gray-300 rounded-md text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-2" value={selectedWitel} onChange={(e) => setSelectedWitel(e.target.value)}>
-                                    <option value="">Semua Witel (Regional 3)</option>
-                                    {witels.map((w) => <option key={w} value={w}>{w}</option>)}
-                                </select>
+            <div className="min-h-screen bg-gray-100 font-sans text-gray-900 pb-20">
+                <div className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 py-8">
+
+                    {/* HEADER TITLE & FILTER */}
+                    <div className="flex flex-col md:flex-row justify-between items-end mb-6 gap-4 border-b border-gray-300 pb-4">
+                        <div>
+                            <h1 className="text-2xl font-extrabold text-gray-900 uppercase">Data Pengawalan PSB HSI</h1>
+                            <p className="text-sm text-gray-500 mt-1 flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                                Last Update: {new Date().toLocaleDateString()}
+                            </p>
+                        </div>
+
+                        {/* FILTER SECTION */}
+                        <div className="flex gap-2 items-center bg-white p-2 rounded-lg shadow-sm border border-gray-200">
+                            <Filter size={16} className="text-gray-400 ml-2" />
+                            <select 
+                                className="bg-transparent border-none text-sm font-semibold text-gray-700 focus:ring-0 cursor-pointer min-w-[150px]"
+                                value={selectedWitel}
+                                onChange={handleWitelChange}
+                            >
+                                <option value="">All Witel</option>
+                                {witels?.map((w) => (
+                                    <option key={w} value={w}>{w}</option>
+                                ))}
+                            </select>
+                            {selectedWitel && (
+                                <button onClick={resetFilter} className="p-1 hover:bg-gray-100 rounded-full transition-colors" title="Reset Filter">
+                                    <RotateCcw size={14} className="text-red-500" />
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* WRAPPER SECTION 1: Background Putih & Rounded Corners untuk Flow & Grid */}
+                    <div className="bg-white rounded-3xl shadow border border-gray-200 p-6 md:p-8 mb-8">
+                        
+                        {/* FLOW CHEVRONS */}
+                        <div className="flex w-full mb-8 overflow-x-auto pb-4 no-scrollbar pl-2">
+                            <HeaderStep title="OFFERING" stepNumber={0} />
+                            <HeaderStep title="VERIFICATION & VALID" stepNumber={1} />
+                            <HeaderStep title="FEASIBILITY" stepNumber={2} />
+                            <HeaderStep title="INSTALASI & AKTIVASI" stepNumber={3} />
+                            <HeaderStep title="PS" color="bg-green-600" isLast={true} stepNumber={4} />
+                        </div>
+
+                        {/* GRID DASHBOARD */}
+                        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                            
+                            {/* COLUMN 1: RE */}
+                            <div className="space-y-3">
+                                <MainCard title="RE" count={flowStats?.re} />
+                                <div className="min-h-[300px] border-2 border-transparent"></div>
                             </div>
-                            <div className="flex gap-2 self-end">
-                                <button onClick={applyFilter} className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2 px-4 rounded shadow transition">Terapkan Filter</button>
-                                {filters.witel && <button onClick={resetFilter} className="bg-white border border-gray-300 text-gray-700 text-sm font-bold py-2 px-4 rounded shadow transition">Reset</button>}
+
+                            {/* COLUMN 2: Valid RE + Fallout Points */}
+                            <div className="space-y-3">
+                                <MainCard title="Valid RE" count={flowStats?.valid_re} total={flowStats?.re} />
+                                <div className="p-3 bg-slate-50 rounded-lg border-2 border-gray-100 min-h-[300px] flex flex-col gap-3">
+                                    <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1 text-center">Fallout Points</div>
+                                    <DetailCard title="OGP Verif & Valid" count={flowStats?.ogp_verif} totalForPercent={flowStats?.re} />
+                                    <DetailCard title="Cancel QC 1" count={flowStats?.cancel_qc1} totalForPercent={flowStats?.re} highlight />
+                                    <DetailCard title="Cancel FCC" count={flowStats?.cancel_fcc} totalForPercent={flowStats?.re} highlight />
+                                </div>
+                            </div>
+
+                            {/* COLUMN 3: Valid WO + Process */}
+                            <div className="space-y-3">
+                                <MainCard title="Valid WO" count={flowStats?.valid_wo} total={flowStats?.re} />
+                                <div className="p-3 bg-slate-50 rounded-lg border-2 border-gray-100 min-h-[300px] flex flex-col gap-3">
+                                    <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1 text-center">Process</div>
+                                    <DetailCard title="Cancel WO" count={flowStats?.cancel_wo} totalForPercent={flowStats?.re} highlight />
+                                    <DetailCard title="UNSC" count={flowStats?.unsc} totalForPercent={flowStats?.re} />
+                                    <DetailCard title="OGP SURVEY" count={flowStats?.ogp_survey_count} totalForPercent={flowStats?.re} />
+                                </div>
+                            </div>
+
+                            {/* COLUMN 4: Valid PI + Technician */}
+                            <div className="space-y-3">
+                                <MainCard title="Valid PI" count={flowStats?.valid_pi} total={flowStats?.re} />
+                                <div className="p-3 bg-slate-50 rounded-lg border-2 border-gray-100 min-h-[300px] flex flex-col gap-3">
+                                    <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1 text-center">Technician</div>
+                                    <DetailCard title="Cancel Instalasi" count={flowStats?.cancel_instalasi} totalForPercent={flowStats?.re} highlight />
+                                    <DetailCard title="Fallout" count={flowStats?.fallout} totalForPercent={flowStats?.re} highlight />
+                                    <DetailCard title="Revoke" count={flowStats?.revoke_count} totalForPercent={flowStats?.re} highlight />
+                                </div>
+                            </div>
+
+                            {/* COLUMN 5: PS (Result) + Provisioning + Ratios */}
+                            <div className="space-y-3">
+                                <MainCard title="PS (COMPLETED)" count={flowStats?.ps_count} total={flowStats?.re} colorClass="bg-green-50 border-2 border-green-500" />
+                                
+                                <div className="p-3 bg-slate-50 rounded-lg border-2 border-gray-100 flex flex-col gap-3">
+                                    <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1 text-center">Provisioning</div>
+                                    <DetailCard title="OGP Provisioning" count={flowStats?.ogp_provi} totalForPercent={flowStats?.re} />
+                                </div>
+
+                                {/* RATIO BOX */}
+                                <div className="bg-gradient-to-br from-blue-600 to-blue-800 rounded-lg p-4 text-white shadow-lg flex flex-col justify-center mt-auto">
+                                    <div className="mb-4 text-center">
+                                        <div className="text-xs font-medium text-blue-200 uppercase mb-1">Conversion PS/RE</div>
+                                        <div className="text-3xl font-bold tracking-tight">{psRePercent}<span className="text-lg">%</span></div>
+                                    </div>
+                                    <div className="w-full bg-blue-500/30 h-px mb-4"></div>
+                                    <div className="text-center">
+                                        <div className="text-xs font-medium text-blue-200 uppercase mb-1">Conversion PS/PI</div>
+                                        <div className="text-3xl font-bold tracking-tight">{psPiPercent}<span className="text-lg">%</span></div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    {flowStats && (
-                        <>
-                            {/* FLOW UTAMA */}
-                            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 overflow-x-auto">
-                                <h3 className="text-lg font-bold text-gray-800 mb-6 text-center uppercase">DATA PENGAWALAN PSB HSI {filters.witel ? `- ${filters.witel}` : '(ALL REGIONAL)'}</h3>
+                    {/* ========================================================= */}
+                    {/* WRAPPER SECTION 2: REVOKE FLOW CHART (TREE DIAGRAM) */}
+                    {/* ========================================================= */}
+                    <div className="mt-12 bg-white rounded-3xl shadow border border-gray-200 p-8">
+                        <div className="flex items-center gap-3 mb-8">
+                            <div className="h-8 w-1 bg-red-500 rounded-full"></div>
+                            <h3 className="text-lg font-bold text-gray-800">Analisis Revoke & Fallout</h3>
+                        </div>
+
+                        <div className="overflow-x-auto">
+                            <div className="min-w-[900px] flex flex-col items-center">
                                 
-                                {/* Header Panah */}
-                                <div className="grid grid-cols-5 gap-2 mb-4 text-center text-white text-sm font-bold min-w-[900px]">
-                                    <div className="bg-gray-800 py-3 rounded">Offering</div>
-                                    <div className="bg-gray-800 py-3 rounded">Verification & Validation</div>
-                                    <div className="bg-gray-800 py-3 rounded">Feasibility</div>
-                                    <div className="bg-gray-800 py-3 rounded">Instalasi & Aktivasi</div>
-                                    <div className="bg-green-600 py-3 rounded">PS</div>
-                                </div>
-
-                                {/* Data Utama */}
-                                <div className="grid grid-cols-5 gap-4 mb-8 relative min-w-[900px]">
-                                    <div className="bg-gray-50 p-4 rounded border border-gray-300 text-center">
-                                        <div className="text-sm font-bold text-gray-600">RE</div>
-                                        <div className="text-3xl font-bold mt-2">{flowStats.re?.toLocaleString()}</div>
-                                    </div>
-                                    <div className="bg-gray-50 p-4 rounded border border-gray-300 text-center">
-                                        <div className="text-sm font-bold text-gray-600">Valid RE</div>
-                                        <div className="text-3xl font-bold mt-2">{flowStats.valid_re?.toLocaleString()}</div>
-                                        <div className="text-sm text-gray-500 mt-1">{flowStats.re > 0 ? ((flowStats.valid_re / flowStats.re) * 100).toFixed(2) : 0}%</div>
-                                    </div>
-                                    <div className="bg-gray-50 p-4 rounded border border-gray-300 text-center">
-                                        <div className="text-sm font-bold text-gray-600">Valid WO</div>
-                                        <div className="text-3xl font-bold mt-2">{flowStats.valid_wo?.toLocaleString()}</div>
-                                        <div className="text-sm text-gray-500 mt-1">{flowStats.re > 0 ? ((flowStats.valid_wo / flowStats.re) * 100).toFixed(2) : 0}%</div>
-                                    </div>
-                                    <div className="bg-gray-50 p-4 rounded border border-gray-300 text-center">
-                                        <div className="text-sm font-bold text-gray-600">Valid PI</div>
-                                        <div className="text-3xl font-bold mt-2">{flowStats.valid_pi?.toLocaleString()}</div>
-                                        <div className="text-sm text-gray-500 mt-1">{flowStats.re > 0 ? ((flowStats.valid_pi / flowStats.re) * 100).toFixed(2) : 0}%</div>
-                                    </div>
-                                    <div className="bg-gray-50 p-4 rounded border border-gray-300 text-center">
-                                        <div className="text-sm font-bold text-gray-600">PS</div>
-                                        <div className="text-3xl font-bold mt-2">{flowStats.ps_count?.toLocaleString()}</div>
-                                        <div className="text-sm text-gray-500 mt-1">{flowStats.re > 0 ? ((flowStats.ps_count / flowStats.re) * 100).toFixed(2) : 0}%</div>
+                                {/* LEVEL 1: ROOT */}
+                                <div className="relative z-10 mb-16">
+                                    <div className="absolute top-full left-1/2 -translate-x-1/2 w-0.5 h-16 bg-gray-300"></div> {/* Line Down */}
+                                    <div className="bg-red-50 border-2 border-red-200 p-4 rounded-3xl text-center shadow min-w-[200px]">
+                                        <div className="text-xs font-bold text-red-600 uppercase mb-1">Total Revoke</div>
+                                        <div className="text-3xl font-extrabold text-red-900">{flowStats?.revoke_count?.toLocaleString() || 0}</div>
                                     </div>
                                 </div>
 
-                                {/* Details */}
-                                <div className="grid grid-cols-4 gap-6 text-center min-w-[900px]">
-                                    <div className="space-y-4">
-                                        <FlowCard title="OGP Verif & Valid" count={flowStats.ogp_verif} totalForPercent={flowStats.re} color="bg-blue-50" borderColor="border-blue-400" />
-                                        <FlowCard title="Cancel QC1" count={flowStats.cancel_qc1} totalForPercent={flowStats.re} color="bg-blue-50" borderColor="border-blue-400" />
-                                        <FlowCard title="Cancel FCC" count={flowStats.cancel_fcc} totalForPercent={flowStats.re} color="bg-blue-50" borderColor="border-blue-400" />
-                                    </div>
-                                    <div className="space-y-4">
-                                        <FlowCard title="Cancel WO" count={flowStats.cancel_wo} totalForPercent={flowStats.re} color="bg-blue-50" borderColor="border-blue-400" />
-                                        <FlowCard title="UNSC" count={flowStats.unsc} totalForPercent={flowStats.re} color="bg-blue-50" borderColor="border-blue-400" />
-                                        <FlowCard title="OGP Survey" count={flowStats.ogp_survey_count} totalForPercent={flowStats.re} color="bg-blue-50" borderColor="border-blue-400" />
-                                    </div>
-                                    <div className="space-y-4">
-                                        <FlowCard title="Cancel" count={flowStats.cancel_instalasi} totalForPercent={flowStats.re} color="bg-blue-50" borderColor="border-blue-400" />
-                                        <FlowCard title="Fallout" count={flowStats.fallout} totalForPercent={flowStats.re} color="bg-blue-50" borderColor="border-blue-400" />
-                                        <FlowCard title="Revoke" count={flowStats.revoke_count} totalForPercent={flowStats.re} color="bg-blue-50" borderColor="border-blue-400" />
-                                    </div>
-                                    <div className="space-y-4">
-                                        <FlowCard title="OGP Provisioning" count={flowStats.ogp_provi} totalForPercent={flowStats.re} color="bg-blue-50" borderColor="border-blue-400" />
-                                        <div className="mt-6 p-4 bg-white border border-gray-300 rounded shadow-sm text-right">
-                                            <div className="text-sm font-bold text-gray-500 mb-1">PS/RE</div>
-                                            <div className="text-3xl font-bold text-gray-800 mb-4">{flowStats.re > 0 ? ((flowStats.ps_count / flowStats.re) * 100).toFixed(2) : 0}%</div>
-                                            <div className="text-sm font-bold text-gray-500 mb-1">PS/PI</div>
-                                            <div className="text-3xl font-bold text-gray-800">{flowStats.valid_pi > 0 ? ((flowStats.ps_count / flowStats.valid_pi) * 100).toFixed(2) : 0}%</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                                {/* LEVEL 2: BRANCHES */}
+                                <div className="flex justify-center gap-10 w-full relative mb-12">
+                                    {/* Connector Horizontal Bar Level 2 */}
+                                    <div className="absolute -top-6 left-[20%] right-[20%] h-10 border-t-2 border-r-2 border-l-2 border-gray-300 rounded-t-3xl"></div>
 
-                            {/* REVOKE FLOW CHART (YANG SUDAH DIPERBAIKI) */}
-                            <div className="bg-white p-8 rounded-lg shadow-sm border border-gray-200 overflow-x-auto">
-                                
-                                {/* 1. REVOKE HEADER */}
-                                <div className="flex justify-center mb-12">
-                                    <div className="flex flex-col items-center p-4 bg-gray-200 rounded-lg border-2 border-gray-400 shadow-md min-w-[200px] relative z-20">
-                                        <span className="text-3xl font-extrabold uppercase mb-1 text-black">Revoke</span>
-                                        <span className="text-2xl font-bold">{flowStats.revoke_count?.toLocaleString()}</span>
+                                    {/* Branch Left */}
+                                    <div className="flex flex-col items-center w-1/3 relative">
+                                        <TreeCard title="Follow Up Completed" count={flowStats?.followup_completed} total={flowStats?.revoke_count} borderColor="border-blue-300" textColor="text-blue-900" color="bg-blue-50" />
+                                        {/* Line Down to Children */}
+                                        <div className="absolute top-full left-1/2 -translate-x-1/2 w-0.5 h-12 bg-gray-300"></div>
+                                    </div>
+
+                                    {/* Branch Middle */}
+                                    <div className="flex flex-col items-center w-1/3 z-10">
+                                        <TreeCard title="Revoke Completed" count={flowStats?.revoke_completed} total={flowStats?.revoke_count} />
+                                    </div>
+
+                                    {/* Branch Right */}
+                                    <div className="flex flex-col items-center w-1/3 z-10">
+                                        <TreeCard title="Revoke Order" count={flowStats?.revoke_order} total={flowStats?.revoke_count} />
                                     </div>
                                 </div>
 
-                                <div className="flex flex-col items-center min-w-[900px]">
-
-                                    {/* 2. TIGA CABANG UTAMA */}
-                                    <div className="flex justify-center gap-8 w-full mb-0 z-20 relative">
-                                        {/* Kiri: Follow Up (Induk) */}
-                                        <div className="flex flex-col items-center w-1/3 relative">
-                                            <RevokeCard title="FOLLOW UP COMPLETED" count={flowStats.followup_completed} totalForPercent={flowStats.revoke_count} bgColor="bg-gray-200" />
-                                            {/* Garis Vertikal Turun */}
-                                            <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 h-8 w-1 bg-red-600"></div>
-                                        </div>
-                                        {/* Tengah */}
-                                        <div className="flex flex-col items-center w-1/3">
-                                            <RevokeCard title="REVOKE COMPLETED" count={flowStats.revoke_completed} totalForPercent={flowStats.revoke_count} bgColor="bg-gray-200" />
-                                        </div>
-                                        {/* Kanan */}
-                                        <div className="flex flex-col items-center w-1/3">
-                                            <RevokeCard title="REVOKE ORDER" count={flowStats.revoke_order} totalForPercent={flowStats.revoke_count} bgColor="bg-gray-200" />
-                                        </div>
-                                    </div>
-
-                                    {/* 3. ANAK-ANAK (TREE DIAGRAM) */}
-                                    <div className="w-full mt-8 relative">
+                                {/* LEVEL 3: CHILDREN OF LEFT BRANCH */}
+                                <div className="relative w-full flex justify-start pl-[5%] pr-[20%]">
+                                    <div className="w-full relative pt-6">
                                         
-                                        {/* Garis Horizontal Panjang (Lebar disesuaikan agar pas dengan anak-anak) */}
-                                        <div className="absolute top-0 left-[10%] right-[10%] border-t-4 border-red-600"></div>
+                                        {/* HORIZONTAL CONNECTOR BRIDGE (Rounded Corners) */}
+                                        <div className="absolute top-0 border-t-2 border-l-2 border-r-2 border-gray-300 rounded-t-3xl h-6" style={{ left: 'calc(10% - 1.2rem)', right: 'calc(10% - 1.2rem)' }}></div>
 
-                                        {/* Container Anak (Flex 1 agar rata) */}
-                                        <div className="flex justify-between w-full gap-4 pt-0 relative top-0 z-10">
-                                            
+                                        {/* Vertical Connectors for Children */}
+                                        <div className="grid grid-cols-5 gap-12">
                                             {/* Child 1: PS */}
-                                            <div className="flex flex-col items-center flex-1 relative">
-                                                <div className="absolute -top-0 left-1/2 -translate-x-1/2 h-8 w-1 bg-red-600 -mt-1"></div>
-                                                <RevokeCard title="PS" count={flowStats.ps_revoke} totalForPercent={flowStats.followup_completed} bgColor="bg-green-500" textColor="text-white" className="mt-7" />
+                                            <div className="relative flex flex-col items-center">
+                                                <TreeCard title="PS" count={flowStats?.ps_revoke} total={flowStats?.followup_completed} color="bg-green-50" borderColor="border-green-200" textColor="text-green-800" />
                                             </div>
 
-                                            {/* Child 2: OGP PROVI */}
-                                            <div className="flex flex-col items-center flex-1 relative">
-                                                <div className="absolute -top-0 left-1/2 -translate-x-1/2 h-8 w-1 bg-red-600 -mt-1"></div>
-                                                <RevokeCard title="OGP PROVI" count={flowStats.ogp_provi_revoke} totalForPercent={flowStats.followup_completed} bgColor="bg-gray-200" className="mt-7" />
+                                            {/* Child 2 */}
+                                            <div className="relative flex flex-col items-center">
+                                                <div className="absolute -top-6 left-1/2 -translate-x-1/2 w-0.5 h-6 bg-gray-300"></div>
+                                                <TreeCard title="OGP Provi" count={flowStats?.ogp_provi_revoke} total={flowStats?.followup_completed} color="bg-yellow-50" borderColor="border-yellow-200" textColor="text-yellow-800" />
                                             </div>
 
-                                            {/* Child 3: FALLOUT */}
-                                            <div className="flex flex-col items-center flex-1 relative">
-                                                <div className="absolute -top-0 left-1/2 -translate-x-1/2 h-8 w-1 bg-red-600 -mt-1"></div>
-                                                <RevokeCard title="FALLOUT" count={flowStats.fallout_revoke} totalForPercent={flowStats.followup_completed} bgColor="bg-gray-200" className="mt-7" />
+                                            {/* Child 3 */}
+                                            <div className="relative flex flex-col items-center">
+                                                <div className="absolute -top-6 left-1/2 -translate-x-1/2 w-0.5 h-6 bg-gray-300"></div>
+                                                <TreeCard title="Fallout" count={flowStats?.fallout_revoke} total={flowStats?.followup_completed} color="bg-orange-50" borderColor="border-orange-200" textColor="text-orange-800" />
                                             </div>
 
-                                            {/* Child 4: CANCEL */}
-                                            <div className="flex flex-col items-center flex-1 relative">
-                                                <div className="absolute -top-0 left-1/2 -translate-x-1/2 h-8 w-1 bg-red-600 -mt-1"></div>
-                                                <RevokeCard title="CANCEL" count={flowStats.cancel_revoke} totalForPercent={flowStats.followup_completed} bgColor="bg-gray-200" className="mt-7" />
+                                            {/* Child 4 */}
+                                            <div className="relative flex flex-col items-center">
+                                                <div className="absolute -top-6 left-1/2 -translate-x-1/2 w-0.5 h-6 bg-gray-300"></div>
+                                                <TreeCard title="Cancel" count={flowStats?.cancel_revoke} total={flowStats?.followup_completed} color="bg-red-50" borderColor="border-red-200" textColor="text-red-800" />
                                             </div>
 
-                                            {/* Child 5: LAIN-LAIN */}
-                                            <div className="flex flex-col items-center flex-1 relative">
-                                                <div className="absolute -top-0 left-1/2 -translate-x-1/2 h-8 w-1 bg-red-600 -mt-1"></div>
-                                                <RevokeCard title="LAIN-LAIN" count={flowStats.lain_lain_revoke} totalForPercent={flowStats.followup_completed} bgColor="bg-gray-200" className="mt-7" />
+                                            {/* Child 5: Lain-Lain */}
+                                            <div className="relative flex flex-col items-center">
+                                                <TreeCard title="Lain-Lain" count={flowStats?.lain_lain_revoke} total={flowStats?.followup_completed} />
                                             </div>
-                                        </div>
-
-                                        <div className="text-[10px] text-gray-500 mt-4 text-right w-full pr-4 leading-tight">
-                                            * LAIN-LAIN : REVOKE, INPROGRES SC, SC BARU TIDAK DITEMUKAN
                                         </div>
                                     </div>
                                 </div>
+
                             </div>
-                        </>
-                    )}
+                        </div>
+                    </div>
+
                 </div>
             </div>
         </AuthenticatedLayout>

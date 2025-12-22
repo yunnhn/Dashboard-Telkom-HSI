@@ -4,11 +4,12 @@ import { Head, router } from '@inertiajs/react';
 import HsiPieChart from '@/Components/HsiPieChart';
 import AmountBySubTypeChart from '@/Components/AmountBySubTypeChartHSI';
 import StackedBarChart from '@/Components/StackedBarChart';
+import HsiMap from '@/Components/HsiMap'; // <-- Pastikan komponen ini ada
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 
 export default function DashboardHSI({ 
-    auth, stats, 
+    auth, stats, mapData, 
     chart1, chart2, chart3, chart4, 
     chart5Data, chart5Keys, chart6Data, chart6Keys, 
     witels, filters 
@@ -62,7 +63,7 @@ export default function DashboardHSI({
             <div className="py-8">
                 <div className="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
                     
-                    {/* FILTER TANGGAL */}
+                    {/* SECTION 1: FILTER TANGGAL */}
                     <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
                         <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
                             <div className="w-full md:w-1/3">
@@ -87,7 +88,7 @@ export default function DashboardHSI({
                         </div>
                     </div>
 
-                    {/* STATS CARDS */}
+                    {/* SECTION 2: STATS CARDS */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div className="bg-white p-6 rounded-lg shadow-sm border-l-4 border-blue-600">
                             <div className="text-gray-500 text-xs font-bold uppercase">Total Order</div>
@@ -103,8 +104,8 @@ export default function DashboardHSI({
                         </div>
                     </div>
 
-                    {/* CHART ROW 1 */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* SECTION 3: CHART ROW 1 (REGIONAL & PS WITEL) */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
                         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
                             <h3 className="text-md font-bold text-gray-700 mb-4 text-center border-b pb-2">Total Order Regional</h3>
                             <div className="h-80 flex justify-center items-center">
@@ -119,8 +120,8 @@ export default function DashboardHSI({
                         </div>
                     </div>
 
-                    {/* CHART ROW 2 (CANCEL) */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* SECTION 4: CHART ROW 2 (CANCEL ANALYSIS) */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
                         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
                             <div className="h-96"> 
                                 {hasData(chart5Data) ? <StackedBarChart data={chart5Data} keys={chart5Keys} title="CANCEL BY FCC (SYSTEM)" /> : <div className="h-full flex items-center justify-center text-gray-400">Tidak ada data Cancel FCC</div>}
@@ -133,8 +134,8 @@ export default function DashboardHSI({
                         </div>
                     </div>
 
-                    {/* CHART ROW 3 (STATUS & LAYANAN) */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
+                    {/* SECTION 5: CHART ROW 3 (STATUS & LAYANAN) */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
                         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
                             <div className="flex justify-between items-center border-b pb-2 mb-4">
                                 <h3 className="text-md font-bold text-gray-700">Komposisi Status</h3>
@@ -158,6 +159,20 @@ export default function DashboardHSI({
                             <div className="h-80">
                                 {hasData(chart3) ? <AmountBySubTypeChart data={chart3} /> : <div className="text-gray-400">No Data</div>}
                             </div>
+                        </div>
+                    </div>
+
+                    {/* SECTION 6: PETA SEBARAN (PINDAH KE BAWAH) */}
+                    <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mt-6 mb-10">
+                        <h3 className="text-md font-bold text-gray-700 mb-4 border-b pb-2">Peta Sebaran Order HSI</h3>
+                        <div className="h-96">
+                            {mapData && mapData.length > 0 ? (
+                                <HsiMap data={mapData} />
+                            ) : (
+                                <div className="h-full flex items-center justify-center text-gray-400 bg-gray-50 rounded border border-dashed border-gray-300">
+                                    <p className="text-center">Data koordinat tidak tersedia atau belum diimport dengan benar.<br/><span className="text-xs">Pastikan kolom GPS_LATITUDE dan GPS_LONGITUDE terisi di Excel.</span></p>
+                                </div>
+                            )}
                         </div>
                     </div>
 

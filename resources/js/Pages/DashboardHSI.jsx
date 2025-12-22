@@ -1,16 +1,11 @@
 import React, { useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, router } from '@inertiajs/react';
-import AmountByWitelChart from '@/Components/AmountByWitelChart';
 import HsiPieChart from '@/Components/HsiPieChart';
 import AmountBySubTypeChart from '@/Components/AmountBySubTypeChartHSI';
 import StackedBarChart from '@/Components/StackedBarChart';
-
-// --- 1. Import Library DatePicker & CSS-nya ---
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
-import "@/Components/DatePickerCustom.css"; // (Opsional) Kita buat CSS sedikit nanti biar rapi
-// ----------------------------------------------
 
 export default function DashboardHSI({ 
     auth, stats, 
@@ -19,15 +14,12 @@ export default function DashboardHSI({
     witels, filters 
 }) {
 
-    // --- 2. Setup State untuk Date Range ---
-    // Konversi string 'YYYY-MM-DD' dari controller kembali ke object Date Javascript
     const [dateRange, setDateRange] = useState([
         filters.start_date ? new Date(filters.start_date) : null, 
         filters.end_date ? new Date(filters.end_date) : null
     ]);
     const [startDate, endDate] = dateRange;
 
-    // Helper format tanggal ke 'YYYY-MM-DD' tanpa timezone shifting
     const formatDate = (date) => {
         if (!date) return '';
         const year = date.getFullYear();
@@ -36,9 +28,7 @@ export default function DashboardHSI({
         return `${year}-${month}-${day}`;
     };
 
-    // Fungsi Apply Filter
     const applyDateFilter = () => {
-        // Cek jika tanggal lengkap (Start & End terisi)
         if (startDate && endDate) {
             router.get(route('dashboard.hsi'), { 
                 ...filters, 
@@ -48,7 +38,6 @@ export default function DashboardHSI({
         }
     };
 
-    // Fungsi Reset
     const resetDateFilter = () => {
         setDateRange([null, null]);
         router.get(route('dashboard.hsi'), { 
@@ -58,10 +47,7 @@ export default function DashboardHSI({
     };
 
     const updateFilter = (key, value) => {
-        router.get(route('dashboard.hsi'), { 
-            ...filters, 
-            [key]: value,
-        }, { preserveState: true, preserveScroll: true, replace: true });
+        router.get(route('dashboard.hsi'), { ...filters, [key]: value }, { preserveState: true, preserveScroll: true, replace: true });
     };
 
     const hasData = (data) => data && data.length > 0;
@@ -69,20 +55,18 @@ export default function DashboardHSI({
     return (
         <AuthenticatedLayout
             user={auth.user}
-            header={<h2 className="font-semibold text-xl text-gray-800 leading-tight">Dashboard HSI</h2>}
+            header={<h2 className="font-semibold text-xl text-gray-800 leading-tight">Dashboard HSI - Overview</h2>}
         >
             <Head title="Dashboard HSI" />
 
             <div className="py-8">
                 <div className="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
                     
-                    {/* --- FILTER TANGGAL (MODIFIKASI SEPERTI GAMBAR) --- */}
+                    {/* FILTER TANGGAL */}
                     <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
                         <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-                            
-                            {/* Bagian Input DatePicker Range */}
                             <div className="w-full md:w-1/3">
-                                <label className="block text-sm font-bold text-gray-700 mb-1">Rentang Tanggal</label>
+                                <label className="block text-sm font-bold text-gray-700 mb-1">Rentang Tanggal (Order Date)</label>
                                 <div className="relative">
                                     <DatePicker
                                         selectsRange={true}
@@ -96,30 +80,14 @@ export default function DashboardHSI({
                                     />
                                 </div>
                             </div>
-
-                            {/* Tombol Aksi */}
                             <div className="flex gap-2 self-end">
-                                <button 
-                                    onClick={applyDateFilter}
-                                    disabled={!startDate || !endDate} // Disable jika belum pilih
-                                    className={`text-sm font-bold py-2 px-4 rounded shadow transition ${(!startDate || !endDate) ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
-                                >
-                                    Terapkan Filter
-                                </button>
-                                {(filters.start_date || filters.end_date) && (
-                                    <button 
-                                        onClick={resetDateFilter}
-                                        className="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-bold py-2 px-4 rounded shadow transition"
-                                    >
-                                        Reset
-                                    </button>
-                                )}
+                                <button onClick={applyDateFilter} disabled={!startDate || !endDate} className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold py-2 px-4 rounded shadow transition">Terapkan Filter</button>
+                                {(filters.start_date || filters.end_date) && <button onClick={resetDateFilter} className="bg-white border border-gray-300 text-gray-700 text-sm font-bold py-2 px-4 rounded shadow transition">Reset</button>}
                             </div>
                         </div>
                     </div>
-                    {/* -------------------------------------------------- */}
 
-                    {/* --- STATS CARDS --- */}
+                    {/* STATS CARDS */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div className="bg-white p-6 rounded-lg shadow-sm border-l-4 border-blue-600">
                             <div className="text-gray-500 text-xs font-bold uppercase">Total Order</div>
@@ -135,7 +103,7 @@ export default function DashboardHSI({
                         </div>
                     </div>
 
-                    {/* --- ROW 1: TOTAL ORDER & SEBARAN PS --- */}
+                    {/* CHART ROW 1 */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
                             <h3 className="text-md font-bold text-gray-700 mb-4 text-center border-b pb-2">Total Order Regional</h3>
@@ -151,31 +119,23 @@ export default function DashboardHSI({
                         </div>
                     </div>
 
-                    {/* --- ROW 2: CANCEL FCC & CANCEL BIASA --- */}
+                    {/* CHART ROW 2 (CANCEL) */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
                             <div className="h-96"> 
-                                {hasData(chart5Data) ? (
-                                    <StackedBarChart data={chart5Data} keys={chart5Keys} title="CANCEL BY FCC (SYSTEM)" /> 
-                                ) : (
-                                    <div className="h-full flex items-center justify-center text-gray-400">Tidak ada data Cancel FCC</div>
-                                )}
+                                {hasData(chart5Data) ? <StackedBarChart data={chart5Data} keys={chart5Keys} title="CANCEL BY FCC (SYSTEM)" /> : <div className="h-full flex items-center justify-center text-gray-400">Tidak ada data Cancel FCC</div>}
                             </div>
                         </div>
                         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
                             <div className="h-96">
-                                {hasData(chart6Data) ? (
-                                    <StackedBarChart data={chart6Data} keys={chart6Keys} title="CANCEL (NON-FCC)" /> 
-                                ) : (
-                                    <div className="h-full flex items-center justify-center text-gray-400">Tidak ada data Cancel Biasa</div>
-                                )}
+                                {hasData(chart6Data) ? <StackedBarChart data={chart6Data} keys={chart6Keys} title="CANCEL (NON-FCC)" /> : <div className="h-full flex items-center justify-center text-gray-400">Tidak ada data Cancel Biasa</div>}
                             </div>
                         </div>
                     </div>
 
-                    {/* --- ROW 3: STATUS & LAYANAN --- */}
+                    {/* CHART ROW 3 (STATUS & LAYANAN) */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
-                        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 relative">
+                        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
                             <div className="flex justify-between items-center border-b pb-2 mb-4">
                                 <h3 className="text-md font-bold text-gray-700">Komposisi Status</h3>
                                 <select className="text-xs border-gray-300 rounded" value={filters.witel_status || ''} onChange={(e) => updateFilter('witel_status', e.target.value)}>

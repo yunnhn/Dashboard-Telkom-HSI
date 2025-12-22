@@ -88,6 +88,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // 1. Dashboard HSI
     Route::get('/dashboard-hsi', [DashboardHsiController::class, 'index'])->name('dashboard.hsi');
 
+    Route::get('/flow-process-hsi', [DashboardHsiController::class, 'flow'])->name('flow.hsi');
+
     // 2. Import Excel HSI (INI YANG DITAMBAHKAN)
     Route::post('/dashboard/hsi/import', [DashboardHsiController::class, 'import'])->name('dashboard.import');
     

@@ -5,22 +5,19 @@ namespace App\Http\Controllers;
 use Inertia\Inertia;
 use App\Models\HsiData;
 use Illuminate\Http\Request;
-use Carbon\Carbon;
+use Carbon\Carbon; // <--- PASTIKAN INI ADA
 
 class ReportHsiController extends Controller
 {
     public function index(Request $request)
     {
-        // 1. Setup Filter
         $startDate = $request->input('start_date');
         $endDate = $request->input('end_date');
-        
-        // Daftar Regional Utama (WITEL) yang diizinkan
         $allowedWitels = ['BALI', 'JATIM BARAT', 'JATIM TIMUR', 'SURAMADU', 'NUSA TENGGARA'];
         
-        $thirtyDaysAgo = Carbon::now()->subDays(30);
+        // --- LOGIKA FILTER TANGGAL TETAP DIPERTAHANKAN ---
+        $thirtyDaysAgo = Carbon::now()->subDays(30); 
 
-        // 2. Ambil Data Mentah (Tambahkan kolom witel_old)
         $query = HsiData::query()
             ->select('witel', 'witel_old', 'status_resume', 'order_date') 
             ->whereIn('witel', $allowedWitels);
@@ -32,11 +29,8 @@ class ReportHsiController extends Controller
 
         $rawData = $query->get();
 
-        // 3. LOGIKA AGREGASI BERTINGKAT (Regional -> Kota)
-        // Grouping level 1: Berdasarkan Regional (WITEL)
         $reportData = $rawData->groupBy('witel')->map(function ($regionItems, $regionName) use ($thirtyDaysAgo) {
             
-            // --- FUNGSI HITUNG (Reusable) ---
             $calculateStats = function($items) use ($thirtyDaysAgo) {
                 $check = fn($i, $str) => str_contains(strtoupper($i->status_resume ?? ''), $str);
                 $isPs = fn($i) => $check($i, 'PS') || $check($i, 'COMPLETED');
@@ -48,6 +42,8 @@ class ReportHsiController extends Controller
                     'total_ps' => $items->filter($isPs)->count(),
                     'total_cancel' => $items->filter($isCancel)->count(),
                     'total_open' => $items->filter($isOpen)->count(),
+                    
+                    // --- PERHITUNGAN TETAP ADA (TAPI NANTI TIDAK DITAMPILKAN) ---
                     'open_more_30_days' => $items->filter(function($i) use ($isOpen, $thirtyDaysAgo) {
                         if (!$isOpen($i)) return false;
                         if (!$i->order_date) return false;
@@ -56,27 +52,24 @@ class ReportHsiController extends Controller
                 ];
             };
 
-            // 1. Hitung Statistik Total untuk Regional ini (Header Biru)
             $regionStats = $calculateStats($regionItems);
 
-            // 2. Grouping Level 2: Berdasarkan Kota (WITEL_OLD)
             $details = $regionItems->groupBy('witel_old')->map(function ($cityItems, $cityName) use ($calculateStats) {
                 return array_merge(
-                    ['name' => $cityName ?: 'LAIN-LAIN'], // Nama Kota
-                    $calculateStats($cityItems) // Statistik Kota
+                    ['name' => $cityName ?: 'LAIN-LAIN'],
+                    $calculateStats($cityItems)
                 );
-            })->sortBy('name')->values(); // Urutkan nama kota abjad
+            })->sortBy('name')->values();
 
             return [
                 'region_name' => $regionName,
-                'stats' => $regionStats, // Data untuk baris biru
-                'details' => $details    // Data untuk baris putih (anak-anaknya)
+                'stats' => $regionStats,
+                'details' => $details
             ];
 
         })->sortBy('region_name')->values();
 
-        // 4. Hitung Grand Total (Keseluruhan)
-        // Kita bisa ambil dari rawData langsung biar cepat
+        // Hitung Grand Total (Logic Tetap Ada)
         $checkGlobal = fn($i, $str) => str_contains(strtoupper($i->status_resume ?? ''), $str);
         $isPsGlobal = fn($i) => $checkGlobal($i, 'PS') || $checkGlobal($i, 'COMPLETED');
         $isCancelGlobal = fn($i) => $checkGlobal($i, 'CANCEL');

@@ -3,29 +3,29 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 
 // --- 1. DEFINISI MAPPING WARNA SPESIFIK (Sesuai Gambar Referensi) ---
 const CATEGORY_COLORS = {
-    // Kategori Utama dari Gambar
-    'null': '#3B82F6',          // Biru Terang (Bright Blue)
-    'LAINNYA': '#0F766E',       // Hijau Tua Teal (Dark Teal)
-    'TIDAK ADA ODP': '#06B6D4', // Biru Muda Cyan (Cyan)
-    'ODP FULL': '#A855F7',      // Ungu (Purple)
-    'ODP JAUH': '#F97316',      // Oranye (Orange)
-    'PENDING': '#EAB308',       // Kuning Emas (Yellow Gold)
-    'ODP RUSAK': '#B45309',     // Coklat/Oranye Gelap (Dark Orange/Tan)
-    'GANTI PAKET': '#EC4899',   // Pink Merah Muda (Pink)
-    'DOUBLE INPUT': '#84CC16',  // Hijau Lime (Lime Green)
-    'BATAL': '#6366F1',         // Biru Indigo (Indigo)
-    'KENDALA JALUR/RUTE TARIKAN': '#7DD3FC', // Biru Langit (Sky Blue) - Asumsi untuk "KENDALA..."
-    // Tambahkan variasi lain jika perlu, misalnya:
+    // --- KHUSUS 'null' JADI BIRU ---
+    'null': '#3B82F6',          // Biru Terang (Blue-500 Tailwind)
+    'Unknown': '#3B82F6',       // Cadangan jika label masih 'Unknown'
+
+    // Kategori Lainnya (Tetap Sama)
+    'LAINNYA': '#0F766E',       // Hijau Tua Teal
+    'TIDAK ADA ODP': '#06B6D4', // Biru Muda Cyan
+    'ODP FULL': '#A855F7',      // Ungu
+    'ODP JAUH': '#F97316',      // Oranye
+    'PENDING': '#EAB308',       // Kuning Emas
+    'ODP RUSAK': '#B45309',     // Coklat/Oranye Gelap
+    'GANTI PAKET': '#EC4899',   // Pink Merah Muda
+    'DOUBLE INPUT': '#84CC16',  // Hijau Lime
+    'BATAL': '#6366F1',         // Biru Indigo
+    'KENDALA JALUR/RUTE TARIKAN': '#7DD3FC', // Biru Langit
     'KENDALA TEKNIS': '#7DD3FC',
 };
 
-// Warna cadangan (Fallback) jika ada kategori baru yang belum terdaftar di atas
+// Warna cadangan (Fallback) jika ada kategori baru
 const FALLBACK_COLORS = [
-    '#64748B', '#94A3B8', '#CBD5E1', // Variasi Abu-abu
-    '#FCA5A5', '#FDBA74', '#FDE047'  // Warna pastel cerah lainnya
+    '#64748B', '#94A3B8', '#CBD5E1', 
+    '#FCA5A5', '#FDBA74', '#FDE047'
 ];
-// -------------------------------------------------------------------
-
 
 const StackedBarChart = ({ data, keys, title }) => {
     // Validasi data kosong
@@ -40,20 +40,19 @@ const StackedBarChart = ({ data, keys, title }) => {
     // Fungsi Render Label Angka di Dalam Bar
     const renderCustomizedLabel = (props) => {
         const { x, y, width, height, value } = props;
-        // Sembunyikan label jika nilainya 0 atau bar terlalu pendek
         if (!value || value === 0 || height < 12) return null;
 
         return (
             <text 
                 x={x + width / 2} 
                 y={y + height / 2} 
-                fill="#fff" // Warna teks putih
+                fill="#fff"
                 textAnchor="middle" 
                 dominantBaseline="central"
                 fontSize={10}
                 fontWeight="bold"
                 style={{ 
-                    textShadow: '0px 0px 2px rgba(0,0,0,0.5)', // Shadow agar terbaca di warna terang
+                    textShadow: '0px 0px 2px rgba(0,0,0,0.5)', 
                     pointerEvents: 'none' 
                 }} 
             >
@@ -105,31 +104,31 @@ const StackedBarChart = ({ data, keys, title }) => {
 
                     {/* Looping Keys untuk membuat Stacked Bar */}
                     {keys.map((key, index) => {
-                        // --- 2. LOGIKA PEMILIHAN WARNA BARU ---
-                        // Normalisasi key (ubah ke string & uppercase) agar pencocokan lebih aman
+                        // --- LOGIKA PEMILIHAN WARNA ---
                         const normalizedKey = String(key).toUpperCase().trim();
                         
-                        // Coba ambil warna dari map CATEGORY_COLORS.
-                        // Jika tidak ada, gunakan warna dari FALLBACK_COLORS berdasarkan urutan (index).
+                        // Cek warna spesifik
                         let barColor = CATEGORY_COLORS[key] || CATEGORY_COLORS[normalizedKey];
                         
+                        // Jika warna tidak ditemukan di map:
                         if (!barColor) {
-                             // Logika pencocokan parsial untuk menangani "KENDALA ..." yang panjang
-                             if (normalizedKey.startsWith('KENDALA')) {
-                                 barColor = CATEGORY_COLORS['KENDALA JALUR/RUTE TARIKAN'];
-                             } else {
-                                 barColor = FALLBACK_COLORS[index % FALLBACK_COLORS.length];
-                             }
+                            if (normalizedKey.startsWith('KENDALA')) {
+                                barColor = CATEGORY_COLORS['KENDALA JALUR/RUTE TARIKAN'];
+                            } else {
+                                // Gunakan fallback colors
+                                barColor = FALLBACK_COLORS[index % FALLBACK_COLORS.length];
+                            }
                         }
-                        // --------------------------------------
+                        // ------------------------------
 
                         return (
                             <Bar 
                                 key={key} 
                                 dataKey={key} 
                                 stackId="a" 
-                                fill={barColor} // Gunakan warna yang sudah ditentukan
+                                fill={barColor} // Warna dinamis
                                 barSize={40} 
+                                // Radius hanya untuk bar paling atas di stack
                                 radius={index === keys.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
                                 label={renderCustomizedLabel}
                             />

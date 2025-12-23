@@ -11,6 +11,8 @@ class ReportHsiController extends Controller
 {
     public function index(Request $request)
     {
+        set_time_limit(300);
+        ini_set('memory_limit', '512M');
         $startDate = $request->input('start_date');
         $endDate = $request->input('end_date');
         $allowedWitels = ['BALI', 'JATIM BARAT', 'JATIM TIMUR', 'SURAMADU', 'NUSA TENGGARA'];

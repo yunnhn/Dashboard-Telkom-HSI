@@ -14,6 +14,8 @@ class ReportHsiAdminController extends Controller
 {
     public function index(Request $request)
     {
+        set_time_limit(300);
+        ini_set('memory_limit', '512M');
         $allowedWitels = ['BALI', 'JATIM BARAT', 'JATIM TIMUR', 'SURAMADU', 'NUSA TENGGARA'];
 
         $query = HsiData::query()->whereIn('witel', $allowedWitels);

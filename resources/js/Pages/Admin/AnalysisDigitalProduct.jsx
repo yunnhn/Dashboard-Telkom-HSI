@@ -488,6 +488,7 @@ export default function AnalysisDigitalProduct({
     errors: pageErrors = {},
     customTargets = {},
     tabCounts = { inprogress: 0, complete: 0, qc: 0, history: 0, netprice: 0 },
+    branchList = [],
 }) {
     const { props } = usePage();
     const { filters } = props;
@@ -591,6 +592,7 @@ export default function AnalysisDigitalProduct({
     const [search, setSearch] = useState(filters.search || "");
     const [decimalPlaces, setDecimalPlaces] = useState(2);
     const [selectedWitel, setSelectedWitel] = useState(filters.witel || "");
+    const [selectedBranch, setSelectedBranch] = useState(filters.branch || "");
 
     const witelList = [
         "BALI",
@@ -830,6 +832,7 @@ export default function AnalysisDigitalProduct({
             period: period,
             in_progress_year: currentInProgressYear,
             witel: selectedWitel,
+            branch: selectedBranch,
             ...newFilters,
         };
 
@@ -878,13 +881,27 @@ export default function AnalysisDigitalProduct({
         if (selectedWitel) {
             params.append("witel", selectedWitel);
         }
+        if (selectedBranch) {
+            params.append("branch", selectedBranch);
+        }
         return `${route("admin.analysisDigitalProduct.export.inprogress")}?${params.toString()}`;
-    }, [currentSegment, currentInProgressYear, selectedWitel]);
+    }, [currentSegment, currentInProgressYear, selectedWitel, selectedBranch]);
 
     function handleWitelChange(e) {
         const newWitel = e.target.value;
         setSelectedWitel(newWitel);
-        handleFilterChange({ witel: newWitel, page: 1 });
+        // Reset branch when witel dikosongkan
+        const newBranch = newWitel ? selectedBranch : "";
+        if (!newWitel) {
+            setSelectedBranch("");
+        }
+        handleFilterChange({ witel: newWitel, branch: newBranch, page: 1 });
+    }
+
+    function handleBranchChange(e) {
+        const newBranch = e.target.value;
+        setSelectedBranch(newBranch);
+        handleFilterChange({ branch: newBranch, page: 1 });
     }
 
     const detailsTotals = useMemo(() => {
@@ -1322,6 +1339,20 @@ export default function AnalysisDigitalProduct({
                                             </option>
                                         ))}
                                     </select>
+                                    {selectedWitel && (
+                                        <select
+                                            value={selectedBranch}
+                                            onChange={handleBranchChange}
+                                            className="border border-gray-300 rounded-md text-sm p-2"
+                                        >
+                                            <option value="">Semua Branch</option>
+                                            {branchList.map((b) => (
+                                                <option key={b} value={b}>
+                                                    {b}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    )}
                                     <select
                                         value={currentInProgressYear}
                                         onChange={handleInProgressYearChange}

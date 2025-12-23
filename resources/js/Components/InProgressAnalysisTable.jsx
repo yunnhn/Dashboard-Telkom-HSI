@@ -86,6 +86,7 @@ const InProgressAnalysisTable = ({ dataPaginator = { data: [], links: [], from: 
                             <th className="p-3">Product Name</th>
                             <th className="p-3">Order ID</th>
                             <th className="p-3">Witel</th>
+                            <th className="p-3">Branch</th>
                             <th className="p-3">Customer Name</th>
                             <th className="p-3">Order Created Date</th>
                             <th className="p-3 text-center">Action</th>
@@ -114,6 +115,7 @@ const InProgressAnalysisTable = ({ dataPaginator = { data: [], links: [], from: 
                                         {item.order_id}
                                     </td>
                                     <td className="p-3">{item.nama_witel}</td>
+                                    <td className="p-3">{item.telda || 'Non-Telda (NCX)'}</td>
                                     <td className="p-3">
                                         {item.customer_name}
                                     </td>

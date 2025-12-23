@@ -75,6 +75,16 @@ class DashboardDigitalProductController extends Controller
         // Case Branch (Handle NULL jadi string agar bisa difilter)
         $branchCaseStatement = "COALESCE(NULLIF(telda, ''), 'Non-Telda (NCX)')";
 
+        // Flag: jika hanya satu witel dipilih, grafik witel akan diganti jadi per-branch (telda)
+        $selectedWitels = $request->input('witels', []);
+        $isSingleWitelSelected = is_array($selectedWitels) && count($selectedWitels) === 1;
+        $witelDisplaySelect = $isSingleWitelSelected
+            ? DB::raw("{$branchCaseStatement} as nama_witel")
+            : 'nama_witel';
+        $witelGroupBy = $isSingleWitelSelected
+            ? DB::raw($branchCaseStatement)
+            : 'nama_witel';
+
         // 4. PREPARE FILTER OPTIONS
         $products = ['Netmonk', 'OCA', 'Antares', 'Pijar'];
         
@@ -129,17 +139,17 @@ class DashboardDigitalProductController extends Controller
         
         // Revenue
         $revenueByWitelData = DocumentData::query()
-            ->select('nama_witel', DB::raw($productCaseStatement . ' as product'), DB::raw('SUM(net_price) as total_revenue'))
+            ->select($witelDisplaySelect, DB::raw($productCaseStatement . ' as product'), DB::raw('SUM(net_price) as total_revenue'))
             ->whereNotNull('nama_witel')->where('net_price', '>', 0)
             ->tap($applyFilters)
-            ->groupBy('nama_witel', DB::raw($productCaseStatement))->get();
+            ->groupBy($witelGroupBy, DB::raw($productCaseStatement))->get();
 
         // Amount
         $amountByWitelData = DocumentData::query()
-            ->select('nama_witel', DB::raw($productCaseStatement . ' as product'), DB::raw('COUNT(*) as total_amount'))
+            ->select($witelDisplaySelect, DB::raw($productCaseStatement . ' as product'), DB::raw('COUNT(*) as total_amount'))
             ->whereNotNull('nama_witel')
             ->tap($applyFilters)
-            ->groupBy('nama_witel', DB::raw($productCaseStatement))->get();
+            ->groupBy($witelGroupBy, DB::raw($productCaseStatement))->get();
 
         // Segment
         $productBySegmentData = DocumentData::query()

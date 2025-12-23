@@ -177,9 +177,12 @@ class AnalysisDigitalProductController extends Controller
     public function index(Request $request)
     {
         // [1] FILTER DASAR
-        $filters = $request->only(['search', 'period', 'segment', 'witel', 'in_progress_year', 'net_price_status', 'channel', 'price_status', 'tab']);
+        $filters = $request->only(['search', 'period', 'segment', 'witel', 'branch', 'in_progress_year', 'net_price_status', 'channel', 'price_status', 'tab']);
         $activeTab = $request->input('tab', 'inprogress');
         $search = $request->input('search');
+        $selectedBranch = $request->input('branch');
+
+        $branchCase = "COALESCE(NULLIF(telda, ''), 'Non-Telda (NCX)')";
 
         $periodInput = $request->input('period', now()->format('Y-m'));
         $selectedSegment = $request->input('segment', 'SME');
@@ -196,16 +199,21 @@ class AnalysisDigitalProductController extends Controller
             ->where('segment', $selectedSegment)
             ->whereYear('order_created_date', $request->input('in_progress_year', now()->year))
             ->when($request->input('witel'), fn ($q, $w) => $q->where('nama_witel', $w))
+            ->when($selectedBranch, fn ($q, $b) => $q->where(DB::raw($branchCase), $b))
             ->when($search, fn ($q, $s) => $q->where('order_id', 'like', '%' . $s . '%'));
 
         $completeQuery = DocumentData::query()
             ->where('status_wfm', 'done close bima')
             ->where('segment', $selectedSegment)
+            ->when($request->input('witel'), fn ($q, $w) => $q->where('nama_witel', $w))
+            ->when($selectedBranch, fn ($q, $b) => $q->where(DB::raw($branchCase), $b))
             ->when($search, fn ($q, $s) => $q->where('order_id', 'like', '%' . $s . '%'));
 
         $qcQuery = DocumentData::query()
             ->where('status_wfm', '')
             ->where('segment', $selectedSegment)
+            ->when($request->input('witel'), fn ($q, $w) => $q->where('nama_witel', $w))
+            ->when($selectedBranch, fn ($q, $b) => $q->where(DB::raw($branchCase), $b))
             ->when($search, fn ($q, $s) => $q->where('order_id', 'like', '%' . $s . '%'));
 
         $historyQuery = UpdateLog::query()
@@ -296,6 +304,15 @@ class AnalysisDigitalProductController extends Controller
             ->paginate($paginationCount, ['*'], 'net_price_page')
             ->withQueryString();
 
+        // [5.1] BRANCH LIST (TELDA) UNTUK WITEL TERPILIH
+        $branchList = DocumentData::query()
+            ->where('segment', $selectedSegment)
+            ->when($request->input('witel'), fn ($q, $w) => $q->where('nama_witel', $w))
+            ->select(DB::raw("{$branchCase} as telda"))
+            ->distinct()
+            ->orderBy('telda')
+            ->pluck('telda');
+
         // [6] LOAD AUX DATA
         $pageName = 'analysis_digital_' . strtolower($selectedSegment);
         $configRecord = UserTableConfiguration::where('page_name', $pageName)->first();
@@ -359,6 +376,7 @@ class AnalysisDigitalProductController extends Controller
             'customTargets' => $customTargets->groupBy('target_key')->map(fn ($group) => $group->pluck('value', 'witel')),
             'savedTableConfig' => $savedTableConfig,
             'filters' => $filters,
+            'branchList' => $branchList,
         ]);
     }
 

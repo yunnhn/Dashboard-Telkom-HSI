@@ -1,208 +1,233 @@
+import React, { useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head } from '@inertiajs/react';
+import { Head, useForm, router } from '@inertiajs/react';
 
-export default function ReportHsi({ auth, reportData, totals }) {
+export default function ReportHsiAdmin({ auth, hsiData, filters }) {
+    // State Search
+    const [search, setSearch] = useState(filters.search || '');
+    
+    // State Upload Form
+    const { data, setData, post, progress, processing, reset, errors } = useForm({
+        file: null,
+        date_format: 'm/d/Y',
+    });
 
-    const formatNumber = (num) => {
-        return new Intl.NumberFormat('id-ID').format(num);
+    // 1. Handle Search
+    const handleSearch = (e) => {
+        if (e.key === 'Enter') {
+            router.get(route('admin.report_hsi.index'), { search }, { preserveState: true });
+        }
     };
 
-    const getPsReColor = (value) => {
-        const num = parseFloat(value);
-        if (isNaN(num)) return '';
-        return num > 80 ? 'bg-[#24c55f] text-white font-bold' : 'bg-[#e65253] text-white font-bold';
+    // 2. Handle Upload (PENTING: forceFormData: true)
+    const handleUpload = (e) => {
+        e.preventDefault();
+        
+        if (!data.file) {
+            alert("Pilih file terlebih dahulu!");
+            return;
+        }
+
+        post(route('admin.report_hsi.store'), {
+            forceFormData: true, // <--- INI WAJIB UNTUK UPLOAD FILE
+            onSuccess: () => {
+                reset('file');
+                alert('Upload Berhasil!');
+                // Reload halaman manual untuk memastikan data terbaru tampil
+                router.reload({ only: ['hsiData'] });
+            },
+            onError: (err) => {
+                console.error(err);
+                alert('Gagal Upload. Cek konsol atau pastikan format file benar.');
+            }
+        });
     };
 
-    const colors = {
-        blue: 'bg-[#3e81f4]',
-        red: 'bg-[#e65253]',
-        green: 'bg-[#24c55f]',
-        gray: 'bg-[#6b717f]',
+    // 3. Handle Reset Database
+    const handleResetDb = () => {
+        if (window.confirm('PERINGATAN: Apakah Anda yakin ingin MENGHAPUS SEMUA DATA? Tindakan ini tidak bisa dibatalkan.')) {
+            router.delete(route('admin.report_hsi.destroy_all'), {
+                onSuccess: () => alert('Database berhasil dikosongkan.'),
+                onError: () => alert('Gagal mereset database.')
+            });
+        }
     };
 
-    const totalRowStyle = "bg-[#cccccc] text-[#464647] font-bold border-slate-400";
+    // 4. Handle Delete Single
+    const handleDelete = (id) => {
+        if (window.confirm('Hapus data baris ini?')) {
+            router.delete(route('admin.report_hsi.destroy', id), {
+                preserveScroll: true,
+                onSuccess: () => console.log('Deleted'),
+            });
+        }
+    };
+
+    // 5. Pagination
+    const handlePageChange = (url) => {
+        if (url) {
+            router.get(url, { search }, { preserveState: true, preserveScroll: true });
+        }
+    };
 
     return (
         <AuthenticatedLayout
             user={auth.user}
-            header={<h2 className="font-semibold text-xl text-gray-800 leading-tight">Report HSI</h2>}
+            header={<h2 className="font-semibold text-xl text-gray-800 leading-tight">Admin - Kelola Data HSI</h2>}
         >
-            <Head title="Report HSI" />
+            <Head title="Admin HSI" />
 
-            <div className="py-6">
-                <div className="max-w-[99%] mx-auto sm:px-2 lg:px-4">
-                    <div className="bg-white overflow-hidden shadow-xl sm:rounded-lg">
-                        
-                        <div className="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
-                            <h3 className="text-lg font-bold text-gray-800 uppercase tracking-wide">
-                                Performance Report HSI Per Witel
+            <div className="py-8">
+                <div className="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
+                    
+                    {/* --- PANEL UPLOAD --- */}
+                    <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                        <div className="flex flex-col md:flex-row justify-between gap-6">
+                            
+                            {/* FORM UPLOAD */}
+                            <form onSubmit={handleUpload} className="flex-1 flex flex-col gap-4">
+                                <h3 className="font-bold text-lg text-gray-700">Import Data Excel</h3>
+                                
+                                {/* Error Message dari Backend */}
+                                {errors.file && <div className="text-red-500 text-sm">{errors.file}</div>}
+
+                                <div className="flex flex-col md:flex-row gap-4 items-end">
+                                    <div className="w-full">
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">File Excel/CSV</label>
+                                        <input 
+                                            type="file" 
+                                            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 border border-gray-300 rounded-md cursor-pointer"
+                                            onChange={e => setData('file', e.target.files[0])}
+                                            accept=".xlsx,.xls,.csv"
+                                        />
+                                        {progress && (
+                                            <div className="w-full bg-gray-200 rounded-full h-2.5 mt-2">
+                                                <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${progress.percentage}%` }}></div>
+                                                <span className="text-xs text-gray-500">{progress.percentage}% Uploaded</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                    
+                                    <div className="min-w-[150px]">
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Format Tanggal</label>
+                                        <select 
+                                            className="border-gray-300 rounded-md text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500 w-full p-2"
+                                            value={data.date_format}
+                                            onChange={e => setData('date_format', e.target.value)}
+                                        >
+                                            <option value="m/d/Y">Bulan/Hari/Thn (Excel Default)</option>
+                                            <option value="d/m/Y">Hari/Bulan/Thn (Indo)</option>
+                                            <option value="Y-m-d">Tahun-Bulan-Hari (SQL)</option>
+                                        </select>
+                                    </div>
+
+                                    <button 
+                                        type="submit" 
+                                        disabled={processing}
+                                        className={`font-bold py-2 px-6 rounded shadow text-white transition ${processing ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
+                                    >
+                                        {processing ? 'Processing...' : 'Upload'}
+                                    </button>
+                                </div>
+                            </form>
+
+                            {/* TOMBOL RESET DB */}
+                            <div className="flex items-end border-l pl-6 border-gray-300">
+                                <button 
+                                    onClick={handleResetDb}
+                                    className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded shadow whitespace-nowrap"
+                                >
+                                    Reset / Kosongkan Database
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* --- TABEL DATA --- */}
+                    <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="font-bold text-lg text-gray-700">
+                                Data Preview <span className="text-sm font-normal text-gray-500">({hsiData?.total || 0} Rows)</span>
                             </h3>
-                            <span className="text-xs font-mono text-gray-500 bg-gray-200 px-2 py-1 rounded">
-                                Last Updated: {new Date().toLocaleDateString('id-ID')}
-                            </span>
+                            <input 
+                                type="text" 
+                                placeholder="Cari Order ID..." 
+                                className="border-gray-300 rounded-md text-sm shadow-sm focus:ring-blue-500 focus:border-blue-500 w-1/3 p-2"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                onKeyDown={handleSearch}
+                            />
                         </div>
 
                         <div className="overflow-x-auto">
-                            <table className="w-full text-[10px] border-collapse border border-slate-400 text-center font-sans">
-                                
-                                <thead className="text-white font-bold uppercase tracking-wider sticky top-0 z-20 shadow-sm">
+                            <table className="min-w-full divide-y divide-gray-200 text-sm">
+                                <thead className="bg-gray-50">
                                     <tr>
-                                        <th className={`border border-slate-300 p-2 min-w-[150px] sticky left-0 z-30 ${colors.blue}`} rowSpan={4}>Witel</th>
-                                        <th className={`border border-slate-300 p-1 ${colors.blue}`} rowSpan={4}>PRE PI</th>
-                                        <th className={`border border-slate-300 p-1 ${colors.blue}`} rowSpan={4}>Registered (RE)</th>
-                                        <th className={`border border-slate-300 p-1 ${colors.gray}`} rowSpan={4}>Inpro SC</th>
-                                        <th className={`border border-slate-300 p-1 ${colors.gray}`} rowSpan={4}>QC 1</th>
-                                        <th className={`border border-slate-300 p-1 ${colors.gray}`} rowSpan={4}>FCC</th>
-                                        <th className={`border border-slate-300 p-1 ${colors.red}`} rowSpan={4}>RJCT FCC</th>
-                                        <th className={`border border-slate-300 p-1 ${colors.gray}`} rowSpan={4}>Survey Manja</th>
-                                        <th className={`border border-slate-300 p-1 ${colors.gray}`} rowSpan={4}>UN-SC</th>
-                                        <th className={`border border-slate-300 p-1 ${colors.gray}`} colSpan={13}>OGP</th>
-                                        <th className={`border border-slate-300 p-1 ${colors.green}`} rowSpan={4}>JML COMP (PS)</th>
-                                        <th className={`border border-slate-300 p-1 ${colors.red}`} colSpan={4}>CANCEL</th>
-                                        <th className={`border border-slate-300 p-1 ${colors.red}`} rowSpan={4}>TOTAL CANCEL</th>
-                                        <th className={`border border-slate-300 p-1 ${colors.red}`} rowSpan={4}>REVOKE</th>
-                                        <th className={`border border-slate-300 p-1 ${colors.blue}`} colSpan={3}>PERFORMANCE</th>
-                                    </tr>
-                                    <tr>
-                                        <th className={`border border-slate-300 p-1 ${colors.gray}`} colSpan={3}>PI</th>
-                                        <th className={`border border-slate-300 p-1 ${colors.gray}`} rowSpan={3}>TOTAL PI</th>
-                                        <th className={`border border-slate-300 p-1 ${colors.gray}`} colSpan={7}>FALLOUT</th>
-                                        <th className={`border border-slate-300 p-1 ${colors.gray}`} rowSpan={3}>TOTAL FALLOUT</th>
-                                        <th className={`border border-slate-300 p-1 ${colors.gray}`} rowSpan={3}>ACT COMP (QC2)</th>
-                                        <th className={`border border-slate-300 p-1 ${colors.red}`} rowSpan={3}>KNDL Plgn</th>
-                                        <th className={`border border-slate-300 p-1 ${colors.red}`} rowSpan={3}>KNDL Teknis</th>
-                                        <th className={`border border-slate-300 p-1 ${colors.red}`} rowSpan={3}>KNDL System</th>
-                                        <th className={`border border-slate-300 p-1 ${colors.red}`} rowSpan={3}>KNDL Others</th>
-                                        <th className={`border border-slate-300 p-1 ${colors.blue}`} rowSpan={3}>PI/RE</th>
-                                        <th className={`border border-slate-300 p-1 ${colors.blue}`} rowSpan={3}>PS/RE</th>
-                                        <th className={`border border-slate-300 p-1 ${colors.blue}`} rowSpan={3}>PS/PI</th>
-                                    </tr>
-                                    <tr>
-                                        <th className={`border border-slate-300 p-1 ${colors.gray}`} rowSpan={2}>&lt; 1 Hari</th>
-                                        <th className={`border border-slate-300 p-1 ${colors.gray}`} rowSpan={2}>1-3 Hari</th>
-                                        <th className={`border border-slate-300 p-1 ${colors.gray}`} rowSpan={2}>&gt; 3 Hari</th>
-                                        <th className={`border border-slate-300 p-1 ${colors.gray}`} colSpan={4}>WFM</th>
-                                        <th className={`border border-slate-300 p-1 ${colors.gray}`} rowSpan={2}>UIM</th>
-                                        <th className={`border border-slate-300 p-1 ${colors.gray}`} rowSpan={2}>ASP</th>
-                                        <th className={`border border-slate-300 p-1 ${colors.gray}`} rowSpan={2}>OSM</th>
-                                    </tr>
-                                    <tr>
-                                        <th className={`border border-slate-300 p-1 ${colors.gray}`}>KNDL Plgn</th>
-                                        <th className={`border border-slate-300 p-1 ${colors.gray}`}>KNDL Teknis</th>
-                                        <th className={`border border-slate-300 p-1 ${colors.gray}`}>KNDL System</th>
-                                        <th className={`border border-slate-300 p-1 ${colors.gray}`}>KNDL Others</th>
+                                        <th className="px-4 py-3 text-left font-medium text-gray-500">Order ID</th>
+                                        <th className="px-4 py-3 text-left font-medium text-gray-500">Tanggal</th>
+                                        <th className="px-4 py-3 text-left font-medium text-gray-500">Pelanggan</th>
+                                        <th className="px-4 py-3 text-left font-medium text-gray-500">Witel</th>
+                                        <th className="px-4 py-3 text-left font-medium text-gray-500">Status</th>
+                                        <th className="px-4 py-3 text-center font-medium text-gray-500">Aksi</th>
                                     </tr>
                                 </thead>
-
-                                <tbody className="bg-white text-gray-700">
-                                    {reportData.map((row, index) => (
-                                        <tr 
-                                            key={index} 
-                                            className={`
-                                                transition-colors 
-                                                ${row.row_type === 'main' ? 'bg-slate-100' : 'bg-white hover:bg-blue-50'}
-                                                ${row.row_type === 'main' ? 'font-bold text-black border-t-2 border-slate-300' : ''}
-                                            `}
-                                        >
-                                            {/* Logic Tampilan Kolom Witel */}
-                                            <td className={`border border-slate-300 p-1 text-left sticky left-0 z-10 px-2 
-                                                ${row.row_type === 'main' ? 'bg-slate-100 font-extrabold uppercase' : 'bg-inherit pl-6'}
-                                            `}>
-                                                {row.witel_display}
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                    {hsiData && hsiData.data && hsiData.data.length > 0 ? (
+                                        hsiData.data.map((item) => (
+                                            <tr key={item.id} className="hover:bg-gray-50 transition">
+                                                <td className="px-4 py-3 font-medium text-blue-600">{item.order_id || item.track_id}</td>
+                                                <td className="px-4 py-3 text-gray-500">{item.order_date}</td>
+                                                <td className="px-4 py-3 text-gray-900 font-semibold">{item.customer_name}</td>
+                                                <td className="px-4 py-3 text-gray-500">{item.witel}</td>
+                                                <td className="px-4 py-3">
+                                                    <span className={`px-2 py-1 rounded-full text-xs font-semibold
+                                                        ${item.kelompok_status === 'PS' ? 'bg-green-100 text-green-800' : 
+                                                          item.kelompok_status === 'CANCEL' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}
+                                                    `}>
+                                                        {item.kelompok_status}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3 text-center">
+                                                    <button 
+                                                        onClick={() => handleDelete(item.id)}
+                                                        className="text-red-600 hover:text-red-900 font-bold px-2 py-1 hover:bg-red-50 rounded"
+                                                        title="Hapus baris ini"
+                                                    >
+                                                        X
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    ) : (
+                                        <tr>
+                                            <td colSpan="6" className="text-center py-8 text-gray-500 italic">
+                                                Tidak ada data. Silakan upload file Excel.
                                             </td>
-                                            
-                                            <td className="border border-slate-300 p-1">{formatNumber(row.pre_pi)}</td>
-                                            <td className="border border-slate-300 p-1">{formatNumber(row.registered)}</td>
-                                            <td className="border border-slate-300 p-1">{formatNumber(row.inprogress_sc)}</td>
-                                            <td className="border border-slate-300 p-1">{formatNumber(row.qc1)}</td>
-                                            <td className="border border-slate-300 p-1">{formatNumber(row.fcc)}</td>
-                                            <td className="border border-slate-300 p-1">{formatNumber(row.cancel_by_fcc)}</td>
-                                            <td className="border border-slate-300 p-1">{formatNumber(row.survey_new_manja)}</td>
-                                            <td className="border border-slate-300 p-1">{formatNumber(row.unsc)}</td>
-
-                                            <td className="border border-slate-300 p-1">{formatNumber(row.pi_under_1_hari)}</td>
-                                            <td className="border border-slate-300 p-1">{formatNumber(row.pi_1_3_hari)}</td>
-                                            <td className="border border-slate-300 p-1">{formatNumber(row.pi_over_3_hari)}</td>
-                                            <td className="border border-slate-300 p-1 bg-slate-50">{formatNumber(row.total_pi)}</td>
-                                            
-                                            <td className="border border-slate-300 p-1">{formatNumber(row.fo_wfm_kndl_plgn)}</td>
-                                            <td className="border border-slate-300 p-1">{formatNumber(row.fo_wfm_kndl_teknis)}</td>
-                                            <td className="border border-slate-300 p-1">{formatNumber(row.fo_wfm_kndl_sys)}</td>
-                                            <td className="border border-slate-300 p-1">{formatNumber(row.fo_wfm_others)}</td>
-                                            
-                                            <td className="border border-slate-300 p-1">{formatNumber(row.fo_uim)}</td>
-                                            <td className="border border-slate-300 p-1">{formatNumber(row.fo_asp)}</td>
-                                            <td className="border border-slate-300 p-1">{formatNumber(row.fo_osm)}</td>
-                                            <td className="border border-slate-300 p-1 bg-slate-50">{formatNumber(row.total_fallout)}</td>
-                                            
-                                            <td className="border border-slate-300 p-1">{formatNumber(row.act_comp)}</td>
-                                            <td className="border border-slate-300 p-1 bg-slate-50">{formatNumber(row.jml_comp_ps)}</td>
-
-                                            <td className="border border-slate-300 p-1">{formatNumber(row.cancel_kndl_plgn)}</td>
-                                            <td className="border border-slate-300 p-1">{formatNumber(row.cancel_kndl_teknis)}</td>
-                                            <td className="border border-slate-300 p-1">{formatNumber(row.cancel_kndl_sys)}</td>
-                                            <td className="border border-slate-300 p-1">{formatNumber(row.cancel_others)}</td>
-                                            <td className="border border-slate-300 p-1 bg-slate-50">{formatNumber(row.total_cancel)}</td>
-
-                                            <td className="border border-slate-300 p-1">{formatNumber(row.revoke)}</td>
-
-                                            <td className="border border-slate-300 p-1">{row.pi_re_percent}%</td>
-                                            <td className={`border border-slate-300 p-1 ${getPsReColor(row.ps_re_percent)}`}>
-                                                {row.ps_re_percent}%
-                                            </td>
-                                            <td className="border border-slate-300 p-1">{row.ps_pi_percent}%</td>
                                         </tr>
-                                    ))}
+                                    )}
                                 </tbody>
-
-                                <tfoot className="sticky bottom-0 z-20">
-                                    <tr className={totalRowStyle}>
-                                        <td className="border border-slate-400 p-2 sticky left-0 z-30 bg-[#cccccc]">TOTAL</td>
-                                        <td className="border border-slate-400 p-1">{formatNumber(totals.pre_pi)}</td>
-                                        <td className="border border-slate-400 p-1">{formatNumber(totals.registered)}</td>
-                                        <td className="border border-slate-400 p-1">{formatNumber(totals.inprogress_sc)}</td>
-                                        <td className="border border-slate-400 p-1">{formatNumber(totals.qc1)}</td>
-                                        <td className="border border-slate-400 p-1">{formatNumber(totals.fcc)}</td>
-                                        <td className="border border-slate-400 p-1">{formatNumber(totals.cancel_by_fcc)}</td>
-                                        <td className="border border-slate-400 p-1">{formatNumber(totals.survey_new_manja)}</td>
-                                        <td className="border border-slate-400 p-1">{formatNumber(totals.unsc)}</td>
-
-                                        <td className="border border-slate-400 p-1">{formatNumber(totals.pi_under_1_hari)}</td>
-                                        <td className="border border-slate-400 p-1">{formatNumber(totals.pi_1_3_hari)}</td>
-                                        <td className="border border-slate-400 p-1">{formatNumber(totals.pi_over_3_hari)}</td>
-                                        <td className="border border-slate-400 p-1">{formatNumber(totals.total_pi)}</td>
-
-                                        <td className="border border-slate-400 p-1">{formatNumber(totals.fo_wfm_kndl_plgn)}</td>
-                                        <td className="border border-slate-400 p-1">{formatNumber(totals.fo_wfm_kndl_teknis)}</td>
-                                        <td className="border border-slate-400 p-1">{formatNumber(totals.fo_wfm_kndl_sys)}</td>
-                                        <td className="border border-slate-400 p-1">{formatNumber(totals.fo_wfm_others)}</td>
-
-                                        <td className="border border-slate-400 p-1">{formatNumber(totals.fo_uim)}</td>
-                                        <td className="border border-slate-400 p-1">{formatNumber(totals.fo_asp)}</td>
-                                        <td className="border border-slate-400 p-1">{formatNumber(totals.fo_osm)}</td>
-                                        <td className="border border-slate-400 p-1">{formatNumber(totals.total_fallout)}</td>
-                                        <td className="border border-slate-400 p-1">{formatNumber(totals.act_comp)}</td>
-
-                                        <td className="border border-slate-400 p-1">{formatNumber(totals.jml_comp_ps)}</td>
-
-                                        <td className="border border-slate-400 p-1">{formatNumber(totals.cancel_kndl_plgn)}</td>
-                                        <td className="border border-slate-400 p-1">{formatNumber(totals.cancel_kndl_teknis)}</td>
-                                        <td className="border border-slate-400 p-1">{formatNumber(totals.cancel_kndl_sys)}</td>
-                                        <td className="border border-slate-400 p-1">{formatNumber(totals.cancel_others)}</td>
-                                        <td className="border border-slate-400 p-1">{formatNumber(totals.total_cancel)}</td>
-
-                                        <td className="border border-slate-400 p-1">{formatNumber(totals.revoke)}</td>
-
-                                        <td className="border border-slate-400 p-1">{totals.pi_re_percent}%</td>
-                                        <td className={`border border-slate-400 p-1 ${getPsReColor(totals.ps_re_percent)}`}>
-                                            {totals.ps_re_percent}%
-                                        </td>
-                                        <td className="border border-slate-400 p-1">{totals.ps_pi_percent}%</td>
-                                    </tr>
-                                </tfoot>
                             </table>
                         </div>
+
+                        {/* Pagination Controls */}
+                        {hsiData && hsiData.links && (
+                            <div className="mt-4 flex justify-end gap-1">
+                                {hsiData.links.map((link, i) => (
+                                    <button
+                                        key={i}
+                                        onClick={() => handlePageChange(link.url)}
+                                        disabled={!link.url || link.active}
+                                        className={`px-3 py-1 border rounded text-xs transition
+                                            ${link.active ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 hover:bg-gray-100'}
+                                            ${!link.url ? 'opacity-50 cursor-not-allowed' : ''}
+                                        `}
+                                        dangerouslySetInnerHTML={{ __html: link.label }}
+                                    />
+                                ))}
+                            </div>
+                        )}
                     </div>
+
                 </div>
             </div>
         </AuthenticatedLayout>

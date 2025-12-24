@@ -22,6 +22,7 @@ class DashboardHsiController extends Controller
         $selectedWitels = $request->input('global_witel', []); 
         $selectedBranches = $request->input('global_branch', []); 
         $mapStatus = $request->input('map_status', []);
+        $searchQuery = $request->input('search'); // <--- Tambahkan baris ini
 
         // 2. DEFINE SCOPE: RSO 2
         $rso2Witels = ['JATIM BARAT', 'JATIM TIMUR', 'SURAMADU', 'BALI', 'NUSA TENGGARA', 'JAWA TIMUR'];
@@ -145,6 +146,36 @@ class DashboardHsiController extends Controller
             'open'      => (clone $baseQuery)->whereNotIn('kelompok_status', ['PS', 'CANCEL', 'REJECT_FCC'])->count(),
         ];
 
+        // =================================================================
+        // [BARU] DATA PREVIEW TABLE (PAGINATED & SEARCHABLE)
+        // =================================================================
+        $tableQuery = (clone $baseQuery); 
+
+        // SEARCH LOGIC (Hanya cari kolom yang pasti ada)
+        if ($searchQuery) {
+            $tableQuery->where(function($q) use ($searchQuery) {
+                $q->where('order_id', 'like', "%{$searchQuery}%")
+                  ->orWhere('customer_name', 'like', "%{$searchQuery}%")
+                  // Ganti produk menjadi type_layanan
+                  ->orWhere('type_layanan', 'like', "%{$searchQuery}%");
+            });
+        }
+
+        // SELECT DATA (Ganti 'produk' jadi 'type_layanan')
+        $tableData = $tableQuery->select(
+            'order_id', 
+            'order_date', 
+            'customer_name', 
+            'witel', 
+            'sto', 
+            'type_layanan', // Nama asli di DB
+            'kelompok_status', 
+            'status_resume'
+        )
+        ->orderBy('order_date', 'asc')
+        ->paginate(10)
+        ->withQueryString();
+
         return Inertia::render('DashboardHSI', [
             'stats'         => $stats,
             'mapData'       => $mapData,
@@ -157,7 +188,8 @@ class DashboardHsiController extends Controller
             'witels'        => $rso2Witels,
             'filters'       => $request->only(['start_date', 'end_date', 'global_witel', 'global_branch', 'map_status']),
             'dimensionLabel'=> $dimensionLabel,
-            'branchMap'     => $branchMap
+            'branchMap'     => $branchMap,
+            'tableData'     => $tableData
         ]);
     }
 

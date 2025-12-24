@@ -47,7 +47,14 @@ class DashboardDigitalProductController extends Controller
             ->where('net_price', '>', 0)
             ->groupBy('sub_type', 'product');
 
-        $date = Carbon::parse($period);
+        // Support range period like '06/11/2025 - 24/12/2025' by using start date's month
+        $normalized = str_replace(['–', '—'], '-', $period);
+        if (strpos($normalized, '/') !== false && strpos($normalized, '-') !== false) {
+            [$start, $end] = array_map('trim', explode('-', $normalized));
+            $date = Carbon::createFromFormat('d/m/Y', $start);
+        } else {
+            $date = Carbon::parse($period);
+        }
         $revenueBySubTypeQuery->whereYear('order_date', $date->year)
                               ->whereMonth('order_date', $date->month);
 

@@ -26,7 +26,16 @@ class DataReportExport implements FromView, WithTitle, ShouldAutoSize
         $this->tableConfig = $tableConfig; // Ini adalah config untuk SME
         $this->detailsLegs = $detailsLegs;
         $this->detailsSme = $detailsSme;
-        $this->period = \Carbon\Carbon::parse($period)->format('F Y');
+        // Support range input like '06/11/2025 - 24/12/2025'
+        $normalizedPeriod = str_replace(['–', '—'], '-', $period);
+        if (strpos($normalizedPeriod, '/') !== false && strpos($normalizedPeriod, '-') !== false) {
+            [$start, $end] = array_map('trim', explode('-', $normalizedPeriod));
+            $startFormatted = \Carbon\Carbon::createFromFormat('d/m/Y', $start)->format('F Y');
+            $endFormatted = \Carbon\Carbon::createFromFormat('d/m/Y', $end)->format('F Y');
+            $this->period = $startFormatted . ' - ' . $endFormatted;
+        } else {
+            $this->period = \Carbon\Carbon::parse($period)->format('F Y');
+        }
     }
 
     public function view(): View

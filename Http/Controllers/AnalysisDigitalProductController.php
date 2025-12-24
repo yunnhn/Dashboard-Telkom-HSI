@@ -67,7 +67,14 @@ class AnalysisDigitalProductController extends Controller
     {
         $periodInput = $request->input('period', now()->format('Y-m'));
         $selectedSegment = $request->input('segment', 'SME');
-        $reportPeriod = \Carbon\Carbon::parse($periodInput)->startOfMonth();
+        // Support range input like '06/11/2025 - 24/12/2025'
+        $normalized = str_replace(['–', '—'], '-', $periodInput);
+        if (strpos($normalized, '/') !== false && strpos($normalized, '-') !== false) {
+            [$start, $end] = array_map('trim', explode('-', $normalized));
+            $reportPeriod = \Carbon\Carbon::createFromFormat('d/m/Y', $start)->startOfMonth();
+        } else {
+            $reportPeriod = \Carbon\Carbon::parse($periodInput)->startOfMonth();
+        }
         $inProgressYear = $request->input('in_progress_year', now()->year);
         $masterWitelList = ['BALI', 'JATIM BARAT', 'JATIM TIMUR', 'NUSA TENGGARA', 'SURAMADU'];
         $documentData = DocumentData::whereIn('nama_witel', $masterWitelList)->where('segment', $selectedSegment)->whereYear('order_created_date', $reportPeriod->year)->whereMonth('order_created_date', $reportPeriod->month)->get();

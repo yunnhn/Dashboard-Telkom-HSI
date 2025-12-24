@@ -186,7 +186,14 @@ class AnalysisDigitalProductController extends Controller
 
         $periodInput = $request->input('period', now()->format('Y-m'));
         $selectedSegment = $request->input('segment', 'SME');
-        $reportPeriod = \Carbon\Carbon::parse($periodInput)->startOfMonth();
+        // Handle range like '06/11/2025 - 24/12/2025' by using the start date's month
+        $normalized = str_replace(['–', '—'], '-', $periodInput);
+        if (strpos($normalized, '/') !== false && strpos($normalized, '-') !== false) {
+            [$start, $end] = array_map('trim', explode('-', $normalized));
+            $reportPeriod = \Carbon\Carbon::createFromFormat('d/m/Y', $start)->startOfMonth();
+        } else {
+            $reportPeriod = \Carbon\Carbon::parse($periodInput)->startOfMonth();
+        }
         $paginationCount = 15;
 
         // [2] LOAD REPORT DATA UTAMA

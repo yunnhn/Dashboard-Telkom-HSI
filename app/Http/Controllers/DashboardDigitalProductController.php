@@ -44,7 +44,7 @@ class DashboardDigitalProductController extends Controller
         $initialStartDate = $isEmbed
             ? now()->startOfYear()->format('Y-m-d')
             : ($firstOrderDate ? Carbon::parse($firstOrderDate)->format('Y-m-d') : now()->format('Y-m-d'));
-        
+
         $initialEndDate = $latestOrderDate ? Carbon::parse($latestOrderDate)->format('Y-m-d') : now()->format('Y-m-d');
 
         $startDateToUse = $request->input('startDate', $initialStartDate);
@@ -87,11 +87,11 @@ class DashboardDigitalProductController extends Controller
 
         // 4. PREPARE FILTER OPTIONS
         $products = ['Netmonk', 'OCA', 'Antares', 'Pijar'];
-        
+
         $witelList = DocumentData::query()
             ->select('nama_witel')
             ->whereNotNull('nama_witel')
-            ->whereNotNull(DB::raw($productCaseStatement)) 
+            ->whereNotNull(DB::raw($productCaseStatement))
             ->distinct()->orderBy('nama_witel')->pluck('nama_witel');
 
         // Branch List Master (Termasuk NCX)
@@ -116,7 +116,7 @@ class DashboardDigitalProductController extends Controller
         // 5. CORE FILTER LOGIC
         $applyFilters = function ($query) use ($request, $startDateToUse, $endDateToUse, $subTypeCaseStatement, $productCaseStatement, $branchCaseStatement) {
             $query->whereBetween('order_date', [$startDateToUse . ' 00:00:00', $endDateToUse . ' 23:59:59']);
-            
+
             // Hapus "Data Hantu" (Product tak dikenal)
             $query->whereNotNull(DB::raw($productCaseStatement));
 
@@ -136,7 +136,7 @@ class DashboardDigitalProductController extends Controller
         };
 
         // 6. QUERY DATA DASHBOARD
-        
+
         // Revenue
         $revenueByWitelData = DocumentData::query()
             ->select($witelDisplaySelect, DB::raw($productCaseStatement . ' as product'), DB::raw('SUM(net_price) as total_revenue'))
@@ -162,7 +162,7 @@ class DashboardDigitalProductController extends Controller
         $productByChannelData = DocumentData::query()
             ->select(
                 DB::raw($productCaseStatement . ' as product'),
-                DB::raw("COALESCE(NULLIF(channel, ''), 'Unmapped') as channel"), 
+                DB::raw("COALESCE(NULLIF(channel, ''), 'Unmapped') as channel"),
                 DB::raw('COUNT(*) as total')
             )
             ->tap($applyFilters)
@@ -199,7 +199,7 @@ class DashboardDigitalProductController extends Controller
                 'order_status_n',
                 'tahun',
                 // Logic khusus Telda/Branch tetap dipertahankan
-                DB::raw("COALESCE(NULLIF(telda, ''), 'Non-Telda (NCX)') as telda"), 
+                DB::raw("COALESCE(NULLIF(telda, ''), 'Non-Telda (NCX)') as telda"),
                 'week',
                 'order_date',
                 'order_created_date'

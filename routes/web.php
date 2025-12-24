@@ -92,10 +92,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // 2. Import Excel HSI (INI YANG DITAMBAHKAN)
     Route::post('/dashboard/hsi/import', [DashboardHsiController::class, 'import'])->name('dashboard.import');
-    
-    // 3. Report HSI
-    Route::get('/report-hsi', [ReportHsiController::class, 'index'])->name('report.hsi');
-
+    Route::get('/report-hsi', [ReportHsiController::class, 'index'])
+    ->name('report.hsi');
     // 4. Admin Report HSI
     Route::get('/admin/report-hsi', [ReportHsiAdminController::class, 'index'])->name('admin.report.hsi.index');
     Route::post('/admin/report-hsi/import', [ReportHsiAdminController::class, 'store'])->name('admin.report.hsi.import');

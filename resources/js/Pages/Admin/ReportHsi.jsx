@@ -7,9 +7,10 @@ export default function ReportHsiAdmin({ auth, hsiData, filters }) {
     const [search, setSearch] = useState(filters.search || '');
     
     // State Upload Form
-    const { data, setData, post, progress, processing, reset, errors } = useForm({
+    // Default format langsung ke 'd/m/Y' sesuai request
+    const { data, setData, post, reset, errors } = useForm({
         file: null,
-        date_format: 'm/d/Y',
+        date_format: 'd/m/Y', 
     });
 
     // 1. Handle Search
@@ -28,12 +29,14 @@ export default function ReportHsiAdmin({ auth, hsiData, filters }) {
             return;
         }
 
+        // Tampilkan alert manual jika ingin memberi feedback ke user tanpa mengubah tombol
+        // alert("Proses upload dimulai. Mohon tunggu..."); 
+
         post(route('admin.report_hsi.store'), {
-            forceFormData: true, // <--- INI WAJIB UNTUK UPLOAD FILE
+            forceFormData: true,
             onSuccess: () => {
                 reset('file');
                 alert('Upload Berhasil!');
-                // Reload halaman manual untuk memastikan data terbaru tampil
                 router.reload({ only: ['hsiData'] });
             },
             onError: (err) => {
@@ -93,19 +96,14 @@ export default function ReportHsiAdmin({ auth, hsiData, filters }) {
 
                                 <div className="flex flex-col md:flex-row gap-4 items-end">
                                     <div className="w-full">
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">File Excel/CSV</label>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">File Excel/CSV/ZIP</label>
                                         <input 
                                             type="file" 
                                             className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 border border-gray-300 rounded-md cursor-pointer"
                                             onChange={e => setData('file', e.target.files[0])}
-                                            accept=".xlsx,.xls,.csv"
+                                            accept=".xlsx,.xls,.csv,.zip"
                                         />
-                                        {progress && (
-                                            <div className="w-full bg-gray-200 rounded-full h-2.5 mt-2">
-                                                <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${progress.percentage}%` }}></div>
-                                                <span className="text-xs text-gray-500">{progress.percentage}% Uploaded</span>
-                                            </div>
-                                        )}
+                                        {/* Progress bar dihapus sesuai permintaan */}
                                     </div>
                                     
                                     <div className="min-w-[150px]">
@@ -115,18 +113,19 @@ export default function ReportHsiAdmin({ auth, hsiData, filters }) {
                                             value={data.date_format}
                                             onChange={e => setData('date_format', e.target.value)}
                                         >
-                                            <option value="m/d/Y">Bulan/Hari/Thn (Excel Default)</option>
+                                            {/* URUTAN DITUKAR: d/m/Y Paling Atas */}
                                             <option value="d/m/Y">Hari/Bulan/Thn (Indo)</option>
+                                            <option value="m/d/Y">Bulan/Hari/Thn (Excel Default)</option>
                                             <option value="Y-m-d">Tahun-Bulan-Hari (SQL)</option>
                                         </select>
                                     </div>
 
                                     <button 
                                         type="submit" 
-                                        disabled={processing}
-                                        className={`font-bold py-2 px-6 rounded shadow text-white transition ${processing ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
+                                        // Disabled dihapus agar tombol selalu aktif secara visual
+                                        className="font-bold py-2 px-6 rounded shadow text-white transition bg-blue-600 hover:bg-blue-700"
                                     >
-                                        {processing ? 'Processing...' : 'Upload'}
+                                        Upload
                                     </button>
                                 </div>
                             </form>

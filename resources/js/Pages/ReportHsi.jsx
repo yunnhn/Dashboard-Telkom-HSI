@@ -3,22 +3,25 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, router } from '@inertiajs/react';
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+// Import Icon Download
+import { MdFileDownload } from "react-icons/md"; 
 
 export default function ReportHsi({ auth, reportData, totals, filters = {} }) {
 
-    // Helper untuk format angka
+    // 1. Helper Format Angka
     const formatNumber = (num) => {
         return new Intl.NumberFormat('id-ID').format(num);
     };
 
-    // Helper warna conditional
+    // 2. Helper Warna Conditional (Untuk Kolom Persentase)
     const getPsReColor = (value) => {
         const num = parseFloat(value);
         if (isNaN(num)) return '';
-        // Contoh logika: Merah jika < 80, Hijau jika >= 80
+        // Merah jika < 80, Hijau jika >= 80
         return num >= 80 ? 'bg-[#24c55f] text-white font-bold' : 'bg-[#e65253] text-white font-bold';
     };
 
+    // 3. DEFINISI WARNA HEADER (Yang menyebabkan error sebelumnya)
     const colors = {
         blue: 'bg-[#3e81f4]',
         red: 'bg-[#e65253]',
@@ -28,10 +31,11 @@ export default function ReportHsi({ auth, reportData, totals, filters = {} }) {
 
     const totalRowStyle = "bg-[#cccccc] text-[#464647] font-bold border-slate-400";
 
-    // --- Filter State ---
+    // --- State Filter ---
     const [startDate, setStartDate] = useState(filters.start_date ? new Date(filters.start_date) : null);
     const [endDate, setEndDate] = useState(filters.end_date ? new Date(filters.end_date) : null);
 
+    // Fungsi Filter Data (Web)
     const handleFilter = () => {
         const query = {};
         if (startDate && endDate) {
@@ -39,6 +43,18 @@ export default function ReportHsi({ auth, reportData, totals, filters = {} }) {
             query.end_date = endDate.toISOString().split('T')[0];
         }
         router.get(route('report.hsi'), query, { preserveState: true });
+    };
+
+    // Fungsi Export Excel
+    const handleExport = () => {
+        const query = {};
+        if (startDate && endDate) {
+            query.start_date = startDate.toISOString().split('T')[0];
+            query.end_date = endDate.toISOString().split('T')[0];
+        }
+        // Menggunakan window.location.href agar browser mendownload file
+        const url = route('report.hsi.export', query);
+        window.location.href = url;
     };
 
     return (
@@ -52,7 +68,7 @@ export default function ReportHsi({ auth, reportData, totals, filters = {} }) {
                 <div className="max-w-[99%] mx-auto sm:px-2 lg:px-4">
                     <div className="bg-white overflow-hidden shadow-xl sm:rounded-lg">
                         
-                        {/* HEADER & FILTER */}
+                        {/* HEADER & FILTER SECTION */}
                         <div className="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
                             <h3 className="text-lg font-bold text-gray-800 uppercase tracking-wide">
                                 Performance Report HSI Per Witel
@@ -77,13 +93,25 @@ export default function ReportHsi({ auth, reportData, totals, filters = {} }) {
                                     placeholderText="End Date"
                                     className="border border-gray-300 rounded text-xs p-1"
                                 />
-                                <button onClick={handleFilter} className="bg-blue-600 text-white text-xs px-3 py-1 rounded hover:bg-blue-700">Go</button>
+                                <button onClick={handleFilter} className="bg-blue-600 text-white text-xs px-3 py-1.5 rounded hover:bg-blue-700 font-bold">
+                                    Go
+                                </button>
+                                
+                                {/* TOMBOL EXPORT EXCEL */}
+                                <button 
+                                    onClick={handleExport} 
+                                    className="bg-green-600 text-white text-xs px-3 py-1.5 rounded hover:bg-green-700 flex items-center gap-1 font-bold shadow-sm"
+                                >
+                                    <MdFileDownload size={16}/> Excel
+                                </button>
                             </div>
                         </div>
 
+                        {/* TABLE SECTION */}
                         <div className="overflow-x-auto max-h-[80vh]">
                             <table className="w-full text-[10px] border-collapse border border-slate-400 text-center font-sans">
                                 
+                                {/* TABLE HEAD */}
                                 <thead className="text-white font-bold uppercase tracking-wider sticky top-0 z-20 shadow-sm">
                                     <tr>
                                         <th className={`border border-slate-300 p-2 min-w-[150px] sticky left-0 z-30 ${colors.blue}`} rowSpan={4}>Witel</th>
@@ -135,6 +163,7 @@ export default function ReportHsi({ auth, reportData, totals, filters = {} }) {
                                     </tr>
                                 </thead>
 
+                                {/* TABLE BODY */}
                                 <tbody className="bg-white text-gray-700">
                                     {reportData.map((row, index) => (
                                         <tr 
@@ -145,7 +174,6 @@ export default function ReportHsi({ auth, reportData, totals, filters = {} }) {
                                                 ${row.row_type === 'main' ? 'font-bold text-black border-t-2 border-slate-300' : ''}
                                             `}
                                         >
-                                            {/* Logic Tampilan Kolom Witel */}
                                             <td className={`border border-slate-300 p-1 text-left sticky left-0 z-10 px-2 
                                                 ${row.row_type === 'main' ? 'bg-slate-100 font-extrabold uppercase' : 'bg-inherit pl-6'}
                                             `}>
@@ -196,6 +224,7 @@ export default function ReportHsi({ auth, reportData, totals, filters = {} }) {
                                     ))}
                                 </tbody>
 
+                                {/* TABLE FOOTER (TOTALS) */}
                                 <tfoot className="sticky bottom-0 z-20">
                                     <tr className={totalRowStyle}>
                                         <td className="border border-slate-400 p-2 sticky left-0 z-30 bg-[#cccccc]">TOTAL</td>

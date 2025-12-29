@@ -21,21 +21,17 @@ class HsiDataImport implements ToModel, WithHeadingRow, WithBatchInserts, WithCh
 
     public function model(array $row)
     {
-        // 1. PEMBERSIH KUAT (Hapus spasi ganda & karakter hantu Excel)
-        $witelRaw = $row['witel'] ?? '';
-        // Regex ini menghapus semua karakter aneh yang tidak terlihat
-        $witelClean = preg_replace('/[\x00-\x1F\x7F\xA0]/u', '', $witelRaw);
-        $witelInput = strtoupper(trim($witelClean));
-
-        // 2. HAPUS FILTER (Biarkan semua data masuk, apa pun nama witelnya)
+        // Normalisasi input Witel
         $witelInput = isset($row['witel']) ? strtoupper(trim($row['witel'])) : null;
+
+        // Filter: Hanya import jika Witel ada di daftar RSO 2
         if (!$witelInput || !in_array($witelInput, $this->allowedWitels)) {
             return null; 
         }
 
         return new HsiData([
             'nomor'             => $row['nomor'] ?? null,
-            'order_id'          => $row['order_id'] ?? $row['nomor_order'] ?? null,
+            'order_id'          => $row['order_id'] ?? $row['nomor_order'] ?? $row['orderid'] ?? null,
             'regional'          => $row['regional'] ?? null,
             'witel'             => $witelInput, // Simpan witel yang sudah dibersihkan
             'regional_old'      => $row['regional_old'] ?? null,
@@ -44,8 +40,8 @@ class HsiDataImport implements ToModel, WithHeadingRow, WithBatchInserts, WithCh
             'sto'               => $row['sto'] ?? null,
             'unit'              => $row['unit'] ?? null,
             'jenis_psb'         => $row['jenis_psb'] ?? $row['jenispsb'] ?? null,
-            'type_trans'        => $row['type_trans'] ?? null,
-            'type_layanan'      => $row['type_layanan'] ?? null,
+            'type_trans'        => $row['type_trans'] ?? $row['typetrans'] ?? null,
+            'type_layanan'      => $row['type_layanan'] ?? $row['typelayanan'] ?? null,
             'status_resume'     => $row['status_resume'] ?? null,
             'provider'          => $row['provider'] ?? null,
             'order_date'        => $this->transformDate($row['order_date'] ?? null),
@@ -53,7 +49,7 @@ class HsiDataImport implements ToModel, WithHeadingRow, WithBatchInserts, WithCh
             'ncli'              => $row['ncli'] ?? null,
             'pots'              => $row['pots'] ?? null,
             'speedy'            => $row['speedy'] ?? null,
-            'customer_name'     => $row['customer_name'] ?? null,
+            'customer_name'     => $row['customer_name'] ?? $row['nama_pelanggan'] ?? null,
             'loc_id'            => $row['loc_id'] ?? null,
             'wonum'             => $row['wonum'] ?? null,
             'flag_deposit'      => $row['flag_deposit'] ?? null,
@@ -90,10 +86,12 @@ class HsiDataImport implements ToModel, WithHeadingRow, WithBatchInserts, WithCh
             'detail_manja'      => $row['detail_manja'] ?? null,
             'suberrorcode'      => $row['suberrorcode'] ?? $row['sub_error_code'] ?? null,
             'engineermemo'      => $row['engineermemo'] ?? $row['engineer_memo'] ?? null,
+
+            // --- 9. PERIODE & PROSES (Kolom Baru) ---
             'tahun'             => $row['tahun'] ?? null,
             'bulan'             => $row['bulan'] ?? null,
             'tanggal'           => $row['tanggal'] ?? null,
-            'ps_1'              => $row['ps_1'] ?? null,
+            'ps_1'              => $this->transformDate($row['ps_1'] ?? $row['ps1'] ?? null),
             'cek'               => $row['cek'] ?? null,
             'hasil'             => $row['hasil'] ?? null,
             'telda'             => $row['telda'] ?? null,
@@ -104,28 +102,57 @@ class HsiDataImport implements ToModel, WithHeadingRow, WithBatchInserts, WithCh
         ]);
     }
 
+    /**
+     * LOGIKA TRANSFORMASI TANGGAL
+     * Menangani format Excel serial number dan string, serta 
+     * fitur 'Swap Date' jika format US/UK tertukar.
+     */
     private function transformDate($value)
     {
         if (empty($value) || $value == '-' || $value == '#N/A') return null;
+
         try {
             $date = null;
+
+            // 1. Parsing
             if (is_numeric($value)) {
                 $date = Date::excelToDateTimeObject($value);
                 $date = Carbon::instance($date);
-            } elseif ($value instanceof \DateTimeInterface) {
+            } 
+            // 2. Parsing jika sudah instance DateTime (kadang library Excel otomatis convert)
+            elseif ($value instanceof \DateTimeInterface) {
                 $date = Carbon::instance($value);
             } else {
+                // Hapus jam/menit jika ada karakter aneh, atau parse langsung
                 $date = Carbon::parse($value);
             }
-            if ($this->userDateFormat === 'm/d/Y' && $date->day <= 12) {
-                 return Carbon::create($date->year, $date->day, $date->month, $date->hour, $date->minute, $date->second)->format('Y-m-d H:i:s');
+
+            // 2. Logic Tukar Bulan/Tanggal (US Format Fix)
+            if ($this->userDateFormat === 'm/d/Y') {
+                // Jika user pilih m/d/Y, tapi sistem baca d/m/Y, kita tukar.
+                // Contoh: 4 Desember (4/12) terbaca 12 April (12/4).
+                // Syarat: Day saat ini <= 12 (karena akan jadi bulan).
+                if ($date->day <= 12) {
+                     return Carbon::create(
+                        $date->year, 
+                        $date->day,   // Day jadi Month
+                        $date->month, // Month jadi Day
+                        $date->hour, $date->minute, $date->second
+                    )->format('Y-m-d H:i:s');
+                }
             }
+
             return $date->format('Y-m-d H:i:s');
+
         } catch (\Throwable $e) {
+            // Jika gagal parse, kembalikan null agar tidak error fatal
             return null;
         }
     }
 
+    // Mengatur ukuran batch insert (1000 baris per query) untuk performa
     public function batchSize(): int { return 1000; }
+    
+    // Mengatur ukuran chunk read (membaca 1000 baris dari file ke RAM) untuk hemat memori
     public function chunkSize(): int { return 1000; }
 }

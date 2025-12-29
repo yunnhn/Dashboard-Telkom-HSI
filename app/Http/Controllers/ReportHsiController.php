@@ -6,17 +6,49 @@ use App\Models\HsiData;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
-use App\Models\Target;
+use App\Exports\HsiReportExport; // Import Class Export
+use Maatwebsite\Excel\Facades\Excel; // Import Facade Excel
 
 class ReportHsiController extends Controller
 {
-    public function index()
+    // === METHOD INDEX (WEB VIEW) ===
+    public function index(Request $request)
     {
-        // 1. Ambil data granular (Group by Witel & Witel Old)
-        // Kita butuh detail witel_old untuk sub-row
-        $rawData = HsiData::select('witel', 'witel_old')
-            ->selectRaw("
+        // Panggil fungsi reusable untuk ambil data
+        $data = $this->getData($request);
+
+        return Inertia::render('ReportHsi', [
+            'reportData' => $data['reportData'],
+            'totals' => $data['totals'],
+            'filters' => $request->only(['start_date', 'end_date']) // Kirim balik filter ke frontend
+        ]);
+    }
+
+    // === METHOD BARU: EXPORT EXCEL ===
+    public function export(Request $request)
+    {
+        // Ambil data yang sama persis dengan yang ada di tabel web
+        $data = $this->getData($request);
+
+        // Download file Excel
+        return Excel::download(new HsiReportExport($data['reportData'], $data['totals']), 'Laporan_HSI_' . date('Y-m-d_H-i') . '.xlsx');
+    }
+
+    // === PRIVATE METHOD: LOGIKA DATA (REUSABLE) ===
+    private function getData($request)
+    {
+        $startDate = $request->input('start_date');
+        $endDate = $request->input('end_date');
+
+        $query = HsiData::select('witel', 'witel_old');
+
+        // Apply Date Filter jika ada
+        if ($startDate && $endDate) {
+            $query->whereDate('order_date', '>=', $startDate)
+                  ->whereDate('order_date', '<=', $endDate);
+        }
+
+        $rawData = $query->selectRaw("
                 -- STATUS DASAR
                 SUM(CASE WHEN kelompok_status = 'PRE PI' THEN 1 ELSE 0 END) as pre_pi,
                 COUNT(*) as registered,
@@ -37,14 +69,14 @@ class ReportHsiController extends Controller
                 SUM(CASE WHEN kelompok_status = 'FO_WFM' AND kelompok_kendala = 'Kendala Pelanggan' THEN 1 ELSE 0 END) as fo_wfm_kndl_plgn,
                 SUM(CASE WHEN kelompok_status = 'FO_WFM' AND kelompok_kendala = 'Kendala Teknik' THEN 1 ELSE 0 END) as fo_wfm_kndl_teknis,
                 SUM(CASE WHEN kelompok_status = 'FO_WFM' AND kelompok_kendala = 'Kendala Lainnya' THEN 1 ELSE 0 END) as fo_wfm_kndl_sys,
-                SUM(CASE WHEN kelompok_status = 'FO_WFM' AND kelompok_kendala IS NULL OR kelompok_kendala = '' OR kelompok_kendala = 'BLANK' THEN 1 ELSE 0 END) as fo_wfm_others,
+                SUM(CASE WHEN kelompok_status = 'FO_WFM' AND (kelompok_kendala IS NULL OR kelompok_kendala = '' OR kelompok_kendala = 'BLANK') THEN 1 ELSE 0 END) as fo_wfm_others,
 
                 -- OTHER FALLOUTS
                 SUM(CASE WHEN kelompok_status = 'FO_UIM' THEN 1 ELSE 0 END) as fo_uim,
                 SUM(CASE WHEN kelompok_status = 'FO_ASAP' THEN 1 ELSE 0 END) as fo_asp,
                 SUM(CASE WHEN kelompok_status = 'FO_OSM' THEN 1 ELSE 0 END) as fo_osm,
                 
-                -- TOTAL FALLOUT (Termasuk FO_WFM sesuai request sebelumnya)
+                -- TOTAL FALLOUT
                 SUM(CASE WHEN kelompok_status IN ('FO_UIM', 'FO_ASAP', 'FO_OSM', 'FO_WFM') THEN 1 ELSE 0 END) as total_fallout,
 
                 -- COMPLETION & OTHERS
@@ -65,14 +97,13 @@ class ReportHsiController extends Controller
             ->orderBy('witel_old')
             ->get();
 
-        // 2. Hitung Grand Total dari data raw (Sebelum dimanipulasi strukturnya)
+        // Hitung Grand Total
         $totals = $this->calculateSummary($rawData, 'GRAND TOTAL');
 
-        // 3. Struktur Ulang Data untuk Frontend (Parent Witel -> Sub Witel)
+        // Struktur Ulang Data (Parent -> Child)
         $finalReportData = collect();
         $groupedData = $rawData->groupBy('witel');
 
-        // Daftar kolom yang perlu dijumlahkan
         $numericFields = [
             'pre_pi', 'registered', 'inprogress_sc', 'qc1', 'fcc', 'cancel_by_fcc', 'survey_new_manja', 'unsc',
             'pi_under_1_hari', 'pi_1_3_hari', 'pi_over_3_hari', 'total_pi',
@@ -84,39 +115,31 @@ class ReportHsiController extends Controller
         ];
 
         foreach ($groupedData as $witel => $children) {
-            // A. Buat Baris Induk (Summary Witel)
             $parent = new \stdClass();
-            $parent->witel_display = $witel; // Nama Witel Utama
-            $parent->row_type = 'main';      // Penanda untuk styling bold
+            $parent->witel_display = $witel;
+            $parent->row_type = 'main';
             
-            // Sum semua field numeric
             foreach ($numericFields as $field) {
                 $parent->$field = $children->sum($field);
             }
             
-            // Hitung Persentase Parent
             $this->calculatePercentages($parent);
-            
-            // Masukkan Parent ke list
             $finalReportData->push($parent);
 
-            // B. Masukkan Baris Anak (Sub Witel)
             foreach ($children as $child) {
-                $child->witel_display = $child->witel_old ?? '(Blank)'; // Nama Sub Witel
-                $child->row_type = 'sub'; // Penanda untuk styling normal/indent
-                
+                $child->witel_display = $child->witel_old ?? '(Blank)';
+                $child->row_type = 'sub';
                 $this->calculatePercentages($child);
                 $finalReportData->push($child);
             }
         }
 
-        return Inertia::render('ReportHsi', [
+        return [
             'reportData' => $finalReportData,
             'totals' => $totals
-        ]);
+        ];
     }
 
-    // Helper untuk menghitung total summary object
     private function calculateSummary($collection, $label)
     {
         $totals = [
@@ -151,25 +174,19 @@ class ReportHsiController extends Controller
             'revoke' => $collection->sum('revoke'),
         ];
 
-        // Konversi ke object agar seragam akses property-nya
         $totalsObj = (object) $totals;
         $this->calculatePercentages($totalsObj);
-        
         return $totalsObj;
     }
 
-    // Helper hitung persentase
     private function calculatePercentages($item)
     {
-        // PI/RE (%)
         $num_pire = $item->total_pi + $item->total_fallout + $item->act_comp + $item->jml_comp_ps + $item->total_cancel;
         $item->pi_re_percent = $item->registered > 0 ? round(($num_pire / $item->registered) * 100, 2) : 0;
 
-        // PS/RE (%)
         $denom_psre = $item->registered - $item->cancel_by_fcc - $item->unsc - $item->revoke;
         $item->ps_re_percent = $denom_psre > 0 ? round(($item->jml_comp_ps / $denom_psre) * 100, 2) : 0;
 
-        // PS/PI (%)
         $denom_pspi = $item->total_pi + $item->total_fallout + $item->act_comp + $item->jml_comp_ps;
         $item->ps_pi_percent = $denom_pspi > 0 ? round(($item->jml_comp_ps / $denom_pspi) * 100, 2) : 0;
     }

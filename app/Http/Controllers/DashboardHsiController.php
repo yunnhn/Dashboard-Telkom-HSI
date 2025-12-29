@@ -8,6 +8,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Imports\HsiDataImport;
 use Maatwebsite\Excel\Facades\Excel;
+use ZipArchive; 
+use Illuminate\Support\Facades\File; 
 
 class DashboardHsiController extends Controller
 {
@@ -281,7 +283,11 @@ class DashboardHsiController extends Controller
             DB::raw("SUM(CASE WHEN data_proses = 'OGP PROVI' THEN 1 ELSE 0 END) as ogp_provi"),
             DB::raw("SUM(CASE WHEN data_proses NOT IN ('CANCEL QC1', 'CANCEL FCC', 'OGP VERIFIKASI DAN VALID', 'UNSC', 'CANCEL', 'FALLOUT', 'REVOKE', 'OGP PROVI', 'OGP SURVEY') AND status_resume != 'MIA - INVALID SURVEY' THEN 1 ELSE 0 END) as ps_count"),
             DB::raw("SUM(CASE WHEN data_proses NOT IN ('CANCEL FCC', 'UNSC', 'REVOKE') AND (group_paket != 'WMS' OR group_paket IS NULL) THEN 1 ELSE 0 END) as ps_re_denominator"),
-            DB::raw("SUM(CASE WHEN data_proses NOT IN ('CANCEL QC1', 'CANCEL FCC', 'OGP VERIFIKASI DAN VALID', 'UNSC', 'CANCEL', 'FALLOUT', 'REVOKE', 'OGP SURVEY') AND status_resume != 'MIA - INVALID SURVEY' THEN 1 ELSE 0 END) as ps_pi_denominator"),
+            
+            // --- UPDATED LOGIC FOR CONVERSION PS/PI ---
+            // Mengikuti logika Report HSI: PI + Fallout + Act Comp + PS
+            DB::raw("SUM(CASE WHEN kelompok_status IN ('PI', 'FO_UIM', 'FO_ASAP', 'FO_OSM', 'FO_WFM', 'ACT_COM', 'PS') THEN 1 ELSE 0 END) as ps_pi_denominator"),
+            
             DB::raw("SUM(CASE WHEN data_proses = 'REVOKE' AND status_resume = '102 | FOLLOW UP COMPLETED' THEN 1 ELSE 0 END) as followup_completed"),
             DB::raw("SUM(CASE WHEN data_proses = 'REVOKE' AND status_resume = '100 | REVOKE COMPLETED' THEN 1 ELSE 0 END) as revoke_completed"),
             DB::raw("SUM(CASE WHEN data_proses = 'REVOKE' AND status_resume = 'REVOKE ORDER' THEN 1 ELSE 0 END) as revoke_order"),
@@ -408,7 +414,6 @@ class DashboardHsiController extends Controller
             if ($isExport) {
                 // Gunakan mapping untuk membersihkan data dari rumus berbahaya
                 $exportData = $detailQuery->get()->map(function ($item) {
-                    // Sanitasi sederhana: Jika data string dimulai dengan =, +, -, @, tambahkan tanda kutip agar dibaca sebagai teks
                     $sanitized = $item->toArray();
                     foreach ($sanitized as $key => $value) {
                         if (is_string($value) && preg_match('/^[\=\+\-\@]/', $value)) {
@@ -418,14 +423,12 @@ class DashboardHsiController extends Controller
                     return $sanitized;
                 });
                 
-                // Gunakan Anonymous Class dengan konfigurasi yang aman
                 return Excel::download(new class($exportData) implements \Maatwebsite\Excel\Concerns\FromCollection, \Maatwebsite\Excel\Concerns\WithHeadings, \Maatwebsite\Excel\Concerns\ShouldAutoSize, \Maatwebsite\Excel\Concerns\WithStrictNullComparison {
                     protected $data;
                     public function __construct($data) { $this->data = $data; }
                     public function collection() { return $this->data; }
                     public function headings(): array { 
-                        // Ambil keys dari item pertama sebagai header
-                        return array_keys($this->data->first() ? $this->data->first() : []); 
+                        return array_keys($this->data->first() ? $this->data->first()->toArray() : []); 
                     }
                 }, "Detail_HSI_{$detailCategory}.xlsx");
             }

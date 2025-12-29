@@ -218,7 +218,7 @@ export default function Sidebar({ user, isSidebarOpen, toggleSidebar, isCmsMode,
                                             <div className="pl-6 mt-1 space-y-1">
                                                 <Link href={route('admin.analysisJT.index')} className={`block px-4 py-2 text-sm rounded-md ${route().current('admin.analysisJT.index') ? 'bg-blue-100 text-blue-700 font-semibold' : 'hover:bg-gray-100'}`}>Report Jaringan Tambahan</Link>
                                                 <Link href={route('admin.analysisSOS.index')} className={`block px-4 py-2 text-sm rounded-md ${route().current('admin.analysisSOS.index') ? 'bg-blue-100 text-blue-700 font-semibold' : 'hover:bg-gray-100'}`}>Report Datin</Link>
-                                                <Link href={route('admin.report.hsi.index')} className={`block px-4 py-2 text-sm rounded-md ${route().current('admin.report.hsi.index') ? 'bg-blue-100 text-blue-700 font-semibold' : 'hover:bg-gray-100'}`}>Report HSI</Link>
+                                                <Link href={route('admin.report_hsi.index')} className={`block px-4 py-2 text-sm rounded-md ${route().current('admin.report_hsi.index') ? 'bg-blue-100 text-blue-700 font-semibold' : 'hover:bg-gray-100'}`}>Report HSI</Link>
                                             </div>
                                         )}
                                     </div>

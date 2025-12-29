@@ -14,9 +14,12 @@ class HsiDataImport implements ToModel, WithHeadingRow, WithBatchInserts, WithCh
 {
     private $userDateFormat;
 
+    // Daftar Witel RSO 2 yang diizinkan untuk di-import
+    private $allowedWitels = ['JATIM TIMUR', 'JATIM BARAT', 'SURAMADU', 'NUSA TENGGARA', 'BALI'];
+
     public function __construct($format)
     {
-        $this->userDateFormat = $format; 
+        $this->userDateFormat = $format;
     }
 
     public function model(array $row)

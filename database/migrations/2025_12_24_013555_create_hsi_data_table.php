@@ -97,6 +97,11 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('hsi_data');
+        // Cek dulu apakah tabelnya ada sebelum hapus kolom
+        if (Schema::hasTable('temp_upload_data')) {
+            Schema::table('temp_upload_data', function (Blueprint $table) {
+                $table->dropColumn('batch_id');
+            });
+        }
     }
 };

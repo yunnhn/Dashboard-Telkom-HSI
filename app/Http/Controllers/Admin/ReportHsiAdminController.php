@@ -24,9 +24,7 @@ class ReportHsiAdminController extends Controller
         ini_set('memory_limit', '512M');
 
         // 2. Scope Wilayah (RSO 2)
-        $allowedWitels = ['BALI', 'JATIM BARAT', 'JATIM TIMUR', 'SURAMADU', 'NUSA TENGGARA', 'JAWA TIMUR'];
-
-        $query = HsiData::query()->whereIn('witel', $allowedWitels);
+        $query = HsiData::query();
 
         // 3. Fitur Pencarian Global
         if ($request->has('search') && $request->search != '') {

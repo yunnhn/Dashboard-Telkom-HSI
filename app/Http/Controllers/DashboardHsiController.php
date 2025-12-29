@@ -25,7 +25,7 @@ class DashboardHsiController extends Controller
         $searchQuery = $request->input('search'); // <--- Tambahkan baris ini
 
         // 2. DEFINE SCOPE: RSO 2
-        $rso2Witels = ['JATIM BARAT', 'JATIM TIMUR', 'SURAMADU', 'BALI', 'NUSA TENGGARA', 'JAWA TIMUR'];
+        $rso2Witels = ['JATIM TIMUR', 'JATIM BARAT', 'SURAMADU', 'NUSA TENGGARA', 'BALI'];
         
         $baseQuery = HsiData::query()->whereIn('witel', $rso2Witels);
 
@@ -205,10 +205,10 @@ class DashboardHsiController extends Controller
         $selectedBranches = $request->input('global_branch', []); 
 
         // 2. DEFINE SCOPE
-        $rso2Witels = ['JATIM BARAT', 'JATIM TIMUR', 'SURAMADU', 'BALI', 'NUSA TENGGARA', 'JAWA TIMUR'];
+        $rso2Witels = ['JATIM TIMUR', 'JATIM BARAT', 'SURAMADU', 'NUSA TENGGARA', 'BALI'];
         
         // Base Query
-        $flowQuery = HsiData::query()->whereIn('witel', $rso2Witels);
+        $flowQuery = HsiData::query()->whereIn(DB::raw('TRIM(UPPER(witel))'), $rso2Witels);
 
         // --- AMBIL BRANCH MAP DINAMIS (Sama seperti index) ---
         $rawBranches = HsiData::select('witel', 'witel_old')
@@ -286,6 +286,8 @@ class DashboardHsiController extends Controller
             'filters'   => $request->only(['start_date', 'end_date', 'global_witel', 'global_branch']),
         ]);
     }
+
+    
 
     public function import(Request $request)
     {

@@ -257,14 +257,15 @@ class AnalysisDigitalProductController extends Controller
             ->select('order_products.id as uid', 'order_products.order_id', 'order_products.product_name', 'order_products.net_price', 'document_data.nama_witel', 'document_data.customer_name', 'document_data.order_created_date', 'order_products.channel', DB::raw('1 as is_bundle'));
         $applyFilters($bundleProductsQuery, 'order_products');
 
-        // Gabungkan Query
+        // Gabungkan Query (Hapus bagian $netPriceTotalCount manual yang lama)
         $netPriceQuery = $singleProductsQuery->union($bundleProductsQuery);
 
-        // [FIX ERROR] HITUNG TOTAL NET PRICE SEBELUM ARRAY $tabCounts
-        // Menggunakan subquery count untuk akurasi UNION
-        $netPriceTotalCount = DB::table(DB::raw("({$netPriceQuery->toSql()}) as sub"))
-            ->mergeBindings($netPriceQuery)
-            ->count();
+        // [PERBAIKAN] Gunakan fromSub untuk menangani UNION dan Pagination dengan aman
+        $netPriceData = DB::query()
+            ->fromSub($netPriceQuery, 'sub')
+            ->orderBy('order_created_date', 'desc')
+            ->paginate($paginationCount, ['*'], 'net_price_page')
+            ->withQueryString();
 
         // [4] TAB COUNTS
         $tabCounts = [
@@ -272,11 +273,12 @@ class AnalysisDigitalProductController extends Controller
             'complete' => (clone $completeQuery)->count(),
             'qc' => (clone $qcQuery)->count(),
             'history' => (clone $historyQuery)->count(),
-            'netprice' => $netPriceTotalCount, // Variabel ini sekarang sudah aman
+            'netprice' => $netPriceData->total(), // Ambil total langsung dari hasil pagination
         ];
 
-        // [5] PAGINASI
+        // [5] PAGINASI (Hapus bagian $netPriceData yang lama di bawah switch case)
         $emptyPaginator = fn () => new LengthAwarePaginator([], 0, $paginationCount);
+        
         $inProgressData = $emptyPaginator();
         $completeData = $emptyPaginator();
         $qcData = $emptyPaginator();

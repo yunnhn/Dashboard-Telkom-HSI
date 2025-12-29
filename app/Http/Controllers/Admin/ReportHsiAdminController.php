@@ -10,6 +10,8 @@ use Maatwebsite\Excel\Facades\Excel;
 use App\Imports\HsiDataImport;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File; // Tambahan untuk manipulasi file/folder
+use ZipArchive; // Tambahan untuk membuka ZIP
 
 class ReportHsiAdminController extends Controller
 {
@@ -47,7 +49,6 @@ class ReportHsiAdminController extends Controller
                       ->withQueryString();
 
         // 5. Render ke Frontend Admin
-        // Pastikan file: resources/js/Pages/Admin/ReportHsi.jsx ada
         return Inertia::render('Admin/ReportHsi', [
             'hsiData' => $data, // Data Tabel (Pagination)
             'filters' => $request->only(['search']),
@@ -55,25 +56,79 @@ class ReportHsiAdminController extends Controller
     }
 
     /**
-     * IMPORT DATA EXCEL
+     * IMPORT DATA (SUPPORT EXCEL & ZIP BESAR)
      */
     public function store(Request $request)
     {
+        // 1. Validasi File (Izinkan Excel & Zip, Max 2GB)
         $request->validate([
-            'file' => 'required|mimes:xlsx,xls,csv|max:20480', // Max 20MB
+            'file' => 'required|mimes:xlsx,xls,csv,zip|max:2048000', // 2048 MB = 2 GB
             'date_format' => 'nullable|in:m/d/Y,d/m/Y,Y-m-d',  // Pilihan format tanggal
         ]);
 
+        // Naikkan limit server khusus untuk proses ini
+        ini_set('memory_limit', '2048M');
+        set_time_limit(3600); // 1 Jam
+
         try {
-            // Default format jika tidak dipilih user: m/d/Y (Format US/Excel Default)
             $dateFormat = $request->input('date_format', 'm/d/Y'); 
+            $file = $request->file('file');
+            $extension = $file->getClientOriginalExtension();
+            $realPath = $file->getPathname();
 
-            // Pastikan Class HsiDataImport menerima constructor $dateFormat
-            Excel::import(new HsiDataImport($dateFormat), $request->file('file'));
+            // === LOGIC IMPORT ZIP ===
+            if ($extension === 'zip') {
+                $zip = new ZipArchive;
+                if ($zip->open($realPath) === TRUE) {
+                    // Buat folder temporary unik agar tidak bentrok antar user
+                    $extractPath = storage_path('app/temp_import_admin/' . uniqid());
+                    
+                    // Pastikan folder ada
+                    if (!File::exists($extractPath)) {
+                        File::makeDirectory($extractPath, 0755, true);
+                    }
 
-            return redirect()->back()->with('success', 'Import Berhasil. Format Tanggal: ' . $dateFormat);
+                    $zip->extractTo($extractPath);
+                    $zip->close();
+
+                    // Cari file Excel/CSV di dalam folder hasil ekstrak
+                    $files = File::allFiles($extractPath);
+                    $targetFile = null;
+                    
+                    foreach ($files as $f) {
+                        if (in_array(strtolower($f->getExtension()), ['xlsx', 'xls', 'csv'])) {
+                            $targetFile = $f;
+                            break; // Ambil file excel pertama yang ketemu
+                        }
+                    }
+
+                    if (!$targetFile) {
+                        // Bersihkan jika gagal
+                        File::deleteDirectory($extractPath);
+                        return redirect()->back()->with('error', 'File ZIP tidak berisi file Excel (.xlsx/.xls) atau CSV yang valid.');
+                    }
+
+                    // Lakukan Import
+                    Excel::import(new HsiDataImport($dateFormat), $targetFile->getPathname());
+
+                    // Hapus folder temp setelah selesai
+                    File::deleteDirectory($extractPath);
+                    
+                } else {
+                    return redirect()->back()->with('error', 'Gagal mengekstrak file ZIP.');
+                }
+            } 
+            // === LOGIC IMPORT EXCEL BIASA ===
+            else {
+                Excel::import(new HsiDataImport($dateFormat), $file);
+            }
+
+            return redirect()->back()->with('success', 'Import Berhasil! Format Tanggal: ' . $dateFormat);
+
         } catch (\Exception $e) {
-            // Tangkap error detail untuk debugging
+            // Bersihkan folder temp jika terjadi error di tengah jalan (opsional, tapi baik untuk maintenance)
+            // if (isset($extractPath) && File::exists($extractPath)) { File::deleteDirectory($extractPath); }
+
             return redirect()->back()->with('error', 'Gagal Import: ' . $e->getMessage());
         }
     }

@@ -22,10 +22,10 @@ class HsiDataImport implements ToModel, WithHeadingRow, WithBatchInserts, WithCh
 
     public function model(array $row)
     {
-        // Normalisasi input Witel
+        // Normalisasi input Witel (Uppercase & Trim)
         $witelInput = isset($row['witel']) ? strtoupper(trim($row['witel'])) : null;
 
-        // Filter: Hanya import jika Witel ada di daftar RSO 2
+        // Filter: Hanya import jika Witel ada di daftar RSO 2 (Case Insensitive sudah dihandle di atas)
         if (!$witelInput || !in_array($witelInput, $this->allowedWitels)) {
             return null; 
         }
@@ -33,7 +33,7 @@ class HsiDataImport implements ToModel, WithHeadingRow, WithBatchInserts, WithCh
         return new HsiData([
             // --- 1. IDENTITAS & LOKASI ---
             'nomor'             => $row['nomor'] ?? null,
-            'order_id'          => $row['order_id'] ?? $row['nomor_order'] ?? null,
+            'order_id'          => $row['order_id'] ?? $row['nomor_order'] ?? $row['orderid'] ?? null,
             'regional'          => $row['regional'] ?? null,
             'witel'             => $witelInput,
             'regional_old'      => $row['regional_old'] ?? null,
@@ -44,8 +44,8 @@ class HsiDataImport implements ToModel, WithHeadingRow, WithBatchInserts, WithCh
 
             // --- 2. DETAIL TRANSAKSI ---
             'jenis_psb'         => $row['jenis_psb'] ?? $row['jenispsb'] ?? null,
-            'type_trans'        => $row['type_trans'] ?? null,
-            'type_layanan'      => $row['type_layanan'] ?? null,
+            'type_trans'        => $row['type_trans'] ?? $row['typetrans'] ?? null,
+            'type_layanan'      => $row['type_layanan'] ?? $row['typelayanan'] ?? null,
             'status_resume'     => $row['status_resume'] ?? null,
             'provider'          => $row['provider'] ?? null,
 
@@ -57,7 +57,7 @@ class HsiDataImport implements ToModel, WithHeadingRow, WithBatchInserts, WithCh
             'ncli'              => $row['ncli'] ?? null,
             'pots'              => $row['pots'] ?? null,
             'speedy'            => $row['speedy'] ?? null,
-            'customer_name'     => $row['customer_name'] ?? null,
+            'customer_name'     => $row['customer_name'] ?? $row['nama_pelanggan'] ?? null,
             'loc_id'            => $row['loc_id'] ?? null,
             'wonum'             => $row['wonum'] ?? null,
             'flag_deposit'      => $row['flag_deposit'] ?? null,
@@ -103,11 +103,11 @@ class HsiDataImport implements ToModel, WithHeadingRow, WithBatchInserts, WithCh
             'suberrorcode'      => $row['suberrorcode'] ?? $row['sub_error_code'] ?? null,
             'engineermemo'      => $row['engineermemo'] ?? $row['engineer_memo'] ?? null,
 
-            // --- 9. PERIODE & PROSES (Kolom Baru) ---
+            // --- 9. PERIODE & PROSES (Kolom Baru dari 67 Kolom) ---
             'tahun'             => $row['tahun'] ?? null,
             'bulan'             => $row['bulan'] ?? null,
             'tanggal'           => $row['tanggal'] ?? null,
-            'ps_1'              => $row['ps_1'] ?? null,
+            'ps_1'              => $this->transformDate($row['ps_1'] ?? $row['ps1'] ?? null),
             'cek'               => $row['cek'] ?? null,
             'hasil'             => $row['hasil'] ?? null,
             'telda'             => $row['telda'] ?? null,
@@ -119,51 +119,77 @@ class HsiDataImport implements ToModel, WithHeadingRow, WithBatchInserts, WithCh
     }
 
     /**
-     * LOGIKA TRANSFORMASI TANGGAL
-     * Menangani format Excel serial number dan string, serta 
-     * fitur 'Swap Date' jika format US/UK tertukar.
+     * LOGIKA TRANSFORMASI TANGGAL YANG KUAT
+     * Menangani: Excel Serial Number, String Format (Y-m-d, d/m/Y), dan Swap Date Logic.
      */
     private function transformDate($value)
     {
-        if (empty($value) || $value == '-' || $value == '#N/A') return null;
+        // Cek nilai kosong atau placeholder error Excel
+        if (empty($value) || $value === '-' || $value === '#N/A' || $value === 'NaT') {
+            return null;
+        }
 
         try {
             $date = null;
 
-            // 1. Parsing
+            // 1. Parsing jika formatnya Excel Serial Number (angka, misal: 45265)
             if (is_numeric($value)) {
                 $date = Date::excelToDateTimeObject($value);
                 $date = Carbon::instance($date);
-            } elseif ($value instanceof \DateTimeInterface) {
+            } 
+            // 2. Parsing jika sudah instance DateTime (kadang library Excel otomatis convert)
+            elseif ($value instanceof \DateTimeInterface) {
                 $date = Carbon::instance($value);
-            } else {
-                // Hapus jam/menit jika ada karakter aneh, atau parse langsung
-                $date = Carbon::parse($value);
+            } 
+            // 3. Parsing jika String
+            else {
+                // Bersihkan string dari karakter aneh
+                $value = trim($value);
+                
+                // Coba parse format standar Y-m-d H:i:s atau Y-m-d
+                try {
+                    $date = Carbon::parse($value);
+                } catch (\Exception $e) {
+                    // Fallback jika formatnya d/m/Y (umum di Indonesia/Excel lokal)
+                    try {
+                        $date = Carbon::createFromFormat('d/m/Y', $value);
+                    } catch (\Exception $ex) {
+                         // Fallback terakhir: Coba format m/d/Y
+                         try {
+                            $date = Carbon::createFromFormat('m/d/Y', $value);
+                         } catch (\Exception $ex2) {
+                            return null; // Menyerah, kembalikan null
+                         }
+                    }
+                }
             }
 
-            // 2. Logic Tukar Bulan/Tanggal (US Format Fix)
-            if ($this->userDateFormat === 'm/d/Y') {
-                // Jika user pilih m/d/Y, tapi sistem baca d/m/Y, kita tukar.
-                // Contoh: 4 Desember (4/12) terbaca 12 April (12/4).
-                // Syarat: Day saat ini <= 12 (karena akan jadi bulan).
+            // 4. Logic Tukar Bulan/Tanggal (US Format Fix)
+            // Ini HANYA dijalankan jika user secara eksplisit memilih format m/d/Y saat upload
+            // Tujuannya membalik tanggal (misal 4/12 -> 4 Des) menjadi (12/4 -> 12 Apr) jika user salah pilih format
+            if ($this->userDateFormat === 'm/d/Y' && $date) {
+                // Syarat swap: Hari saat ini <= 12 (karena angka > 12 tidak mungkin jadi bulan)
                 if ($date->day <= 12) {
                      return Carbon::create(
                         $date->year, 
-                        $date->day,   // Day jadi Month
-                        $date->month, // Month jadi Day
+                        $date->day,   // Day lama jadi Month baru
+                        $date->month, // Month lama jadi Day baru
                         $date->hour, $date->minute, $date->second
                     )->format('Y-m-d H:i:s');
                 }
             }
 
-            return $date->format('Y-m-d H:i:s');
+            return $date ? $date->format('Y-m-d H:i:s') : null;
 
         } catch (\Throwable $e) {
-            // Jika gagal parse, kembalikan null agar tidak error fatal
+            // Log error jika perlu, tapi kembalikan null agar proses import baris lain tetap jalan
             return null;
         }
     }
 
+    // Mengatur ukuran batch insert (1000 baris per query) untuk performa
     public function batchSize(): int { return 1000; }
+    
+    // Mengatur ukuran chunk read (membaca 1000 baris dari file ke RAM) untuk hemat memori
     public function chunkSize(): int { return 1000; }
 }

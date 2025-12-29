@@ -5,6 +5,7 @@ import HsiPieChart from '@/Components/HsiPieChart';
 import AmountBySubTypeChart from '@/Components/AmountBySubTypeChartHSI';
 import StackedBarChart from '@/Components/StackedBarChart';
 import HsiMap from '@/Components/HsiMap';
+import TrendLineChartHSI from '@/Components/TrendLineChartHSI';
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 
@@ -69,9 +70,10 @@ export default function DashboardHSI({
     auth, stats, mapData, 
     chart1, chart2, chart3, chart4, 
     chart5Data, chart5Keys, chart6Data, chart6Keys, 
+    chartTrend, 
     witels, filters, dimensionLabel,
     branchMap,
-    tableData // <--- TERIMA DATA TABEL
+    tableData 
 }) {
 
     const [dateRange, setDateRange] = useState([
@@ -257,6 +259,26 @@ export default function DashboardHSI({
                             </div>
                         </div>
                     </div>
+
+                    {/* === BAGIAN BARU: TREND CHART (DIPINDAHKAN KESINI) === */}
+                    <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 mt-6">
+                        <div className="flex justify-between items-center border-b pb-4 mb-4">
+                            <div>
+                                <h3 className="text-lg font-bold text-gray-800">Trend Penjualan Harian</h3>
+                                <p className="text-sm text-gray-500">Perbandingan Total Order Masuk vs Completed (PS)</p>
+                            </div>
+                        </div>
+                        <div className="h-80 w-full">
+                            {hasData(chartTrend) ? (
+                                <TrendLineChartHSI data={chartTrend} />
+                            ) : (
+                                <div className="h-full flex items-center justify-center text-gray-400">
+                                    Data Trend Tidak Tersedia
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                    {/* === END TREND CHART === */}
 
                     {/* SECTION 6: PETA SEBARAN */}
                     <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mt-6 mb-10 relative">

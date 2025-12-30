@@ -57,7 +57,9 @@ const MultiSelectDropdown = ({ options, selected, onChange, placeholder, isMapCo
                                 readOnly 
                                 className="mr-2 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 pointer-events-none"
                             />
-                            <span className="text-sm text-gray-700 select-none">{option}</span>
+                            <span className="text-sm text-gray-700 select-none">
+                                {option === null ? 'Null / Kosong' : option}
+                            </span>
                         </div>
                     ))}
                 </div>
@@ -90,7 +92,37 @@ export default function DashboardHSI({
     // Search State
     const [searchQuery, setSearchQuery] = useState(filters.search || '');
 
-    const mapStatusOptions = ['Completed', 'Open', 'Cancel'];
+    // --- UPDATED OPTIONS UNTUK DROPDOWN STATUS (CANCEL NON FCC) ---
+    // Sesuai request: null, ODP JAUH, ODP FULL, dll.
+    const mapStatusOptions = [
+        'Completed', 'Open', 'Cancel', // Opsi Default
+        'Null', // Representasi null dari backend biasanya string 'Null' jika pakai COALESCE
+        'ODP JAUH', 
+        'ODP FULL', 
+        'DOUBLE INPUT', 
+        'BATAL', 
+        'TIDAK ADA ODP', 
+        'PENDING', 
+        'LAINNYA', 
+        'KENDALA JALUR/RUTE TARIKAN', 
+        'GANTI PAKET'
+    ];
+
+    // --- FILTER CHART KEYS (CANCEL NON FCC) ---
+    // Hanya tampilkan kategori yang diinginkan di Stacked Bar Chart Non-FCC
+    const allowedCancelKeys = [
+        'Null', 'ODP JAUH', 'ODP FULL', 'DOUBLE INPUT', 'BATAL', 
+        'TIDAK ADA ODP', 'PENDING', 'LAINNYA', 'KENDALA JALUR/RUTE TARIKAN', 'GANTI PAKET'
+    ];
+
+    // Filter chart6Keys agar hanya berisi yang ada di allowedCancelKeys
+    const filteredChart6Keys = useMemo(() => {
+        if (!chart6Keys) return [];
+        return chart6Keys.filter(key => 
+            allowedCancelKeys.map(k => k.toUpperCase()).includes(String(key).toUpperCase())
+        );
+    }, [chart6Keys]);
+
 
     const branchOptions = useMemo(() => {
         if (!branchMap) return [];
@@ -230,7 +262,7 @@ export default function DashboardHSI({
                         </div>
                     </div>
 
-                    {/* CHART ROW 2 */}
+                    {/* CHART ROW 2: CANCEL */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
                         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
                             <div className="h-96"> 
@@ -239,7 +271,16 @@ export default function DashboardHSI({
                         </div>
                         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
                             <div className="h-96">
-                                {hasData(chart6Data) ? <StackedBarChart data={chart6Data} keys={chart6Keys} title={`CANCEL NON-FCC (${dimensionLabel})`} /> : <div className="h-full flex items-center justify-center text-gray-400">Tidak ada data Cancel Biasa</div>}
+                                {/* GUNAKAN filteredChart6Keys AGAR SESUAI REQUEST */}
+                                {hasData(chart6Data) ? (
+                                    <StackedBarChart 
+                                        data={chart6Data} 
+                                        keys={filteredChart6Keys} 
+                                        title={`CANCEL NON-FCC (${dimensionLabel})`} 
+                                    />
+                                ) : (
+                                    <div className="h-full flex items-center justify-center text-gray-400">Tidak ada data Cancel Biasa</div>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -260,7 +301,7 @@ export default function DashboardHSI({
                         </div>
                     </div>
 
-                    {/* === BAGIAN BARU: TREND CHART (DIPINDAHKAN KESINI) === */}
+                    {/* TREND CHART */}
                     <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 mt-6">
                         <div className="flex justify-between items-center border-b pb-4 mb-4">
                             <div>
@@ -278,9 +319,8 @@ export default function DashboardHSI({
                             )}
                         </div>
                     </div>
-                    {/* === END TREND CHART === */}
 
-                    {/* SECTION 6: PETA SEBARAN */}
+                    {/* PETA SEBARAN */}
                     <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mt-6 mb-10 relative">
                         <div className="flex flex-col md:flex-row justify-between items-center border-b pb-4 mb-4">
                             <h3 className="text-md font-bold text-gray-700">Peta Sebaran Order HSI</h3>
@@ -307,14 +347,10 @@ export default function DashboardHSI({
                         </div>
                     </div>
 
-                    {/* ================================================= */}
-                    {/* BAGIAN BARU: DATA PREVIEW TABLE                   */}
-                    {/* ================================================= */}
+                    {/* DATA PREVIEW TABLE */}
                     <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 mt-8 mb-10">
                         <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
                             <h3 className="text-lg font-bold text-gray-800">Data Preview</h3>
-                            
-                            {/* SEARCH BAR */}
                             <div className="relative w-full md:w-1/3">
                                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                     <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -332,12 +368,10 @@ export default function DashboardHSI({
                             </div>
                         </div>
 
-                        {/* TABLE */}
                         <div className="overflow-x-auto">
                             <table className="min-w-full divide-y divide-gray-200">
                                 <thead className="bg-gray-50">
                                     <tr>
-                                        {/* HEADER TABLE */}
                                         {['Order ID', 'Order Date', 'Customer Name', 'Witel', 'STO', 'Layanan', 'Status Group', 'Detail Status'].map((head) => (
                                             <th key={head} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                                                 {head}
@@ -378,7 +412,6 @@ export default function DashboardHSI({
                             </table>
                         </div>
 
-                        {/* PAGINATION */}
                         {tableData && tableData.links && (
                             <div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6 mt-4">
                                 <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">

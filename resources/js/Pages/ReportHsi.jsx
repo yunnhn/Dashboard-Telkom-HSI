@@ -3,101 +3,274 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, router } from '@inertiajs/react';
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+// Import Icon Download
+import { MdFileDownload } from "react-icons/md"; 
 
-export default function ReportHsi({ auth, reportData = [], grandTotal = {}, filters = {} }) {
-    // ... (Filter logic tetap sama) ...
+export default function ReportHsi({ auth, reportData, totals, filters = {} }) {
+
+    // 1. Helper Format Angka
+    const formatNumber = (num) => {
+        return new Intl.NumberFormat('id-ID').format(num);
+    };
+
+    // 2. Helper Warna Conditional (Untuk Kolom Persentase)
+    const getPsReColor = (value) => {
+        const num = parseFloat(value);
+        if (isNaN(num)) return '';
+        // Merah jika < 80, Hijau jika >= 80
+        return num >= 80 ? 'bg-[#24c55f] text-white font-bold' : 'bg-[#e65253] text-white font-bold';
+    };
+
+    // 3. DEFINISI WARNA HEADER (Yang menyebabkan error sebelumnya)
+    const colors = {
+        blue: 'bg-[#3e81f4]',
+        red: 'bg-[#e65253]',
+        green: 'bg-[#24c55f]',
+        gray: 'bg-[#6b717f]',
+    };
+
+    const totalRowStyle = "bg-[#cccccc] text-[#464647] font-bold border-slate-400";
+
+    // --- State Filter ---
+    const [startDate, setStartDate] = useState(filters.start_date ? new Date(filters.start_date) : null);
+    const [endDate, setEndDate] = useState(filters.end_date ? new Date(filters.end_date) : null);
+
+    // Fungsi Filter Data (Web)
+    const handleFilter = () => {
+        const query = {};
+        if (startDate && endDate) {
+            query.start_date = startDate.toISOString().split('T')[0];
+            query.end_date = endDate.toISOString().split('T')[0];
+        }
+        router.get(route('report.hsi'), query, { preserveState: true });
+    };
+
+    // Fungsi Export Excel
+    const handleExport = () => {
+        const query = {};
+        if (startDate && endDate) {
+            query.start_date = startDate.toISOString().split('T')[0];
+            query.end_date = endDate.toISOString().split('T')[0];
+        }
+        // Menggunakan window.location.href agar browser mendownload file
+        const url = route('report.hsi.export', query);
+        window.location.href = url;
+    };
 
     return (
         <AuthenticatedLayout
-           // ... (Header tetap sama) ...
+            user={auth.user}
+            header={<h2 className="font-semibold text-xl text-gray-800 leading-tight">Report HSI</h2>}
         >
             <Head title="Report HSI" />
 
-            <div className="py-8">
-                <div className="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
-                    {/* ... (Div Filter tetap sama) ... */}
-
-                    <div className="bg-white overflow-hidden shadow-sm sm:rounded-lg border border-gray-200">
-                        <div className="p-6">
-                            <h3 className="text-lg font-bold text-gray-800 mb-4">Summary Report per Witel & Area</h3>
+            <div className="py-6">
+                <div className="max-w-[99%] mx-auto sm:px-2 lg:px-4">
+                    <div className="bg-white overflow-hidden shadow-xl sm:rounded-lg">
+                        
+                        {/* HEADER & FILTER SECTION */}
+                        <div className="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+                            <h3 className="text-lg font-bold text-gray-800 uppercase tracking-wide">
+                                Performance Report HSI Per Witel
+                            </h3>
                             
-                            <div className="overflow-x-auto">
-                                <table className="min-w-full text-sm border-collapse border border-gray-300">
-                                    <thead>
-                                        {/* HEADER BARIS 1 */}
-                                        <tr className="bg-[#1e3a8a] text-white">
-                                            <th rowSpan={2} className="px-4 py-3 border border-gray-400 text-left font-bold uppercase w-1/4">WITEL / AREA</th>
-                                            <th rowSpan={2} className="px-4 py-3 border border-gray-400 text-center font-bold uppercase bg-blue-900">TOTAL ORDER</th>
-                                            
-                                            {/* ColSpan jadi 3 saja karena kolom attention hilang */}
-                                            <th colSpan={3} className="px-4 py-2 border border-gray-400 text-center font-bold uppercase bg-[#2563eb]">STATUS PROGRESS</th>
-                                            
-                                            {/* --- HAPUS HEADER 'ATTENTION' DI SINI --- */}
-                                        </tr>
-                                        
-                                        {/* HEADER BARIS 2 */}
-                                        <tr className="bg-[#1e3a8a] text-white text-xs">
-                                            <th className="px-2 py-2 border border-gray-400 text-center uppercase font-semibold bg-[#3b82f6]">COMPLETED (PS)</th>
-                                            <th className="px-2 py-2 border border-gray-400 text-center uppercase font-semibold bg-[#eab308] text-black">OPEN (PROSES)</th>
-                                            <th className="px-2 py-2 border border-gray-400 text-center uppercase font-semibold bg-[#64748b]">CANCEL</th>
-                                            
-                                            {/* --- HAPUS HEADER 'OPEN > 30 HARI' DI SINI --- */}
-                                        </tr>
-                                    </thead>
-
-                                    <tbody className="bg-white">
-                                        {reportData && reportData.length > 0 ? (
-                                            reportData.map((region, rIndex) => (
-                                                <React.Fragment key={rIndex}>
-                                                    
-                                                    {/* REGIONAL ROW (BIRU) */}
-                                                    <tr className="bg-[#172554] text-white font-bold border-b border-blue-800">
-                                                        <td className="px-4 py-3 border-r border-blue-400 uppercase tracking-wide">{region.region_name}</td>
-                                                        <td className="px-4 py-3 text-center border-r border-blue-400">{region.stats.total_order.toLocaleString()}</td>
-                                                        <td className="px-4 py-3 text-center border-r border-blue-400 bg-[#1d4ed8]">{region.stats.total_ps.toLocaleString()}</td>
-                                                        <td className="px-4 py-3 text-center border-r border-blue-400 bg-[#a16207]">{region.stats.total_open.toLocaleString()}</td>
-                                                        <td className="px-4 py-3 text-center border-r border-blue-400 bg-[#475569]">{region.stats.total_cancel.toLocaleString()}</td>
-                                                        
-                                                        {/* --- HAPUS CELL DATA MERAH REGIONAL --- */}
-                                                    </tr>
-
-                                                    {/* CITY ROWS (PUTIH) */}
-                                                    {region.details.map((city, cIndex) => (
-                                                        <tr key={`${rIndex}-${cIndex}`} className="hover:bg-blue-50 text-gray-700 border-b border-gray-200">
-                                                            <td className="px-8 py-2 border-l border-r border-gray-300 text-gray-600 font-medium">{city.name}</td>
-                                                            <td className="px-4 py-2 text-center border-r border-gray-300">{city.total_order.toLocaleString()}</td>
-                                                            <td className="px-4 py-2 text-center border-r border-gray-300 text-green-700">{city.total_ps.toLocaleString()}</td>
-                                                            <td className="px-4 py-2 text-center border-r border-gray-300 text-yellow-600">{city.total_open.toLocaleString()}</td>
-                                                            <td className="px-4 py-2 text-center border-r border-gray-300 text-gray-500">{city.total_cancel.toLocaleString()}</td>
-
-                                                            {/* --- HAPUS CELL DATA MERAH CITY --- */}
-                                                        </tr>
-                                                    ))}
-
-                                                </React.Fragment>
-                                            ))
-                                        ) : (
-                                            <tr>
-                                                {/* colSpan jadi 5 karena kolom berkurang 1 */}
-                                                <td colSpan={5} className="px-4 py-8 text-center text-gray-400">Tidak ada data.</td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-
-                                    {/* FOOTER */}
-                                    <tfoot>
-                                        <tr className="bg-black text-white font-bold text-sm border-t-4 border-gray-400">
-                                            <td className="px-4 py-4 border-r border-gray-600 uppercase">GRAND TOTAL</td>
-                                            <td className="px-4 py-4 text-center bg-blue-900 border-r border-gray-600">{grandTotal?.total_order?.toLocaleString() || 0}</td>
-                                            <td className="px-4 py-4 text-center bg-[#1d4ed8] border-r border-gray-600">{grandTotal?.total_ps?.toLocaleString() || 0}</td>
-                                            <td className="px-4 py-4 text-center bg-[#a16207] border-r border-gray-600">{grandTotal?.total_open?.toLocaleString() || 0}</td>
-                                            <td className="px-4 py-4 text-center bg-[#475569] border-r border-gray-600">{grandTotal?.total_cancel?.toLocaleString() || 0}</td>
-
-                                            {/* --- HAPUS CELL DATA MERAH FOOTER --- */}
-                                        </tr>
-                                    </tfoot>
-                                </table>
+                            <div className="flex gap-2 items-center">
+                                <DatePicker 
+                                    selected={startDate} 
+                                    onChange={(date) => setStartDate(date)} 
+                                    selectsStart
+                                    startDate={startDate}
+                                    endDate={endDate}
+                                    placeholderText="Start Date"
+                                    className="border border-gray-300 rounded text-xs p-1"
+                                />
+                                <DatePicker 
+                                    selected={endDate} 
+                                    onChange={(date) => setEndDate(date)} 
+                                    selectsEnd
+                                    startDate={startDate}
+                                    endDate={endDate}
+                                    placeholderText="End Date"
+                                    className="border border-gray-300 rounded text-xs p-1"
+                                />
+                                <button onClick={handleFilter} className="bg-blue-600 text-white text-xs px-3 py-1.5 rounded hover:bg-blue-700 font-bold">
+                                    Go
+                                </button>
+                                
+                                {/* TOMBOL EXPORT EXCEL */}
+                                <button 
+                                    onClick={handleExport} 
+                                    className="bg-green-600 text-white text-xs px-3 py-1.5 rounded hover:bg-green-700 flex items-center gap-1 font-bold shadow-sm"
+                                >
+                                    <MdFileDownload size={16}/> Excel
+                                </button>
                             </div>
+                        </div>
+
+                        {/* TABLE SECTION */}
+                        <div className="overflow-x-auto max-h-[80vh]">
+                            <table className="w-full text-[10px] border-collapse border border-slate-400 text-center font-sans">
+                                
+                                {/* TABLE HEAD */}
+                                <thead className="text-white font-bold uppercase tracking-wider sticky top-0 z-20 shadow-sm">
+                                    <tr>
+                                        <th className={`border border-slate-300 p-2 min-w-[150px] sticky left-0 z-30 ${colors.blue}`} rowSpan={4}>Witel</th>
+                                        <th className={`border border-slate-300 p-1 ${colors.blue}`} rowSpan={4}>PRE PI</th>
+                                        <th className={`border border-slate-300 p-1 ${colors.blue}`} rowSpan={4}>Registered (RE)</th>
+                                        <th className={`border border-slate-300 p-1 ${colors.gray}`} rowSpan={4}>Inpro SC</th>
+                                        <th className={`border border-slate-300 p-1 ${colors.gray}`} rowSpan={4}>QC 1</th>
+                                        <th className={`border border-slate-300 p-1 ${colors.gray}`} rowSpan={4}>FCC</th>
+                                        <th className={`border border-slate-300 p-1 ${colors.red}`} rowSpan={4}>RJCT FCC</th>
+                                        <th className={`border border-slate-300 p-1 ${colors.gray}`} rowSpan={4}>Survey Manja</th>
+                                        <th className={`border border-slate-300 p-1 ${colors.gray}`} rowSpan={4}>UN-SC</th>
+                                        <th className={`border border-slate-300 p-1 ${colors.gray}`} colSpan={13}>OGP</th>
+                                        <th className={`border border-slate-300 p-1 ${colors.green}`} rowSpan={4}>JML COMP (PS)</th>
+                                        <th className={`border border-slate-300 p-1 ${colors.red}`} colSpan={5}>CANCEL</th>
+                                        <th className={`border border-slate-300 p-1 ${colors.red}`} rowSpan={4}>REVOKE</th>
+                                        <th className={`border border-slate-300 p-1 ${colors.blue}`} colSpan={3}>PERFORMANCE</th>
+                                    </tr>
+                                    <tr>
+                                        <th className={`border border-slate-300 p-1 ${colors.gray}`} colSpan={3}>PI</th>
+                                        <th className={`border border-slate-300 p-1 ${colors.gray}`} rowSpan={3}>TOTAL PI</th>
+                                        <th className={`border border-slate-300 p-1 ${colors.gray}`} colSpan={7}>FALLOUT</th>
+                                        <th className={`border border-slate-300 p-1 ${colors.gray}`} rowSpan={3}>TOTAL FALLOUT</th>
+                                        <th className={`border border-slate-300 p-1 ${colors.gray}`} rowSpan={3}>ACT COMP (QC2)</th>
+                                        
+                                        <th className={`border border-slate-300 p-1 ${colors.red}`} rowSpan={3}>KNDL Plgn</th>
+                                        <th className={`border border-slate-300 p-1 ${colors.red}`} rowSpan={3}>KNDL Teknis</th>
+                                        <th className={`border border-slate-300 p-1 ${colors.red}`} rowSpan={3}>KNDL System</th>
+                                        <th className={`border border-slate-300 p-1 ${colors.red}`} rowSpan={3}>KNDL Others</th>
+                                        <th className={`border border-slate-300 p-1 ${colors.red}`} rowSpan={3}>TOTAL CANCEL</th>
+
+                                        <th className={`border border-slate-300 p-1 ${colors.blue}`} rowSpan={3}>PI/RE</th>
+                                        <th className={`border border-slate-300 p-1 ${colors.blue}`} rowSpan={3}>PS/RE</th>
+                                        <th className={`border border-slate-300 p-1 ${colors.blue}`} rowSpan={3}>PS/PI</th>
+                                    </tr>
+                                    <tr>
+                                        <th className={`border border-slate-300 p-1 ${colors.gray}`} rowSpan={2}>&lt; 1 Hari</th>
+                                        <th className={`border border-slate-300 p-1 ${colors.gray}`} rowSpan={2}>1-3 Hari</th>
+                                        <th className={`border border-slate-300 p-1 ${colors.gray}`} rowSpan={2}>&gt; 3 Hari</th>
+                                        <th className={`border border-slate-300 p-1 ${colors.gray}`} colSpan={4}>WFM</th>
+                                        <th className={`border border-slate-300 p-1 ${colors.gray}`} rowSpan={2}>UIM</th>
+                                        <th className={`border border-slate-300 p-1 ${colors.gray}`} rowSpan={2}>ASP</th>
+                                        <th className={`border border-slate-300 p-1 ${colors.gray}`} rowSpan={2}>OSM</th>
+                                    </tr>
+                                    <tr>
+                                        <th className={`border border-slate-300 p-1 ${colors.gray}`}>KNDL Plgn</th>
+                                        <th className={`border border-slate-300 p-1 ${colors.gray}`}>KNDL Teknis</th>
+                                        <th className={`border border-slate-300 p-1 ${colors.gray}`}>KNDL System</th>
+                                        <th className={`border border-slate-300 p-1 ${colors.gray}`}>KNDL Others</th>
+                                    </tr>
+                                </thead>
+
+                                {/* TABLE BODY */}
+                                <tbody className="bg-white text-gray-700">
+                                    {reportData.map((row, index) => (
+                                        <tr 
+                                            key={index} 
+                                            className={`
+                                                transition-colors 
+                                                ${row.row_type === 'main' ? 'bg-slate-100' : 'bg-white hover:bg-blue-50'}
+                                                ${row.row_type === 'main' ? 'font-bold text-black border-t-2 border-slate-300' : ''}
+                                            `}
+                                        >
+                                            <td className={`border border-slate-300 p-1 text-left sticky left-0 z-10 px-2 
+                                                ${row.row_type === 'main' ? 'bg-slate-100 font-extrabold uppercase' : 'bg-inherit pl-6'}
+                                            `}>
+                                                {row.witel_display}
+                                            </td>
+                                            
+                                            <td className="border border-slate-300 p-1">{formatNumber(row.pre_pi)}</td>
+                                            <td className="border border-slate-300 p-1">{formatNumber(row.registered)}</td>
+                                            <td className="border border-slate-300 p-1">{formatNumber(row.inprogress_sc)}</td>
+                                            <td className="border border-slate-300 p-1">{formatNumber(row.qc1)}</td>
+                                            <td className="border border-slate-300 p-1">{formatNumber(row.fcc)}</td>
+                                            <td className="border border-slate-300 p-1">{formatNumber(row.cancel_by_fcc)}</td>
+                                            <td className="border border-slate-300 p-1">{formatNumber(row.survey_new_manja)}</td>
+                                            <td className="border border-slate-300 p-1">{formatNumber(row.unsc)}</td>
+
+                                            <td className="border border-slate-300 p-1">{formatNumber(row.pi_under_1_hari)}</td>
+                                            <td className="border border-slate-300 p-1">{formatNumber(row.pi_1_3_hari)}</td>
+                                            <td className="border border-slate-300 p-1">{formatNumber(row.pi_over_3_hari)}</td>
+                                            <td className="border border-slate-300 p-1 bg-slate-50">{formatNumber(row.total_pi)}</td>
+                                            
+                                            <td className="border border-slate-300 p-1">{formatNumber(row.fo_wfm_kndl_plgn)}</td>
+                                            <td className="border border-slate-300 p-1">{formatNumber(row.fo_wfm_kndl_teknis)}</td>
+                                            <td className="border border-slate-300 p-1">{formatNumber(row.fo_wfm_kndl_sys)}</td>
+                                            <td className="border border-slate-300 p-1">{formatNumber(row.fo_wfm_others)}</td>
+                                            
+                                            <td className="border border-slate-300 p-1">{formatNumber(row.fo_uim)}</td>
+                                            <td className="border border-slate-300 p-1">{formatNumber(row.fo_asp)}</td>
+                                            <td className="border border-slate-300 p-1">{formatNumber(row.fo_osm)}</td>
+                                            <td className="border border-slate-300 p-1 bg-slate-50">{formatNumber(row.total_fallout)}</td>
+                                            
+                                            <td className="border border-slate-300 p-1">{formatNumber(row.act_comp)}</td>
+                                            <td className="border border-slate-300 p-1 bg-slate-50">{formatNumber(row.jml_comp_ps)}</td>
+
+                                            <td className="border border-slate-300 p-1">{formatNumber(row.cancel_kndl_plgn)}</td>
+                                            <td className="border border-slate-300 p-1">{formatNumber(row.cancel_kndl_teknis)}</td>
+                                            <td className="border border-slate-300 p-1">{formatNumber(row.cancel_kndl_sys)}</td>
+                                            <td className="border border-slate-300 p-1">{formatNumber(row.cancel_others)}</td>
+                                            <td className="border border-slate-300 p-1 bg-slate-50">{formatNumber(row.total_cancel)}</td>
+
+                                            <td className="border border-slate-300 p-1">{formatNumber(row.revoke)}</td>
+
+                                            <td className="border border-slate-300 p-1">{row.pi_re_percent}%</td>
+                                            <td className={`border border-slate-300 p-1 ${getPsReColor(row.ps_re_percent)}`}>
+                                                {row.ps_re_percent}%
+                                            </td>
+                                            <td className="border border-slate-300 p-1">{row.ps_pi_percent}%</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+
+                                {/* TABLE FOOTER (TOTALS) */}
+                                <tfoot className="sticky bottom-0 z-20">
+                                    <tr className={totalRowStyle}>
+                                        <td className="border border-slate-400 p-2 sticky left-0 z-30 bg-[#cccccc]">TOTAL</td>
+                                        <td className="border border-slate-400 p-1">{formatNumber(totals.pre_pi)}</td>
+                                        <td className="border border-slate-400 p-1">{formatNumber(totals.registered)}</td>
+                                        <td className="border border-slate-400 p-1">{formatNumber(totals.inprogress_sc)}</td>
+                                        <td className="border border-slate-400 p-1">{formatNumber(totals.qc1)}</td>
+                                        <td className="border border-slate-400 p-1">{formatNumber(totals.fcc)}</td>
+                                        <td className="border border-slate-400 p-1">{formatNumber(totals.cancel_by_fcc)}</td>
+                                        <td className="border border-slate-400 p-1">{formatNumber(totals.survey_new_manja)}</td>
+                                        <td className="border border-slate-400 p-1">{formatNumber(totals.unsc)}</td>
+
+                                        <td className="border border-slate-400 p-1">{formatNumber(totals.pi_under_1_hari)}</td>
+                                        <td className="border border-slate-400 p-1">{formatNumber(totals.pi_1_3_hari)}</td>
+                                        <td className="border border-slate-400 p-1">{formatNumber(totals.pi_over_3_hari)}</td>
+                                        <td className="border border-slate-400 p-1">{formatNumber(totals.total_pi)}</td>
+
+                                        <td className="border border-slate-400 p-1">{formatNumber(totals.fo_wfm_kndl_plgn)}</td>
+                                        <td className="border border-slate-400 p-1">{formatNumber(totals.fo_wfm_kndl_teknis)}</td>
+                                        <td className="border border-slate-400 p-1">{formatNumber(totals.fo_wfm_kndl_sys)}</td>
+                                        <td className="border border-slate-400 p-1">{formatNumber(totals.fo_wfm_others)}</td>
+
+                                        <td className="border border-slate-400 p-1">{formatNumber(totals.fo_uim)}</td>
+                                        <td className="border border-slate-400 p-1">{formatNumber(totals.fo_asp)}</td>
+                                        <td className="border border-slate-400 p-1">{formatNumber(totals.fo_osm)}</td>
+                                        <td className="border border-slate-400 p-1">{formatNumber(totals.total_fallout)}</td>
+                                        <td className="border border-slate-400 p-1">{formatNumber(totals.act_comp)}</td>
+
+                                        <td className="border border-slate-400 p-1">{formatNumber(totals.jml_comp_ps)}</td>
+
+                                        <td className="border border-slate-400 p-1">{formatNumber(totals.cancel_kndl_plgn)}</td>
+                                        <td className="border border-slate-400 p-1">{formatNumber(totals.cancel_kndl_teknis)}</td>
+                                        <td className="border border-slate-400 p-1">{formatNumber(totals.cancel_kndl_sys)}</td>
+                                        <td className="border border-slate-400 p-1">{formatNumber(totals.cancel_others)}</td>
+                                        <td className="border border-slate-400 p-1">{formatNumber(totals.total_cancel)}</td>
+
+                                        <td className="border border-slate-400 p-1">{formatNumber(totals.revoke)}</td>
+
+                                        <td className="border border-slate-400 p-1">{totals.pi_re_percent}%</td>
+                                        <td className={`border border-slate-400 p-1 ${getPsReColor(totals.ps_re_percent)}`}>
+                                            {totals.ps_re_percent}%
+                                        </td>
+                                        <td className="border border-slate-400 p-1">{totals.ps_pi_percent}%</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
                         </div>
                     </div>
                 </div>

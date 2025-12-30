@@ -23,8 +23,11 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('temp_upload_data', function (Blueprint $table) {
-            $table->dropColumn('batch_id');
-        });
+        // Cek dulu apakah tabelnya ada
+        if (Schema::hasTable('temp_upload_data')) {
+            Schema::table('temp_upload_data', function (Blueprint $table) {
+                $table->dropColumn('batch_id');
+            });
+        }
     }
 };

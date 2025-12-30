@@ -1,30 +1,30 @@
 import React from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { 
+    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LabelList 
+} from 'recharts';
 
-// --- 1. DEFINISI MAPPING WARNA SPESIFIK (Sesuai Gambar Referensi) ---
+// --- 1. DEFINISI MAPPING WARNA SPESIFIK (SESUAI REQUEST) ---
 const CATEGORY_COLORS = {
-    // --- KHUSUS 'null' JADI BIRU ---
-    'null': '#3B82F6',          // Biru Terang (Blue-500 Tailwind)
-    'Unknown': '#3B82F6',       // Cadangan jika label masih 'Unknown'
+    // KELOMPOK 1: Sesuai Warna Witel/Cancel by FCC
+    'Null': '#5e83e6',      // Biru (Sama dg Suramadu)
+    'NULL': '#5e83e6',      
+    'LAINNYA': '#dfa56b',   // Oranye (Sama dg Jatim Barat)
+    'ODP FULL': '#a082da',  // Ungu (Sama dg Jatim Timur)
+    'ODP JAUH': '#bbc67a',  // Hijau Pucat (Sama dg Nusa Tenggara)
+    'TIDAK ADA ODP': '#73b3c5', // Cyan Pucat (Sama dg Bali)
 
-    // Kategori Lainnya (Tetap Sama)
-    'LAINNYA': '#0F766E',       // Hijau Tua Teal
-    'TIDAK ADA ODP': '#06B6D4', // Biru Muda Cyan
-    'ODP FULL': '#A855F7',      // Ungu
-    'ODP JAUH': '#F97316',      // Oranye
-    'PENDING': '#EAB308',       // Kuning Emas
-    'ODP RUSAK': '#B45309',     // Coklat/Oranye Gelap
-    'GANTI PAKET': '#EC4899',   // Pink Merah Muda
-    'DOUBLE INPUT': '#84CC16',  // Hijau Lime
-    'BATAL': '#6366F1',         // Biru Indigo
-    'KENDALA JALUR/RUTE TARIKAN': '#7DD3FC', // Biru Langit
-    'KENDALA TEKNIS': '#7DD3FC',
+    // KELOMPOK 2: Tambahan Kategori Cancel
+    'DOUBLE INPUT': '#e0c668',  // Kuning Emas
+    'BATAL': '#cb7eac',         // Pink/Magenta Pucat
+    'KENDALA JALUR/RUTE TARIKAN': '#d2bc92', // Coklat Muda/Beige
+    'KENDALA TEKNIS': '#d2bc92', // (Opsional) Mapping ke warna yang sama
+    'GANTI PAKET': '#bdd7e8',   // Biru Muda Langit
+    'PENDING': '#6865b2',       // Ungu Gelap/Indigo
 };
 
-// Warna cadangan (Fallback) jika ada kategori baru
 const FALLBACK_COLORS = [
     '#64748B', '#94A3B8', '#CBD5E1', 
-    '#FCA5A5', '#FDBA74', '#FDE047'
+    '#FCA5A5', '#FDBA74', '#FDE047'  
 ];
 
 const StackedBarChart = ({ data, keys, title }) => {
@@ -37,23 +37,27 @@ const StackedBarChart = ({ data, keys, title }) => {
         );
     }
 
-    // Fungsi Render Label Angka di Dalam Bar
+    // --- RENDER LABEL CUSTOM (VALUE ASLI) ---
+    // Menampilkan angka asli di tengah bar (tidak dijumlahkan secara visual)
     const renderCustomizedLabel = (props) => {
         const { x, y, width, height, value } = props;
+        
+        // Jangan tampilkan jika nilainya 0 atau bar terlalu kecil (height < 12px)
         if (!value || value === 0 || height < 12) return null;
 
         return (
             <text 
                 x={x + width / 2} 
                 y={y + height / 2} 
-                fill="#fff"
+                fill="#fff" 
                 textAnchor="middle" 
                 dominantBaseline="central"
                 fontSize={10}
                 fontWeight="bold"
                 style={{ 
                     textShadow: '0px 0px 2px rgba(0,0,0,0.5)', 
-                    pointerEvents: 'none' 
+                    pointerEvents: 'none',
+                    userSelect: 'none'
                 }} 
             >
                 {value}
@@ -63,75 +67,81 @@ const StackedBarChart = ({ data, keys, title }) => {
 
     return (
         <div className="w-full h-full flex flex-col items-center">
-            {/* Judul Grafik */}
-            {title && <h4 className="text-sm font-bold text-gray-600 mb-4 uppercase">{title}</h4>}
+            {title && <h4 className="text-sm font-bold text-gray-600 mb-2 uppercase">{title}</h4>}
             
-            <ResponsiveContainer width="100%" height="85%">
+            <ResponsiveContainer width="100%" height="95%">
                 <BarChart
                     data={data}
-                    margin={{ top: 10, right: 5, left: -10, bottom: 5 }}
+                    // Margin bottom diperbesar agar label XAxis miring tidak terpotong
+                    margin={{ top: 10, right: 10, left: -20, bottom: 60 }} 
                 >
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                    
                     <XAxis 
                         dataKey="name" 
-                        fontSize={11} 
+                        fontSize={10} 
                         tickLine={false}
                         axisLine={{ stroke: '#e5e7eb' }}
-                        interval={0} 
+                        interval={0} // Paksa tampilkan semua label
+                        angle={-30}  // Miringkan teks
+                        textAnchor="end" 
+                        height={60} 
                     />
+                    
                     <YAxis 
                         fontSize={11} 
                         tickLine={false}
                         axisLine={false}
                     />
+                    
                     <Tooltip 
                         cursor={{ fill: '#f3f4f6' }}
-                        contentStyle={{ backgroundColor: '#fff', borderRadius: '6px', fontSize: '12px' }}
+                        contentStyle={{ backgroundColor: '#fff', borderRadius: '6px', fontSize: '12px', boxShadow: '0 2px 5px rgba(0,0,0,0.1)', border: 'none' }}
                     />
                     
                     <Legend 
-                        layout="vertical"      
-                        align="right"          
-                        verticalAlign="middle" 
+                        layout="horizontal"      
+                        align="center"          
+                        verticalAlign="top" 
                         iconType="circle"      
                         wrapperStyle={{ 
                             fontSize: '11px',  
-                            paddingLeft: '15px', 
-                            maxWidth: '200px', 
-                            lineHeight: '18px' 
+                            paddingBottom: '20px' 
                         }}
                     />
 
-                    {/* Looping Keys untuk membuat Stacked Bar */}
                     {keys.map((key, index) => {
-                        // --- LOGIKA PEMILIHAN WARNA ---
                         const normalizedKey = String(key).toUpperCase().trim();
                         
-                        // Cek warna spesifik
+                        // 1. Cek warna di CATEGORY_COLORS
                         let barColor = CATEGORY_COLORS[key] || CATEGORY_COLORS[normalizedKey];
                         
-                        // Jika warna tidak ditemukan di map:
+                        // 2. Logic Fallback & Kendala
                         if (!barColor) {
-                            if (normalizedKey.startsWith('KENDALA')) {
-                                barColor = CATEGORY_COLORS['KENDALA JALUR/RUTE TARIKAN'];
-                            } else {
-                                // Gunakan fallback colors
-                                barColor = FALLBACK_COLORS[index % FALLBACK_COLORS.length];
-                            }
+                             if (normalizedKey.startsWith('KENDALA')) {
+                                 // Jika nama key diawali "KENDALA...", pakai warna Kendala Jalur
+                                 barColor = CATEGORY_COLORS['KENDALA JALUR/RUTE TARIKAN'];
+                             } else {
+                                 // Jika tidak ketemu sama sekali, pakai warna urutan
+                                 barColor = FALLBACK_COLORS[index % FALLBACK_COLORS.length];
+                             }
                         }
-                        // ------------------------------
 
                         return (
                             <Bar 
                                 key={key} 
                                 dataKey={key} 
                                 stackId="a" 
-                                fill={barColor} // Warna dinamis
+                                fill={barColor} 
                                 barSize={40} 
-                                // Radius hanya untuk bar paling atas di stack
-                                radius={index === keys.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
-                                label={renderCustomizedLabel}
-                            />
+                                radius={[0, 0, 0, 0]}
+                            >
+                                {/* PENTING: LabelList untuk menampilkan angka asli */}
+                                <LabelList 
+                                    dataKey={key} 
+                                    content={renderCustomizedLabel} 
+                                />
+                            </Bar>
                         );
                     })}
                 </BarChart>

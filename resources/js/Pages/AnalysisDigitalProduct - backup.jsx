@@ -1343,6 +1343,10 @@ export default function AnalysisDigitalProduct({ auth, reportData = [], currentS
         },
     ]);
 
+    const { props } = usePage();
+    // [PERBAIKAN] Berikan default object kosong jika filters undefined
+    const filters = props.filters || {};
+    
     // <-- LANGKAH 2: LETAKKAN LOGIKA (STATE & EFFECT) DI SINI -->
     const [progressStates, setProgressStates] = useState({
         mentah: null,

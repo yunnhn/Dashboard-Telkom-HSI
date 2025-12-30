@@ -92,15 +92,30 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // 2. Import Excel HSI (INI YANG DITAMBAHKAN)
     Route::post('/dashboard/hsi/import', [DashboardHsiController::class, 'import'])->name('dashboard.import');
-    
-    // 3. Report HSI
-    Route::get('/report-hsi', [ReportHsiController::class, 'index'])->name('report.hsi');
 
-    // 4. Admin Report HSI
-    Route::get('/admin/report-hsi', [ReportHsiAdminController::class, 'index'])->name('admin.report.hsi.index');
-    Route::post('/admin/report-hsi/import', [ReportHsiAdminController::class, 'store'])->name('admin.report.hsi.import');
-    Route::delete('/admin/report-hsi/{id}', [ReportHsiAdminController::class, 'destroy'])->name('admin.report.hsi.destroy');
-    Route::delete('/admin/reset-hsi-data', [ReportHsiAdminController::class, 'destroyAll'])->name('admin.report.hsi.reset');
+    // Tambahkan route export ini:
+    Route::get('/report-hsi/export', [ReportHsiController::class, 'export'])->name('report.hsi.export');
+    Route::get('/report-hsi', [ReportHsiController::class, 'index']) ->name('report.hsi');
+
+    
+
+    
+
+// Group route untuk Admin Report HSI
+    Route::middleware(['auth', 'verified'])->prefix('admin/report-hsi')->name('admin.report_hsi.')->group(function () {
+    
+    // Halaman Utama Admin (Tabel & Form)
+        Route::get('/', [ReportHsiAdminController::class, 'index'])->name('index');
+    
+    // Proses Upload Excel
+        Route::post('/store', [ReportHsiAdminController::class, 'store'])->name('store');
+    
+    // Reset Database (Hapus Semua)
+        Route::delete('/destroy-all', [ReportHsiAdminController::class, 'destroyAll'])->name('destroy_all');
+    
+    // Hapus Satu Data
+        Route::delete('/{id}', [ReportHsiAdminController::class, 'destroy'])->name('destroy');
+});
 
 
     /*

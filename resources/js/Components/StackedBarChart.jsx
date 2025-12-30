@@ -1,20 +1,25 @@
 import React from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { 
+    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LabelList 
+} from 'recharts';
 
-// --- 1. DEFINISI MAPPING WARNA SPESIFIK ---
+// --- 1. DEFINISI MAPPING WARNA SPESIFIK (SESUAI REQUEST) ---
 const CATEGORY_COLORS = {
-    'Null': '#3B82F6',      // Biru Terang (Bright Blue) - Sesuai Backend 'Null'
-    'LAINNYA': '#0F766E',   
-    'TIDAK ADA ODP': '#06B6D4', 
-    'ODP FULL': '#A855F7',   
-    'ODP JAUH': '#F97316',   
-    'PENDING': '#EAB308',    
-    'ODP RUSAK': '#B45309',  
-    'GANTI PAKET': '#EC4899',
-    'DOUBLE INPUT': '#84CC16',
-    'BATAL': '#6366F1',      
-    'KENDALA JALUR/RUTE TARIKAN': '#7DD3FC', 
-    'KENDALA TEKNIS': '#7DD3FC',
+    // KELOMPOK 1: Sesuai Warna Witel/Cancel by FCC
+    'Null': '#5e83e6',      // Biru (Sama dg Suramadu)
+    'NULL': '#5e83e6',      
+    'LAINNYA': '#dfa56b',   // Oranye (Sama dg Jatim Barat)
+    'ODP FULL': '#a082da',  // Ungu (Sama dg Jatim Timur)
+    'ODP JAUH': '#bbc67a',  // Hijau Pucat (Sama dg Nusa Tenggara)
+    'TIDAK ADA ODP': '#73b3c5', // Cyan Pucat (Sama dg Bali)
+
+    // KELOMPOK 2: Tambahan Kategori Cancel
+    'DOUBLE INPUT': '#e0c668',  // Kuning Emas
+    'BATAL': '#cb7eac',         // Pink/Magenta Pucat
+    'KENDALA JALUR/RUTE TARIKAN': '#d2bc92', // Coklat Muda/Beige
+    'KENDALA TEKNIS': '#d2bc92', // (Opsional) Mapping ke warna yang sama
+    'GANTI PAKET': '#bdd7e8',   // Biru Muda Langit
+    'PENDING': '#6865b2',       // Ungu Gelap/Indigo
 };
 
 const FALLBACK_COLORS = [
@@ -23,6 +28,7 @@ const FALLBACK_COLORS = [
 ];
 
 const StackedBarChart = ({ data, keys, title }) => {
+    // Validasi data kosong
     if (!data || data.length === 0 || !keys || keys.length === 0) {
         return (
             <div className="flex items-center justify-center w-full h-full text-gray-500 border border-dashed rounded-lg">
@@ -31,8 +37,12 @@ const StackedBarChart = ({ data, keys, title }) => {
         );
     }
 
+    // --- RENDER LABEL CUSTOM (VALUE ASLI) ---
+    // Menampilkan angka asli di tengah bar (tidak dijumlahkan secara visual)
     const renderCustomizedLabel = (props) => {
         const { x, y, width, height, value } = props;
+        
+        // Jangan tampilkan jika nilainya 0 atau bar terlalu kecil (height < 12px)
         if (!value || value === 0 || height < 12) return null;
 
         return (
@@ -46,7 +56,8 @@ const StackedBarChart = ({ data, keys, title }) => {
                 fontWeight="bold"
                 style={{ 
                     textShadow: '0px 0px 2px rgba(0,0,0,0.5)', 
-                    pointerEvents: 'none' 
+                    pointerEvents: 'none',
+                    userSelect: 'none'
                 }} 
             >
                 {value}
@@ -58,24 +69,23 @@ const StackedBarChart = ({ data, keys, title }) => {
         <div className="w-full h-full flex flex-col items-center">
             {title && <h4 className="text-sm font-bold text-gray-600 mb-2 uppercase">{title}</h4>}
             
-            <ResponsiveContainer width="100%" height="90%">
+            <ResponsiveContainer width="100%" height="95%">
                 <BarChart
                     data={data}
-                    // Tambahkan margin bottom agar teks miring tidak terpotong
-                    margin={{ top: 10, right: 5, left: -10, bottom: 20 }} 
+                    // Margin bottom diperbesar agar label XAxis miring tidak terpotong
+                    margin={{ top: 10, right: 10, left: -20, bottom: 60 }} 
                 >
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
                     
-                    {/* --- PERBAIKAN DI SINI (XAxis) --- */}
                     <XAxis 
                         dataKey="name" 
-                        fontSize={10} // Perkecil sedikit font
+                        fontSize={10} 
                         tickLine={false}
                         axisLine={{ stroke: '#e5e7eb' }}
                         interval={0} // Paksa tampilkan semua label
-                        angle={-30}  // Miringkan teks 30 derajat
-                        textAnchor="end" // Jangkar di ujung agar rapi saat miring
-                        height={60} // Beri ruang tinggi ekstra untuk teks miring
+                        angle={-30}  // Miringkan teks
+                        textAnchor="end" 
+                        height={60} 
                     />
                     
                     <YAxis 
@@ -83,32 +93,36 @@ const StackedBarChart = ({ data, keys, title }) => {
                         tickLine={false}
                         axisLine={false}
                     />
+                    
                     <Tooltip 
                         cursor={{ fill: '#f3f4f6' }}
-                        contentStyle={{ backgroundColor: '#fff', borderRadius: '6px', fontSize: '12px', zIndex: 100 }}
+                        contentStyle={{ backgroundColor: '#fff', borderRadius: '6px', fontSize: '12px', boxShadow: '0 2px 5px rgba(0,0,0,0.1)', border: 'none' }}
                     />
                     
                     <Legend 
-                        layout="vertical"      
-                        align="right"          
-                        verticalAlign="middle" 
+                        layout="horizontal"      
+                        align="center"          
+                        verticalAlign="top" 
                         iconType="circle"      
                         wrapperStyle={{ 
                             fontSize: '11px',  
-                            paddingLeft: '15px', 
-                            maxWidth: '120px', // Batasi lebar legend agar grafik lebih luas
-                            lineHeight: '18px' 
+                            paddingBottom: '20px' 
                         }}
                     />
 
                     {keys.map((key, index) => {
                         const normalizedKey = String(key).toUpperCase().trim();
+                        
+                        // 1. Cek warna di CATEGORY_COLORS
                         let barColor = CATEGORY_COLORS[key] || CATEGORY_COLORS[normalizedKey];
                         
+                        // 2. Logic Fallback & Kendala
                         if (!barColor) {
                              if (normalizedKey.startsWith('KENDALA')) {
+                                 // Jika nama key diawali "KENDALA...", pakai warna Kendala Jalur
                                  barColor = CATEGORY_COLORS['KENDALA JALUR/RUTE TARIKAN'];
                              } else {
+                                 // Jika tidak ketemu sama sekali, pakai warna urutan
                                  barColor = FALLBACK_COLORS[index % FALLBACK_COLORS.length];
                              }
                         }
@@ -120,9 +134,14 @@ const StackedBarChart = ({ data, keys, title }) => {
                                 stackId="a" 
                                 fill={barColor} 
                                 barSize={40} 
-                                radius={index === keys.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
-                                label={renderCustomizedLabel}
-                            />
+                                radius={[0, 0, 0, 0]}
+                            >
+                                {/* PENTING: LabelList untuk menampilkan angka asli */}
+                                <LabelList 
+                                    dataKey={key} 
+                                    content={renderCustomizedLabel} 
+                                />
+                            </Bar>
                         );
                     })}
                 </BarChart>

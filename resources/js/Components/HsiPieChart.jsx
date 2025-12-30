@@ -1,35 +1,50 @@
 import React from 'react';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
-// --- 1. WARNA SPESIFIK (PRIORITAS UTAMA) ---
-// Digunakan untuk Witel Besar & Status agar warnanya tetap konsisten sesuai request Anda.
+// --- 1. WARNA SPESIFIK (PRIORITAS UTAMA - SESUAI REQUEST) ---
 const SPECIFIC_COLORS = {
-    'SURAMADU': '#3B82F6',      // Biru Terang
-    'JATIM TIMUR': '#F97316',   // Oranye
-    'JATIM BARAT': '#A855F7',   // Ungu
-    'NUSA TENGGARA': '#84CC16', // Hijau Lime/Olive
-    'BALI': '#06B6D4',          // Cyan/Teal
-    'JAWA TIMUR': '#EAB308',    // Kuning (Jaga-jaga jika ada label Jawa Timur)
+    // --- WARNA WITEL ---
+    'SURAMADU': '#5e83e6',      // Biru
+    'JATIM BARAT': '#dfa56b',   // Oranye Pucat
+    'JATIM TIMUR': '#a082da',   // Ungu
+    'NUSA TENGGARA': '#bbc67a', // Hijau Pucat/Olive
+    'BALI': '#73b3c5',          // Cyan Pucat
+
+    // --- WARNA KATEGORI CANCEL / FALLOUT ---
+    'NULL': '#5e83e6',          // Biru (Sama dg Suramadu)
+    'Null': '#5e83e6',
     
-    // Warna Status (Untuk chart komposisi)
-    'Completed': '#10B981',     // Hijau
-    'Open': '#FBBF24',          // Kuning
-    'Cancel': '#EF4444',        // Merah
+    'LAINNYA': '#dfa56b',       // Oranye (Sama dg Jatim Barat)
+    'ODP FULL': '#a082da',      // Ungu (Sama dg Jatim Timur)
+    'ODP JAUH': '#bbc67a',      // Hijau Pucat (Sama dg Nusa Tenggara)
+    'TIDAK ADA ODP': '#73b3c5', // Cyan Pucat (Sama dg Bali)
+    
+    'DOUBLE INPUT': '#e0c668',  // Kuning Emas
+    'BATAL': '#cb7eac',         // Pink/Magenta Pucat
+    'KENDALA JALUR/RUTE TARIKAN': '#d2bc92', // Coklat Muda/Beige
+    'KENDALA JALUR': '#d2bc92', // Variasi nama pendek
+    'GANTI PAKET': '#bdd7e8',   // Biru Muda Langit
+    'PENDING': '#6865b2',       // Ungu Gelap/Indigo
+
+    // --- WARNA STATUS UMUM (Jaga-jaga) ---
+    'Completed': '#10B981',     // Hijau Standar
+    'Open': '#FBBF24',          // Kuning Standar
+    'Cancel': '#EF4444',        // Merah Standar
 };
 
-// --- 2. PALET WARNA CADANGAN (UNTUK DISTRIK / WITEL OLD) ---
-// Jika nama wilayah TIDAK ADA di SPECIFIC_COLORS (misal: "JEMBER", "MATARAM"),
-// maka warna diambil dari sini secara berurutan agar tetap warna-warni.
+// --- 2. PALET WARNA CADANGAN ---
+// Urutan warna jika label tidak ditemukan di SPECIFIC_COLORS
 const PALETTE_COLORS = [
-    '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6',
-    '#EC4899', '#6366F1', '#14B8A6', '#F97316', '#84CC16',
-    '#06B6D4', '#D946EF', '#EAB308', '#64748B', '#A855F7',
-    '#FB7185', '#2DD4BF', '#FB923C', '#A3E635', '#60A5FA',
+    '#5e83e6', '#dfa56b', '#a082da', '#bbc67a', '#73b3c5',
+    '#e0c668', '#cb7eac', '#d2bc92', '#bdd7e8', '#6865b2'
 ];
 
 const HsiPieChart = ({ data, title }) => {
-    // Cek data kosong
-    if (!data || data.length === 0 || data.every(item => item.value === 0)) {
+    // Validasi Data: Pastikan data ada dan tidak semua nilainya 0
+    const safeData = Array.isArray(data) ? data : [];
+    const hasValidData = safeData.length > 0 && safeData.some(item => item.value > 0);
+
+    if (!hasValidData) {
         return (
             <div className="flex items-center justify-center w-full h-[300px] text-gray-500 text-center border border-dashed rounded-lg">
                 <p>Tidak ada data.</p>
@@ -37,12 +52,13 @@ const HsiPieChart = ({ data, title }) => {
         );
     }
 
-    // Custom Label: Menampilkan ANGKA
+    // Custom Label: Menampilkan ANGKA di tengah potongan Pie
     const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, value, percent }) => {
         // Jangan tampilkan label jika nilainya 0 atau potongannya terlalu kecil (< 5%)
         if (value === 0 || percent < 0.05) return null;
 
         const RADIAN = Math.PI / 180;
+        // Hitung posisi label agar berada di tengah radius slice
         const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
         const x = cx + radius * Math.cos(-midAngle * RADIAN);
         const y = cy + radius * Math.sin(-midAngle * RADIAN);
@@ -55,7 +71,7 @@ const HsiPieChart = ({ data, title }) => {
                 textAnchor="middle" 
                 dominantBaseline="central" 
                 className="text-[10px] font-bold drop-shadow-md"
-                style={{ pointerEvents: 'none' }}
+                style={{ pointerEvents: 'none', userSelect: 'none' }}
             >
                 {value.toLocaleString('id-ID')}
             </text>
@@ -70,7 +86,7 @@ const HsiPieChart = ({ data, title }) => {
             <ResponsiveContainer width="100%" height={320}>
                 <PieChart>
                     <Pie
-                        data={data}
+                        data={safeData}
                         cx="50%"
                         cy="50%"
                         labelLine={false}
@@ -80,15 +96,24 @@ const HsiPieChart = ({ data, title }) => {
                         dataKey="value"
                         nameKey="product" 
                         paddingAngle={2} // Jarak antar potongan
+                        isAnimationActive={true}
                     >
-                        {data.map((entry, index) => {
-                            const name = entry.product;
+                        {safeData.map((entry, index) => {
+                            const name = entry.product || '';
+                            const normalizedName = name.toString().toUpperCase().trim();
                             
-                            // --- LOGIKA GABUNGAN ---
-                            // 1. Cek apakah ada di SPECIFIC_COLORS?
-                            let finalColor = SPECIFIC_COLORS[name];
+                            // --- LOGIKA PEWARNAAN ---
+                            // 1. Cek apakah ada di SPECIFIC_COLORS? (Case Insensitive)
+                            let finalColor = SPECIFIC_COLORS[normalizedName];
 
-                            // 2. Jika tidak ada (berarti ini Distrik/Witel Old), ambil dari PALETTE
+                            // 2. Cek parsial untuk kasus khusus (misal: "KENDALA JALUR...")
+                            if (!finalColor) {
+                                if (normalizedName.includes('KENDALA JALUR') || normalizedName.includes('RUTE TARIKAN')) {
+                                    finalColor = SPECIFIC_COLORS['KENDALA JALUR/RUTE TARIKAN'];
+                                }
+                            }
+
+                            // 3. Jika tetap tidak ada, ambil dari PALETTE urut
                             if (!finalColor) {
                                 finalColor = PALETTE_COLORS[index % PALETTE_COLORS.length];
                             }
@@ -105,7 +130,8 @@ const HsiPieChart = ({ data, title }) => {
                     </Pie>
                     <Tooltip 
                         formatter={(value) => value.toLocaleString('id-ID')}
-                        contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', fontSize: '12px' }}
+                        contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', fontSize: '12px', border: '1px solid #e5e7eb' }}
+                        itemStyle={{ color: '#374151' }}
                     />
                     <Legend 
                         layout="vertical" 
@@ -114,7 +140,7 @@ const HsiPieChart = ({ data, title }) => {
                         wrapperStyle={{ 
                             fontSize: '11px', 
                             paddingLeft: '10px',
-                            maxHeight: '280px', // Scroll jika distrik banyak
+                            maxHeight: '280px', 
                             overflowY: 'auto'
                         }}
                     />

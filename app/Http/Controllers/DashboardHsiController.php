@@ -427,8 +427,25 @@ class DashboardHsiController extends Controller
                     protected $data;
                     public function __construct($data) { $this->data = $data; }
                     public function collection() { return $this->data; }
-                    public function headings(): array { 
-                        return array_keys($this->data->first() ? $this->data->first()->toArray() : []); 
+                    public function headings(): array {
+                        $data = $this->data;
+                        $first = null;
+
+                        if (is_array($data)) {
+                            $first = reset($data);
+                        } elseif ($data instanceof \Illuminate\Support\Collection) {
+                            $first = $data->first();
+                        }
+
+                        if (is_object($first) && method_exists($first, 'toArray')) {
+                            return array_keys($first->toArray());
+                        }
+
+                        if (is_array($first)) {
+                            return array_keys($first);
+                        }
+
+                        return [];
                     }
                 }, "Detail_HSI_{$detailCategory}.xlsx");
             }

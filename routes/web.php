@@ -64,8 +64,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/data-report/export', [DataReportController::class, 'export'])->name('data-report.export');
     Route::get('/data-report/export/inprogress', [DataReportController::class, 'exportInProgress'])->name('data-report.exportInProgress');
 
-    Route::get('/galaksi', [GalaksiController::class, 'index'])->name('galaksi.index'); 
-    Route::get('/galaksi/details', [DataReportController::class, 'showDetails'])->name('galaksi.showDetails'); 
+    Route::get('/galaksi', [GalaksiController::class, 'index'])->name('galaksi.index');
+    Route::get('/galaksi/details', [DataReportController::class, 'showDetails'])->name('galaksi.showDetails');
     Route::get('/data-report/details', [DataReportController::class, 'showDetails'])->name('data-report.details');
 
     // Tools & Others
@@ -84,7 +84,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/report-datin/galaksi-details', [ReportDatinController::class, 'showGalaksiDetails'])->name('report.datin.galaksiDetails');
 
     // --- RUTE HSI (MODUL BARU) ---
-    
+
     // 1. Dashboard HSI
     Route::get('/dashboard-hsi', [DashboardHsiController::class, 'index'])->name('dashboard.hsi');
 
@@ -97,22 +97,22 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/report-hsi/export', [ReportHsiController::class, 'export'])->name('report.hsi.export');
     Route::get('/report-hsi', [ReportHsiController::class, 'index']) ->name('report.hsi');
 
-    
 
-    
+
+
 
 // Group route untuk Admin Report HSI
     Route::middleware(['auth', 'verified'])->prefix('admin/report-hsi')->name('admin.report_hsi.')->group(function () {
-    
+
     // Halaman Utama Admin (Tabel & Form)
         Route::get('/', [ReportHsiAdminController::class, 'index'])->name('index');
-    
+
     // Proses Upload Excel
         Route::post('/store', [ReportHsiAdminController::class, 'store'])->name('store');
-    
+
     // Reset Database (Hapus Semua)
         Route::delete('/destroy-all', [ReportHsiAdminController::class, 'destroyAll'])->name('destroy_all');
-    
+
     // Hapus Satu Data
         Route::delete('/{id}', [ReportHsiAdminController::class, 'destroy'])->name('destroy');
 });
@@ -123,7 +123,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     | Rute Khusus Admin (Area CMS) - Bisa diakses Admin & Superadmin
     |--------------------------------------------------------------------------
     */
-    Route::middleware(['role:admin,superadmin']) 
+    Route::middleware(['role:admin,superadmin'])
         ->prefix('admin')
         ->name('admin.')
         ->group(function () {
@@ -200,8 +200,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 ->group(function () {
                     Route::get('/', 'index')->name('index');
                     Route::post('/upload', 'upload')->name('upload');
-                    Route::post('/store', 'store')->name('store'); 
-                    Route::post('/update-mapping', 'updateMapping')->name('updateMapping'); 
+                    Route::post('/store', 'store')->name('store');
+                    Route::post('/update-mapping', 'updateMapping')->name('updateMapping');
                 });
 
             // Rute Resource untuk Account Officer
@@ -226,17 +226,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
     | Rute HANYA untuk Superadmin
     |--------------------------------------------------------------------------
     */
-    Route::middleware(['role:superadmin']) 
-        ->prefix('superadmin') 
-        ->name('superadmin.') 
+    Route::middleware(['role:superadmin'])
+        ->prefix('superadmin')
+        ->name('superadmin.')
         ->group(function () {
             Route::resource('users', UserController::class);
 
             Route::controller(SuperAdminController::class)->group(function () {
                 Route::get('/rollback', 'showRollbackPage')->name('rollback.show');
-                Route::post('/rollback', 'executeRollback')->name('rollback.execute'); 
-                Route::post('/rollback-jt', 'executeRollbackJT')->name('rollback.executeJT'); 
-                Route::post('/rollback-datin', 'executeRollbackDatin')->name('rollback.executeDatin'); 
+                Route::post('/rollback', 'executeRollback')->name('rollback.execute');
+                Route::post('/rollback-jt', 'executeRollbackJT')->name('rollback.executeJT');
+                Route::post('/rollback-datin', 'executeRollbackDatin')->name('rollback.executeDatin');
             });
         });
 });

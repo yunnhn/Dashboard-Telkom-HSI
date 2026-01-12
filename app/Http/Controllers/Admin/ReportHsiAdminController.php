@@ -42,7 +42,7 @@ class ReportHsiAdminController extends Controller
 
         // 4. Ambil Data (Paginate 10 per halaman)
         // Gunakan orderBy order_date agar data tanggal terbaru muncul di atas
-        $data = $query->orderBy('order_date', 'desc') 
+        $data = $query->orderBy('order_date', 'desc')
                       ->paginate(10)
                       ->withQueryString();
 
@@ -69,7 +69,7 @@ class ReportHsiAdminController extends Controller
         set_time_limit(3600); // 1 Jam
 
         try {
-            $dateFormat = $request->input('date_format', 'm/d/Y'); 
+            $dateFormat = $request->input('date_format', 'm/d/Y');
             $file = $request->file('file');
             $extension = $file->getClientOriginalExtension();
             $realPath = $file->getPathname();
@@ -80,7 +80,7 @@ class ReportHsiAdminController extends Controller
                 if ($zip->open($realPath) === TRUE) {
                     // Buat folder temporary unik agar tidak bentrok antar user
                     $extractPath = storage_path('app/temp_import_admin/' . uniqid());
-                    
+
                     // Pastikan folder ada
                     if (!File::exists($extractPath)) {
                         File::makeDirectory($extractPath, 0755, true);
@@ -92,7 +92,7 @@ class ReportHsiAdminController extends Controller
                     // Cari file Excel/CSV di dalam folder hasil ekstrak
                     $files = File::allFiles($extractPath);
                     $targetFile = null;
-                    
+
                     foreach ($files as $f) {
                         if (in_array(strtolower($f->getExtension()), ['xlsx', 'xls', 'csv'])) {
                             $targetFile = $f;
@@ -111,11 +111,11 @@ class ReportHsiAdminController extends Controller
 
                     // Hapus folder temp setelah selesai
                     File::deleteDirectory($extractPath);
-                    
+
                 } else {
                     return redirect()->back()->with('error', 'Gagal mengekstrak file ZIP.');
                 }
-            } 
+            }
             // === LOGIC IMPORT EXCEL BIASA ===
             else {
                 Excel::import(new HsiDataImport($dateFormat), $file);

@@ -11,7 +11,7 @@ export default function ImportModal({ show, onClose }) {
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        
+
         // Ganti 'dashboard.import' dengan nama route di web.php Anda yang mengarah ke fungsi import tadi
         post(route('dashboard.import'), {
             onSuccess: () => {
@@ -31,7 +31,7 @@ export default function ImportModal({ show, onClose }) {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
             <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4 overflow-hidden">
-                
+
                 {/* Header Modal */}
                 <div className="bg-gray-100 px-6 py-4 border-b flex justify-between items-center">
                     <h3 className="text-lg font-bold text-gray-800">Upload Data HSI</h3>
@@ -42,11 +42,11 @@ export default function ImportModal({ show, onClose }) {
                 <div className="p-6">
                     {isSuccess ? (
                         <div className="p-4 bg-green-100 text-green-700 rounded mb-4 text-center">
-                            ✅ Berhasil Import Data!
+                            âœ… Berhasil Import Data!
                         </div>
                     ) : (
                         <form onSubmit={handleSubmit} className="space-y-4">
-                            
+
                             {/* INPUT FILE */}
                             <div>
                                 <label className="block text-sm font-bold text-gray-700 mb-2">File Excel (.xlsx, .csv)</label>
@@ -72,7 +72,7 @@ export default function ImportModal({ show, onClose }) {
                                 <p className="text-xs text-gray-600 mb-2">
                                     Lihat kolom tanggal di Excel Anda. Bagaimana urutannya?
                                 </p>
-                                
+
                                 <select
                                     value={data.date_format}
                                     onChange={(e) => setData('date_format', e.target.value)}
@@ -80,10 +80,10 @@ export default function ImportModal({ show, onClose }) {
                                 >
                                     {/* Opsi 1: US Format (Kasus Anda: 12/4 = 4 Des) */}
                                     <option value="m/d/Y">Bulan/Tanggal/Tahun (Contoh: 12/31/2025)</option>
-                                    
+
                                     {/* Opsi 2: Indo/UK Format (Kasus Umum: 31/12) */}
                                     <option value="d/m/Y">Tanggal/Bulan/Tahun (Contoh: 31/12/2025)</option>
-                                    
+
                                     {/* Opsi 3: DB Format */}
                                     <option value="Y-m-d">Tahun-Bulan-Tanggal (Contoh: 2025-12-31)</option>
                                 </select>

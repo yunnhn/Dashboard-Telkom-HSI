@@ -33,7 +33,7 @@ const MultiSelectDropdown = ({ options, selected, onChange, placeholder, isMapCo
 
     return (
         <div className="relative w-full" ref={dropdownRef}>
-            <div 
+            <div
                 className="w-full border border-gray-300 rounded-md p-2 bg-white cursor-pointer flex justify-between items-center text-sm shadow-sm"
                 onClick={() => setIsOpen(!isOpen)}
             >
@@ -42,19 +42,19 @@ const MultiSelectDropdown = ({ options, selected, onChange, placeholder, isMapCo
                 </span>
                 <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
             </div>
-            
+
             {isOpen && (
                 <div className={`absolute left-0 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto ${isMapControl ? 'z-[1001]' : 'z-50'}`}>
                     {options.map((option) => (
-                        <div 
-                            key={option} 
+                        <div
+                            key={option}
                             className="flex items-center p-2 hover:bg-gray-100 cursor-pointer"
                             onClick={() => toggleOption(option)}
                         >
-                            <input 
-                                type="checkbox" 
-                                checked={selected.includes(option)} 
-                                readOnly 
+                            <input
+                                type="checkbox"
+                                checked={selected.includes(option)}
+                                readOnly
                                 className="mr-2 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 pointer-events-none"
                             />
                             <span className="text-sm text-gray-700 select-none">
@@ -68,27 +68,27 @@ const MultiSelectDropdown = ({ options, selected, onChange, placeholder, isMapCo
     );
 };
 
-export default function DashboardHSI({ 
-    auth, stats, mapData, 
-    chart1, chart2, chart3, chart4, 
-    chart5Data, chart5Keys, chart6Data, chart6Keys, 
-    chartTrend, 
+export default function DashboardHSI({
+    auth, stats, mapData,
+    chart1, chart2, chart3, chart4,
+    chart5Data, chart5Keys, chart6Data, chart6Keys,
+    chartTrend,
     witels, filters, dimensionLabel,
     branchMap,
-    tableData 
+    tableData
 }) {
 
     const [dateRange, setDateRange] = useState([
-        filters.start_date ? new Date(filters.start_date) : null, 
+        filters.start_date ? new Date(filters.start_date) : null,
         filters.end_date ? new Date(filters.end_date) : null
     ]);
     const [startDate, endDate] = dateRange;
-    
+
     // State Filter
     const [selectedWitels, setSelectedWitels] = useState(Array.isArray(filters.global_witel) ? filters.global_witel : []);
     const [selectedBranches, setSelectedBranches] = useState(Array.isArray(filters.global_branch) ? filters.global_branch : []);
     const [selectedMapStatus, setSelectedMapStatus] = useState(Array.isArray(filters.map_status) ? filters.map_status : []);
-    
+
     // Search State
     const [searchQuery, setSearchQuery] = useState(filters.search || '');
 
@@ -97,28 +97,28 @@ export default function DashboardHSI({
     const mapStatusOptions = [
         'Completed', 'Open', 'Cancel', // Opsi Default
         'Null', // Representasi null dari backend biasanya string 'Null' jika pakai COALESCE
-        'ODP JAUH', 
-        'ODP FULL', 
-        'DOUBLE INPUT', 
-        'BATAL', 
-        'TIDAK ADA ODP', 
-        'PENDING', 
-        'LAINNYA', 
-        'KENDALA JALUR/RUTE TARIKAN', 
+        'ODP JAUH',
+        'ODP FULL',
+        'DOUBLE INPUT',
+        'BATAL',
+        'TIDAK ADA ODP',
+        'PENDING',
+        'LAINNYA',
+        'KENDALA JALUR/RUTE TARIKAN',
         'GANTI PAKET'
     ];
 
     // --- FILTER CHART KEYS (CANCEL NON FCC) ---
     // Hanya tampilkan kategori yang diinginkan di Stacked Bar Chart Non-FCC
     const allowedCancelKeys = [
-        'Null', 'ODP JAUH', 'ODP FULL', 'DOUBLE INPUT', 'BATAL', 
+        'Null', 'ODP JAUH', 'ODP FULL', 'DOUBLE INPUT', 'BATAL',
         'TIDAK ADA ODP', 'PENDING', 'LAINNYA', 'KENDALA JALUR/RUTE TARIKAN', 'GANTI PAKET'
     ];
 
     // Filter chart6Keys agar hanya berisi yang ada di allowedCancelKeys
     const filteredChart6Keys = useMemo(() => {
         if (!chart6Keys) return [];
-        return chart6Keys.filter(key => 
+        return chart6Keys.filter(key =>
             allowedCancelKeys.map(k => k.toUpperCase()).includes(String(key).toUpperCase())
         );
     }, [chart6Keys]);
@@ -147,7 +147,7 @@ export default function DashboardHSI({
 
     const applyFilter = (overrideParams = {}) => {
         const query = {
-            search: searchQuery, 
+            search: searchQuery,
             ...overrideParams
         };
 
@@ -198,7 +198,7 @@ export default function DashboardHSI({
 
             <div className="py-8">
                 <div className="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
-                    
+
                     {/* SECTION 1: GLOBAL FILTER */}
                     <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-200">
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
@@ -265,7 +265,7 @@ export default function DashboardHSI({
                     {/* CHART ROW 2: CANCEL */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
                         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-                            <div className="h-96"> 
+                            <div className="h-96">
                                 {hasData(chart5Data) ? <StackedBarChart data={chart5Data} keys={chart5Keys} title={`CANCEL BY FCC (${dimensionLabel})`} /> : <div className="h-full flex items-center justify-center text-gray-400">Tidak ada data Cancel FCC</div>}
                             </div>
                         </div>
@@ -273,10 +273,10 @@ export default function DashboardHSI({
                             <div className="h-96">
                                 {/* GUNAKAN filteredChart6Keys AGAR SESUAI REQUEST */}
                                 {hasData(chart6Data) ? (
-                                    <StackedBarChart 
-                                        data={chart6Data} 
-                                        keys={filteredChart6Keys} 
-                                        title={`CANCEL NON-FCC (${dimensionLabel})`} 
+                                    <StackedBarChart
+                                        data={chart6Data}
+                                        keys={filteredChart6Keys}
+                                        title={`CANCEL NON-FCC (${dimensionLabel})`}
                                     />
                                 ) : (
                                     <div className="h-full flex items-center justify-center text-gray-400">Tidak ada data Cancel Biasa</div>
@@ -390,8 +390,8 @@ export default function DashboardHSI({
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.sto}</td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.type_layanan}</td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                                                        ${row.kelompok_status === 'PS' ? 'bg-green-100 text-green-800' : 
+                                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                                                        ${row.kelompok_status === 'PS' ? 'bg-green-100 text-green-800' :
                                                           (row.kelompok_status === 'CANCEL' || row.kelompok_status === 'REJECT_FCC') ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>
                                                         {row.kelompok_status}
                                                     </span>
@@ -427,7 +427,7 @@ export default function DashboardHSI({
                                                     key={i}
                                                     onClick={() => handlePageChange(link.url)}
                                                     disabled={!link.url || link.active}
-                                                    className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold focus:z-20 
+                                                    className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold focus:z-20
                                                         ${link.active ? 'z-10 bg-blue-600 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600' : 'text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:outline-offset-0'}
                                                         ${!link.url ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
                                                         ${i === 0 ? 'rounded-l-md' : ''}

@@ -8,8 +8,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Imports\HsiDataImport;
 use Maatwebsite\Excel\Facades\Excel;
-use ZipArchive; 
-use Illuminate\Support\Facades\File; 
+use ZipArchive;
+use Illuminate\Support\Facades\File;
 
 class DashboardHsiController extends Controller
 {
@@ -21,14 +21,14 @@ class DashboardHsiController extends Controller
         // 1. FILTER PARAMETERS
         $startDate = $request->input('start_date');
         $endDate = $request->input('end_date');
-        $selectedWitels = $request->input('global_witel', []); 
-        $selectedBranches = $request->input('global_branch', []); 
+        $selectedWitels = $request->input('global_witel', []);
+        $selectedBranches = $request->input('global_branch', []);
         $mapStatus = $request->input('map_status', []);
-        $searchQuery = $request->input('search'); 
+        $searchQuery = $request->input('search');
 
         // 2. DEFINE SCOPE: RSO 2
         $rso2Witels = ['JATIM TIMUR', 'JATIM BARAT', 'SURAMADU', 'NUSA TENGGARA', 'BALI'];
-        
+
         $baseQuery = HsiData::query()->whereIn('witel', $rso2Witels);
 
         // --- AMBIL LIST BRANCH DINAMIS ---
@@ -68,7 +68,7 @@ class DashboardHsiController extends Controller
             $dimension = 'witel_old';
             $dimensionLabel = 'Distrik (Witel Old)';
         } else {
-            $dimension = 'witel'; 
+            $dimension = 'witel';
             $dimensionLabel = 'Regional (Witel)';
         }
 
@@ -76,7 +76,7 @@ class DashboardHsiController extends Controller
         // VISUALISASI CHART
         // =================================================================
         $chart1 = (clone $baseQuery)->select($dimension, DB::raw('count(*) as total_amount'))->whereNotNull($dimension)->groupBy($dimension)->orderBy('total_amount', 'desc')->get()->map(fn($i) => ['product' => $i->$dimension, 'value' => $i->total_amount]);
-        
+
         $chart4 = (clone $baseQuery)->where('kelompok_status', 'PS')->select($dimension, DB::raw('count(*) as value'))->whereNotNull($dimension)->groupBy($dimension)->orderBy('value', 'desc')->get()->map(fn($i) => ['product' => $i->$dimension, 'value' => $i->value]);
 
         // Cancel FCC
@@ -119,7 +119,7 @@ class DashboardHsiController extends Controller
         $mapQuery = (clone $baseQuery)->whereNotNull('gps_latitude')->whereNotNull('gps_longitude');
         if (!empty($mapStatus)) {
             $mapQuery->where(function($q) use ($mapStatus) {
-                $q->whereRaw('1 = 0'); 
+                $q->whereRaw('1 = 0');
                 if (in_array('Completed', $mapStatus)) $q->orWhere('kelompok_status', 'PS');
                 if (in_array('Cancel', $mapStatus)) $q->orWhereIn('kelompok_status', ['CANCEL', 'REJECT_FCC']);
                 if (in_array('Open', $mapStatus)) $q->orWhereNotIn('kelompok_status', ['PS', 'CANCEL', 'REJECT_FCC']);
@@ -131,12 +131,12 @@ class DashboardHsiController extends Controller
             $lng = $fixCoord($item->gps_longitude ?? $item->GPS_LONGITUDE, false);
             if ($lat===null || $lng===null) return null;
             $witel = strtoupper($item->witel ?? '');
-            
+
             $act = 'OTHER_AREA';
             if ($lat >= -8.95 && $lat <= -7.90 && $lng >= 114.40 && $lng <= 115.75) $act = 'BALI';
             elseif ($lat >= -8.90 && $lat <= -6.60 && $lng >= 110.80 && $lng <= 114.45) $act = 'JATIM_AREA';
             elseif ($lat >= -11.20 && $lat <= -8.00 && $lng >= 115.80 && $lng <= 127.50) $act = 'NUSA TENGGARA';
-            
+
             $statusGroup = 'Open'; if ($item->kelompok_status === 'PS') $statusGroup = 'Completed'; elseif (in_array($item->kelompok_status, ['CANCEL', 'REJECT_FCC'])) $statusGroup = 'Cancel';
 
             return ['id' => $item->order_id, 'lat' => $lat, 'lng' => $lng, 'status_group' => $statusGroup, 'name' => $item->customer_name, 'witel' => $witel];
@@ -170,7 +170,7 @@ class DashboardHsiController extends Controller
         // =================================================================
         // DATA PREVIEW TABLE
         // =================================================================
-        $tableQuery = (clone $baseQuery); 
+        $tableQuery = (clone $baseQuery);
 
         if ($searchQuery) {
             $tableQuery->where(function($q) use ($searchQuery) {
@@ -181,13 +181,13 @@ class DashboardHsiController extends Controller
         }
 
         $tableData = $tableQuery->select(
-            'order_id', 
-            'order_date', 
-            'customer_name', 
-            'witel', 
-            'sto', 
+            'order_id',
+            'order_date',
+            'customer_name',
+            'witel',
+            'sto',
             'type_layanan',
-            'kelompok_status', 
+            'kelompok_status',
             'status_resume'
         )
         ->orderBy('order_date', 'asc')
@@ -197,8 +197,8 @@ class DashboardHsiController extends Controller
         return Inertia::render('DashboardHSI', [
             'stats'         => $stats,
             'mapData'       => $mapData,
-            'chart1'        => $chart1, 
-            'chart4'        => $chart4, 
+            'chart1'        => $chart1,
+            'chart4'        => $chart4,
             'chart5Data'    => $chart5Data, 'chart5Keys' => $chart5Keys,
             'chart6Data'    => $chart6Data, 'chart6Keys' => $chart6Keys,
             'chart2'        => $chart2,
@@ -220,16 +220,16 @@ class DashboardHsiController extends Controller
         // 1. FILTER PARAMETERS
         $startDate = $request->input('start_date');
         $endDate = $request->input('end_date');
-        $selectedWitels = $request->input('global_witel', []); 
-        $selectedBranches = $request->input('global_branch', []); 
-        
+        $selectedWitels = $request->input('global_witel', []);
+        $selectedBranches = $request->input('global_branch', []);
+
         // PARAMETER BARU UNTUK DETAIL DAN EXPORT
-        $detailCategory = $request->input('detail_category'); 
+        $detailCategory = $request->input('detail_category');
         $isExport = $request->input('export_detail', false);
 
         // 2. DEFINE SCOPE
         $rso2Witels = ['JATIM TIMUR', 'JATIM BARAT', 'SURAMADU', 'NUSA TENGGARA', 'BALI'];
-        
+
         // Base Query
         $flowQuery = HsiData::query()->whereIn(DB::raw('TRIM(UPPER(witel))'), $rso2Witels);
 
@@ -283,11 +283,11 @@ class DashboardHsiController extends Controller
             DB::raw("SUM(CASE WHEN data_proses = 'OGP PROVI' THEN 1 ELSE 0 END) as ogp_provi"),
             DB::raw("SUM(CASE WHEN data_proses NOT IN ('CANCEL QC1', 'CANCEL FCC', 'OGP VERIFIKASI DAN VALID', 'UNSC', 'CANCEL', 'FALLOUT', 'REVOKE', 'OGP PROVI', 'OGP SURVEY') AND status_resume != 'MIA - INVALID SURVEY' THEN 1 ELSE 0 END) as ps_count"),
             DB::raw("SUM(CASE WHEN data_proses NOT IN ('CANCEL FCC', 'UNSC', 'REVOKE') AND (group_paket != 'WMS' OR group_paket IS NULL) THEN 1 ELSE 0 END) as ps_re_denominator"),
-            
+
             // --- UPDATED LOGIC FOR CONVERSION PS/PI ---
             // Mengikuti logika Report HSI: PI + Fallout + Act Comp + PS
             DB::raw("SUM(CASE WHEN kelompok_status IN ('PI', 'FO_UIM', 'FO_ASAP', 'FO_OSM', 'FO_WFM', 'ACT_COM', 'PS') THEN 1 ELSE 0 END) as ps_pi_denominator"),
-            
+
             DB::raw("SUM(CASE WHEN data_proses = 'REVOKE' AND status_resume = '102 | FOLLOW UP COMPLETED' THEN 1 ELSE 0 END) as followup_completed"),
             DB::raw("SUM(CASE WHEN data_proses = 'REVOKE' AND status_resume = '100 | REVOKE COMPLETED' THEN 1 ELSE 0 END) as revoke_completed"),
             DB::raw("SUM(CASE WHEN data_proses = 'REVOKE' AND status_resume = 'REVOKE ORDER' THEN 1 ELSE 0 END) as revoke_order"),
@@ -296,7 +296,7 @@ class DashboardHsiController extends Controller
             DB::raw("SUM(CASE WHEN data_proses = 'REVOKE' AND status_resume = '102 | FOLLOW UP COMPLETED' AND (data_ps_revoke = 'FO_WFM' OR data_ps_revoke = 'FO_UIM' OR data_ps_revoke = 'FO_ASAP') THEN 1 ELSE 0 END) as fallout_revoke"),
             DB::raw("SUM(CASE WHEN data_proses = 'REVOKE' AND status_resume = '102 | FOLLOW UP COMPLETED' AND data_ps_revoke = 'CANCEL' THEN 1 ELSE 0 END) as cancel_revoke"),
             DB::raw("SUM(CASE WHEN data_proses = 'REVOKE' AND status_resume = '102 | FOLLOW UP COMPLETED' AND (data_ps_revoke IS NULL OR data_ps_revoke = '#N/A' OR data_ps_revoke = 'INPROGESS_SC' OR data_ps_revoke = 'REVOKE') THEN 1 ELSE 0 END) as lain_lain_revoke"),
-            
+
             // --- FIX COMPLY ---
             DB::raw("SUM(CASE WHEN UPPER(hasil) = 'COMPLY' THEN 1 ELSE 0 END) as comply_count")
         )->first();
@@ -363,7 +363,7 @@ class DashboardHsiController extends Controller
 
                 // COLUMN 5
                 case 'PS (COMPLETED)':
-                    // Pastikan filter PS yang paling valid digunakan. 
+                    // Pastikan filter PS yang paling valid digunakan.
                     // Jika data_proses tidak konsisten, pakai kelompok_status atau status_resume
                     $detailQuery->whereNotIn('data_proses', ['CANCEL QC1', 'CANCEL FCC', 'OGP VERIFIKASI DAN VALID', 'UNSC', 'CANCEL', 'FALLOUT', 'REVOKE', 'OGP PROVI', 'OGP SURVEY'])
                                 ->where('status_resume', '!=', 'MIA - INVALID SURVEY');
@@ -385,7 +385,7 @@ class DashboardHsiController extends Controller
                 case 'Revoke Order':
                     $detailQuery->where('data_proses', 'REVOKE')->where('status_resume', 'REVOKE ORDER');
                     break;
-                
+
                 // LEVEL 3 REVOKE
                 case 'PS Revoke':
                     $detailQuery->where('data_proses', 'REVOKE')->where('status_resume', '102 | FOLLOW UP COMPLETED')->where('data_ps_revoke', 'PS');
@@ -422,7 +422,7 @@ class DashboardHsiController extends Controller
                     }
                     return $sanitized;
                 });
-                
+
                 return Excel::download(new class($exportData) implements \Maatwebsite\Excel\Concerns\FromCollection, \Maatwebsite\Excel\Concerns\WithHeadings, \Maatwebsite\Excel\Concerns\ShouldAutoSize, \Maatwebsite\Excel\Concerns\WithStrictNullComparison {
                     protected $data;
                     public function __construct($data) { $this->data = $data; }
@@ -458,8 +458,8 @@ class DashboardHsiController extends Controller
         }
 
         return Inertia::render('FlowProcessHSI', [
-            'flowStats' => $flowStats, 
-            'witels'    => $rso2Witels, 
+            'flowStats' => $flowStats,
+            'witels'    => $rso2Witels,
             'branchMap' => $branchMap, // <-- Kirim Map
             'filters'   => $request->only(['start_date', 'end_date', 'global_witel', 'global_branch', 'detail_category']),
             'detailData' => $detailData, // Kirim Data Tabel Detail
@@ -467,7 +467,7 @@ class DashboardHsiController extends Controller
         ]);
     }
 
-    
+
 
     public function import(Request $request)
     {

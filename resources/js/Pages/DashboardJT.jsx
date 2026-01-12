@@ -62,9 +62,9 @@ export default function DashboardJT({
     const [localFilters, setLocalFilters] = useState(() => ({
         witels: filters.witels && Array.isArray(filters.witels) ? filters.witels : witelOptions,
         pos: filters.pos && Array.isArray(filters.pos) ? filters.pos : allPoOptions,
-        startDate: filters.startDate ? new Date(filters.startDate) : new Date(), 
+        startDate: filters.startDate ? new Date(filters.startDate) : new Date(),
         endDate: filters.endDate ? new Date(filters.endDate) : new Date(),
-        
+
         search: filters.search || '',
     }));
 
@@ -197,7 +197,7 @@ export default function DashboardJT({
             <div className="bg-white p-6 rounded-lg shadow-md mt-6">
                 <div className="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
                     <h3 className="font-semibold text-lg text-gray-800">Data Preview (Diurutkan berdasarkan Usia Tertinggi)</h3>
-                    
+
                     <div className="flex items-center gap-2">
                         {/* Search Input [NEW] */}
                         <div className="relative">
@@ -209,7 +209,7 @@ export default function DashboardJT({
                                 onKeyDown={handleSearchKeyDown}
                                 className="border border-gray-300 rounded-md text-sm pl-3 pr-8 py-2 w-64 focus:ring-blue-500 focus:border-blue-500"
                             />
-                            <button 
+                            <button
                                 onClick={applyFilters}
                                 className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-blue-600"
                             >
@@ -283,29 +283,29 @@ export default function DashboardJT({
                                     <tr key={index} className="bg-white border-b hover:bg-gray-50">
                                         <td className="px-6 py-4 font-mono text-xs text-gray-700">{item.id_i_hld}</td>
                                         <td className="px-6 py-4 font-mono text-xs text-gray-700">{item.no_nde_spmk}</td>
-                                        
+
                                         {/* Uraian Kegiatan: Bolehkan wrap sedikit jika terlalu panjang, atau pakai max-w-md */}
                                         <td className="px-6 py-4 font-medium text-gray-900 whitespace-normal min-w-[300px]" title={item.uraian_kegiatan}>
                                             {item.uraian_kegiatan}
                                         </td>
-                                        
+
                                         <td className="px-6 py-4">{item.segmen}</td>
                                         <td className="px-6 py-4 font-semibold text-blue-600">{item.po_name}</td>
                                         <td className="px-6 py-4">{item.witel_baru}</td>
                                         <td className="px-6 py-4">{item.witel_lama}</td>
                                         <td className="px-6 py-4">{item.region}</td>
-                                        
+
                                         <td className="px-6 py-4">
                                             <StatusBadge
                                                 text={item.status_proyek?.toUpperCase()}
                                                 colorClass={getStatusColor(item.status_proyek)}
                                             />
                                         </td>
-                                        
+
                                         <td className="px-6 py-4">
                                             {item.tanggal_cb ? new Date(item.tanggal_cb).toLocaleDateString('id-ID') : '-'}
                                         </td>
-                                        
+
                                         <td className="px-6 py-4">{item.jenis_kegiatan}</td>
                                         <td className="px-6 py-4">{formatRupiah(item.revenue_plan)}</td>
                                         <td className="px-6 py-4 text-center">{item.go_live}</td>
@@ -314,15 +314,15 @@ export default function DashboardJT({
                                         <td className="px-6 py-4">{item.mom}</td>
                                         <td className="px-6 py-4">{item.ba_drop}</td>
                                         <td className="px-6 py-4 text-center">{item.populasi_non_drop}</td>
-                                        
+
                                         <td className="px-6 py-4 font-semibold">
                                             {item.tanggal_mom ? new Date(item.tanggal_mom).toLocaleDateString('id-ID') : '-'}
                                         </td>
-                                        
+
                                         <td className="px-6 py-4 font-bold text-center text-red-600 bg-red-50 rounded">
                                             {item.usia}
                                         </td>
-                                        
+
                                         <td className="px-6 py-4">{formatRupiah(item.rab)}</td>
                                         <td className="px-6 py-4">{item.total_port}</td>
                                         <td className="px-6 py-4">{item.template_durasi}</td>

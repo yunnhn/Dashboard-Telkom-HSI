@@ -37,33 +37,33 @@ const TrendLineChartHSI = ({ data }) => {
                 }}
             >
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis 
-                    dataKey="date" 
-                    tick={{ fontSize: 12 }} 
+                <XAxis
+                    dataKey="date"
+                    tick={{ fontSize: 12 }}
                     tickMargin={10}
                 />
                 <YAxis />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend verticalAlign="top" height={36}/>
-                
+
                 {/* Garis Total Order (Biru) */}
-                <Line 
-                    type="monotone" 
-                    dataKey="total" 
-                    name="Total Order (Input)" 
-                    stroke="#2563eb" 
-                    strokeWidth={3} 
-                    activeDot={{ r: 8 }} 
+                <Line
+                    type="monotone"
+                    dataKey="total"
+                    name="Total Order (Input)"
+                    stroke="#2563eb"
+                    strokeWidth={3}
+                    activeDot={{ r: 8 }}
                     dot={false}
                 />
 
                 {/* Garis Completed PS (Hijau) */}
-                <Line 
-                    type="monotone" 
-                    dataKey="ps" 
-                    name="Completed (PS)" 
-                    stroke="#16a34a" 
-                    strokeWidth={3} 
+                <Line
+                    type="monotone"
+                    dataKey="ps"
+                    name="Completed (PS)"
+                    stroke="#16a34a"
+                    strokeWidth={3}
                     dot={false}
                 />
             </LineChart>

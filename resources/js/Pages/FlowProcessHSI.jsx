@@ -18,8 +18,8 @@ const MultiSelectDropdown = ({ options, selected, onChange, placeholder }) => {
     }, []);
 
     const toggleOption = (value) => {
-        const newSelected = selected.includes(value) 
-            ? selected.filter((item) => item !== value) 
+        const newSelected = selected.includes(value)
+            ? selected.filter((item) => item !== value)
             : [...selected, value];
         onChange(newSelected);
     };
@@ -45,14 +45,14 @@ const MultiSelectDropdown = ({ options, selected, onChange, placeholder }) => {
 };
 
 export default function FlowProcessHSI({ auth, flowStats, witels, branchMap, filters = {}, detailData, activeCategory }) {
-    
+
     // --- 1. STATE & FILTER LOGIC ---
     const [dateRange, setDateRange] = useState([
-        filters.start_date ? new Date(filters.start_date) : null, 
+        filters.start_date ? new Date(filters.start_date) : null,
         filters.end_date ? new Date(filters.end_date) : null
     ]);
     const [startDate, endDate] = dateRange;
-    
+
     const [selectedWitels, setSelectedWitels] = useState(Array.isArray(filters.global_witel) ? filters.global_witel : []);
     const [selectedBranches, setSelectedBranches] = useState(Array.isArray(filters.global_branch) ? filters.global_branch : []);
 
@@ -79,15 +79,15 @@ export default function FlowProcessHSI({ auth, flowStats, witels, branchMap, fil
     // --- ACTIONS ---
     const applyFilter = () => {
         const query = {};
-        if (startDate && endDate) { 
-            query.start_date = formatDate(startDate); 
-            query.end_date = formatDate(endDate); 
+        if (startDate && endDate) {
+            query.start_date = formatDate(startDate);
+            query.end_date = formatDate(endDate);
         }
         if (selectedWitels.length > 0) query.global_witel = selectedWitels;
         if (selectedBranches.length > 0) query.global_branch = selectedBranches;
-        
+
         // Reset detail jika filter utama berubah, atau pertahankan jika diinginkan
-        // query.detail_category = activeCategory; 
+        // query.detail_category = activeCategory;
 
         router.get(route('flow.hsi'), query, { preserveState: true, preserveScroll: true });
     };
@@ -100,20 +100,20 @@ export default function FlowProcessHSI({ auth, flowStats, witels, branchMap, fil
     // --- INTERACTIVE ACTIONS (DETAIL & EXPORT) ---
     const handleCardClick = (categoryName) => {
         const query = {};
-        if (startDate && endDate) { 
-            query.start_date = formatDate(startDate); 
-            query.end_date = formatDate(endDate); 
+        if (startDate && endDate) {
+            query.start_date = formatDate(startDate);
+            query.end_date = formatDate(endDate);
         }
         if (selectedWitels.length > 0) query.global_witel = selectedWitels;
         if (selectedBranches.length > 0) query.global_branch = selectedBranches;
-        
+
         // Set Kategori Aktif
         query.detail_category = categoryName;
 
-        router.get(route('flow.hsi'), query, { 
-            preserveState: true, 
-            preserveScroll: true, 
-            only: ['detailData', 'activeCategory', 'filters'] 
+        router.get(route('flow.hsi'), query, {
+            preserveState: true,
+            preserveScroll: true,
+            only: ['detailData', 'activeCategory', 'filters']
         });
 
         // Scroll ke bagian detail setelah data load (opsional, bisa pakai useEffect juga)
@@ -124,47 +124,47 @@ export default function FlowProcessHSI({ auth, flowStats, witels, branchMap, fil
 
     const handleExportDetail = () => {
         if (!activeCategory) return;
-        
-        const query = { 
-            ...filters, 
-            export_detail: true, 
-            detail_category: activeCategory 
+
+        const query = {
+            ...filters,
+            export_detail: true,
+            detail_category: activeCategory
         };
         // Gunakan window.location agar browser mendownload file tanpa refresh SPA
         const url = route('flow.hsi') + '?' + new URLSearchParams(query).toString(); // Pastikan route() menghasilkan base url yang benar
-        
+
         // Jika route('flow.hsi') sudah ada query string, logic ini mungkin perlu disesuaikan.
         // Cara paling aman dengan Inertia/Laravel Ziggy:
-        // window.location.href = route('flow.hsi', query); 
-        // Tapi kadang Inertia menghandle ini sebagai visit. 
+        // window.location.href = route('flow.hsi', query);
+        // Tapi kadang Inertia menghandle ini sebagai visit.
         // Jadi paling aman manual build URL atau pastikan backend handle non-inertia request.
-        
+
         window.location.href = route('flow.hsi', query);
     };
 
     const handlePageChange = (url) => {
         if(url) {
-            router.get(url, {}, { 
-                preserveState: true, 
-                preserveScroll: true, 
-                only: ['detailData'] 
+            router.get(url, {}, {
+                preserveState: true,
+                preserveScroll: true,
+                only: ['detailData']
             });
         }
     }
 
     // --- 2. CALCULATIONS (RASIO) ---
-    const psRePercent = flowStats?.ps_re_denominator > 0 
-        ? ((flowStats.ps_count / flowStats.ps_re_denominator) * 100).toFixed(2) 
-        : 0;
-        
-    const psPiPercent = flowStats?.ps_pi_denominator > 0 
-        ? ((flowStats.ps_count / flowStats.ps_pi_denominator) * 100).toFixed(2) 
+    const psRePercent = flowStats?.ps_re_denominator > 0
+        ? ((flowStats.ps_count / flowStats.ps_re_denominator) * 100).toFixed(2)
         : 0;
 
-    const complyCount = flowStats?.comply_count || 0; 
-    const complyDenominator = flowStats?.ps_count || 1; 
-    const complyPercent = flowStats?.ps_count > 0 
-        ? ((complyCount / complyDenominator) * 100).toFixed(2) 
+    const psPiPercent = flowStats?.ps_pi_denominator > 0
+        ? ((flowStats.ps_count / flowStats.ps_pi_denominator) * 100).toFixed(2)
+        : 0;
+
+    const complyCount = flowStats?.comply_count || 0;
+    const complyDenominator = flowStats?.ps_count || 1;
+    const complyPercent = flowStats?.ps_count > 0
+        ? ((complyCount / complyDenominator) * 100).toFixed(2)
         : 0;
 
 
@@ -182,9 +182,9 @@ export default function FlowProcessHSI({ auth, flowStats, witels, branchMap, fil
     const MainCard = ({ title, count, total, colorClass = "bg-slate-50 border-2 border-gray-300", onClick }) => {
         const percent = total > 0 ? ((count / total) * 100).toFixed(2) + '%' : '';
         return (
-            <div 
+            <div
                 onClick={onClick}
-                className={`${colorClass} rounded-lg p-3 text-center shadow-sm flex flex-col justify-center min-h-[120px] 
+                className={`${colorClass} rounded-lg p-3 text-center shadow-sm flex flex-col justify-center min-h-[120px]
                 hover:shadow-lg hover:scale-105 transition-all cursor-pointer`}
             >
                 <div className="text-xs md:text-sm font-bold text-gray-500 uppercase tracking-wide mb-2">{title}</div>
@@ -199,9 +199,9 @@ export default function FlowProcessHSI({ auth, flowStats, witels, branchMap, fil
     const DetailCard = ({ title, count, totalForPercent, highlight = false, onClick }) => {
         const percent = totalForPercent > 0 ? ((count / totalForPercent) * 100).toFixed(2) + '%' : '';
         return (
-            <div 
+            <div
                 onClick={onClick}
-                className={`relative overflow-hidden rounded-lg p-3 shadow-sm border flex flex-col justify-center min-h-[80px] 
+                className={`relative overflow-hidden rounded-lg p-3 shadow-sm border flex flex-col justify-center min-h-[80px]
                 transition-all hover:translate-y-[-2px] hover:shadow-md cursor-pointer
                 ${highlight ? 'bg-red-50 border-red-200 hover:bg-red-100' : 'bg-blue-50 border-blue-100 hover:bg-blue-100'}`}
             >
@@ -217,9 +217,9 @@ export default function FlowProcessHSI({ auth, flowStats, witels, branchMap, fil
     const TreeCard = ({ title, count, total, color = "bg-white", borderColor = "border-gray-300", textColor = "text-gray-800", onClick }) => {
         const percent = total > 0 ? ((count / total) * 100).toFixed(2) + '%' : '';
         return (
-            <div 
+            <div
                 onClick={onClick}
-                className={`p-3 rounded-3xl border-2 ${borderColor} ${color} shadow-sm text-center w-full min-w-[110px] z-20 relative 
+                className={`p-3 rounded-3xl border-2 ${borderColor} ${color} shadow-sm text-center w-full min-w-[110px] z-20 relative
                 hover:shadow-lg hover:-translate-y-1 transition-all cursor-pointer`}
             >
                 <div className={`text-[10px] font-bold uppercase mb-2 ${textColor} opacity-80`}>{title}</div>
@@ -269,7 +269,7 @@ export default function FlowProcessHSI({ auth, flowStats, witels, branchMap, fil
 
                     {/* MAIN WRAPPER - FLOWCHART */}
                     <div className="bg-white rounded-3xl shadow border border-gray-200 p-6 md:p-8 mb-8">
-                        
+
                         {/* FLOW CHEVRONS */}
                         <div className="flex w-full mb-8 overflow-x-auto pb-4 no-scrollbar pl-2">
                             <HeaderStep title="OFFERING" stepNumber={0} />
@@ -281,7 +281,7 @@ export default function FlowProcessHSI({ auth, flowStats, witels, branchMap, fil
 
                         {/* GRID DASHBOARD */}
                         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                            
+
                             {/* COLUMN 1: RE */}
                             <div className="space-y-3">
                                 <MainCard title="RE" count={flowStats?.re} onClick={() => handleCardClick('RE')} />
@@ -324,7 +324,7 @@ export default function FlowProcessHSI({ auth, flowStats, witels, branchMap, fil
                             {/* COLUMN 5: PS + Provisioning + RATIO BOX */}
                             <div className="space-y-3">
                                 <MainCard title="PS (COMPLETED)" count={flowStats?.ps_count} total={flowStats?.re} colorClass="bg-green-50 border-2 border-green-500" onClick={() => handleCardClick('PS (COMPLETED)')} />
-                                
+
                                 <div className="p-3 bg-slate-50 rounded-lg border-2 border-gray-100 flex flex-col gap-3">
                                     <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1 text-center">Provisioning</div>
                                     <DetailCard title="OGP Provisioning" count={flowStats?.ogp_provi} totalForPercent={flowStats?.re} onClick={() => handleCardClick('OGP Provisioning')} />
@@ -368,7 +368,7 @@ export default function FlowProcessHSI({ auth, flowStats, witels, branchMap, fil
                                 {/* LEVEL 1 */}
                                 <div className="relative z-10 mb-16">
                                     <div className="absolute top-full left-1/2 -translate-x-1/2 w-0.5 h-16 bg-gray-300"></div>
-                                    <div 
+                                    <div
                                         className="bg-red-50 border-2 border-red-200 p-4 rounded-3xl text-center shadow min-w-[200px] cursor-pointer hover:bg-red-100 transition-colors"
                                         onClick={() => handleCardClick('Total Revoke')}
                                     >
@@ -431,7 +431,7 @@ export default function FlowProcessHSI({ auth, flowStats, witels, branchMap, fil
                                         <p className="text-sm text-gray-500">Menampilkan daftar order untuk kategori terpilih.</p>
                                     </div>
                                 </div>
-                                <button 
+                                <button
                                     onClick={handleExportDetail}
                                     className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg shadow flex items-center gap-2 text-sm font-bold transition-colors"
                                 >
@@ -464,7 +464,7 @@ export default function FlowProcessHSI({ auth, flowStats, witels, branchMap, fil
                                                     <td className="px-6 py-4 whitespace-nowrap text-gray-500">{item.type_layanan}</td>
                                                     <td className="px-6 py-4 whitespace-nowrap">
                                                         <span className={`px-2 py-1 rounded-full text-xs font-bold ${
-                                                            item.kelompok_status === 'PS' ? 'bg-green-100 text-green-800' : 
+                                                            item.kelompok_status === 'PS' ? 'bg-green-100 text-green-800' :
                                                             (item.kelompok_status && item.kelompok_status.includes('CANCEL')) ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
                                                         }`}>
                                                             {item.kelompok_status}

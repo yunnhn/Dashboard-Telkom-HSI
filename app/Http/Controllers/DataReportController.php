@@ -56,8 +56,8 @@ class DataReportController extends Controller
 
         // [TAMBAHAN] LOGIC GALAKSI (KPI PO)
         $officers = AccountOfficer::orderBy('name')->get();
-        
-        $q3Months = [7, 8, 9]; 
+
+        $q3Months = [7, 8, 9];
         $currentYear = Carbon::parse($endDate)->year;
 
         $galaksiData = $officers->map(function ($officer) use ($startDate, $endDate, $currentYear, $q3Months) {
@@ -78,7 +78,7 @@ class DataReportController extends Controller
                     (COUNT(CASE WHEN status_wfm = 'done close bima' AND channel = 'SC-One' AND order_created_date BETWEEN ? AND ? THEN 1 END) / 2) as done_scone,
                     (COUNT(CASE WHEN status_wfm = 'in progress' AND channel != 'SC-One' AND order_created_date BETWEEN ? AND ? THEN 1 END) / 2) as ogp_ncx,
                     (COUNT(CASE WHEN status_wfm = 'in progress' AND channel = 'SC-One' AND order_created_date BETWEEN ? AND ? THEN 1 END) / 2) as ogp_scone,
-                    
+
                     (COUNT(CASE WHEN status_wfm = 'done close bima' AND channel != 'SC-One' AND YEAR(order_created_date) = ? AND MONTH(order_created_date) IN (?,?,?) THEN 1 END) / 2) as done_ncx_q3,
                     (COUNT(CASE WHEN status_wfm = 'done close bima' AND channel = 'SC-One' AND YEAR(order_created_date) = ? AND MONTH(order_created_date) IN (?,?,?) THEN 1 END) / 2) as done_scone_q3,
                     (COUNT(CASE WHEN status_wfm = 'in progress' AND channel != 'SC-One' AND YEAR(order_created_date) = ? AND MONTH(order_created_date) IN (?,?,?) THEN 1 END) / 2) as ogp_ncx_q3,
@@ -162,8 +162,8 @@ class DataReportController extends Controller
         // 1. VALIDASI INPUT
         $validated = $request->validate([
             'officer_id'   => 'nullable|integer',
-            'kpi_type'     => 'nullable|string', 
-            'channel_type' => 'nullable|string', 
+            'kpi_type'     => 'nullable|string',
+            'channel_type' => 'nullable|string',
             'witel'        => 'nullable|string',
             'segment'      => 'nullable|string',
             'kpi_key'      => 'nullable|string',
@@ -176,32 +176,32 @@ class DataReportController extends Controller
 
         // VARIABLE DEFAULT
         $statusWfm = [];
-        $channelOperator = null; 
+        $channelOperator = null;
         $channelValue = 'SC-One';
         $productKeywords = [];
         $dateColumnToFilter = 'document_data.order_created_date';
         $pageTitle = 'Detail Order';
-        
+
         $witelFilter = null;
         $specialFilter = null;
-        $witelColumn = 'witel_lama'; 
+        $witelColumn = 'witel_lama';
 
         // --- LOGIC 1: REQUEST DARI GALAKSI (PO) ---
         if ($request->has('officer_id') && $request->filled('officer_id')) {
             $officer = AccountOfficer::findOrFail($validated['officer_id']);
             $pageTitle = "Detail Order " . $officer->name;
-            
+
             $witelFilter = $officer->filter_witel_lama;
-            $witelColumn = 'witel_lama'; 
-            
+            $witelColumn = 'witel_lama';
+
             $statusWfm = ($validated['kpi_type'] === 'done') ? ['done close bima'] : ['in progress'];
             $channelOperator = ($validated['channel_type'] === 'ncx') ? '!=' : '=';
-            $dateColumnToFilter = 'document_data.order_created_date'; 
+            $dateColumnToFilter = 'document_data.order_created_date';
 
             if ($officer->special_filter_column && $officer->special_filter_value) {
                 $specialFilter = ['column' => $officer->special_filter_column, 'value' => $officer->special_filter_value];
             }
-        } 
+        }
         // --- LOGIC 2: REQUEST DARI DATA REPORT (SME/LEGS) ---
         else {
             $witelParam = $validated['witel'] ?? 'Semua Witel';
@@ -210,7 +210,7 @@ class DataReportController extends Controller
 
             if ($witelParam !== 'Semua Witel') {
                 $witelFilter = $witelParam;
-                $witelColumn = 'nama_witel'; 
+                $witelColumn = 'nama_witel';
             }
 
             if ($segmentParam !== 'All') {
@@ -224,10 +224,10 @@ class DataReportController extends Controller
                 $statusWfm = ['in progress'];
                 $dateColumnToFilter = 'document_data.order_created_date';
                 $parts = explode('_', $key);
-                $productInitial = end($parts); 
+                $productInitial = end($parts);
             } elseif (str_contains($key, 'prov_comp') || str_contains($key, 'revenue')) {
                 $statusWfm = ['done close bima'];
-                $dateColumnToFilter = 'document_data.order_date'; 
+                $dateColumnToFilter = 'document_data.order_date';
                 $parts = explode('_', $key);
                 if (isset($parts[2])) $productInitial = $parts[2];
             }
@@ -242,7 +242,7 @@ class DataReportController extends Controller
 
         // --- HELPER FILTER (PERBAIKAN AMBIGUOUS COLUMN) ---
         $applyFilters = function($query, $tablePrefix = '') use ($witelFilter, $witelColumn, $specialFilter, $statusWfm, $channelOperator, $channelValue, $startDate, $endDate, $dateColumnToFilter) {
-            
+
             // 1. FILTER WITEL
             if ($witelFilter) {
                 $query->where('document_data.' . $witelColumn, $witelFilter);
@@ -252,14 +252,14 @@ class DataReportController extends Controller
             if ($specialFilter) {
                 $query->where('document_data.' . $specialFilter['column'], $specialFilter['value']);
             }
-            
+
             // 3. Channel (FIX AMBIGU)
             if ($channelOperator) {
                  // Jika ada prefix, pakai prefix. Jika tidak, pakai 'channel' (untuk single query tanpa join)
                  $col = $tablePrefix ? $tablePrefix . '.channel' : 'channel';
                  $query->where($col, $channelOperator, $channelValue);
             }
-            
+
             // 4. Tanggal
             if ($startDate && $endDate) {
                  $query->whereBetween($dateColumnToFilter, [$startDate, $endDate]);
@@ -271,7 +271,7 @@ class DataReportController extends Controller
         // =================================================================
         $bundleQuery = DB::table('order_products')
             ->join('document_data', 'order_products.order_id', '=', 'document_data.order_id')
-            ->where('document_data.product', 'LIKE', '%-%') 
+            ->where('document_data.product', 'LIKE', '%-%')
             ->tap(fn($q) => $applyFilters($q, 'document_data')); // Kirim prefix 'document_data'
 
         if (!empty($statusWfm)) {
@@ -341,7 +341,7 @@ class DataReportController extends Controller
             ->values();
 
         return Inertia::render('Galaksi/ShowDetails', [
-            'orders' => $allOrders, 
+            'orders' => $allOrders,
             'pageTitle' => $pageTitle,
             'filters' => $validated
         ]);
@@ -444,9 +444,9 @@ class DataReportController extends Controller
             ->whereBetween('order_created_date', [$startDate, $endDate])
             ->get();
 
-        // 3. QUERY TARGET 
+        // 3. QUERY TARGET
         $targetPeriod = Carbon::parse($endDate)->startOfMonth()->format('Y-m-d');
-        
+
         $targets = Target::where('segment', $segment)
             ->where('period', $targetPeriod)
             ->get();

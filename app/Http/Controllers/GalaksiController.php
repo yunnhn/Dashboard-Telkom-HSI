@@ -25,14 +25,14 @@ class GalaksiController extends Controller
         ]);
 
         $selectedYear = $request->input('year', now()->year);
-        $q3Months = $request->input('q3_months', [7, 8, 9]); 
-        
+        $q3Months = $request->input('q3_months', [7, 8, 9]);
+
         // 2. DATA OFFICERS
         $officers = AccountOfficer::orderBy('name')->get();
 
         // 3. TRANSFORMASI DATA
         $kpiData = $officers->map(function ($officer) use ($selectedYear, $q3Months) {
-            
+
             // Setup Filter
             $witelFilter = $officer->filter_witel_lama;
             $specialFilter = $officer->special_filter_column && $officer->special_filter_value
@@ -41,7 +41,7 @@ class GalaksiController extends Controller
 
             // --- BUILD QUERY ---
             // PERUBAHAN DISINI: Menambahkan "/ 2" pada setiap COUNT
-            
+
             // Query Single Orders
             $singleStats = DocumentData::query()
                 ->where('witel_lama', $witelFilter)
@@ -55,7 +55,7 @@ class GalaksiController extends Controller
                     (COUNT(CASE WHEN status_wfm = 'done close bima' AND channel = 'SC-One' THEN 1 END) / 2) as done_scone,
                     (COUNT(CASE WHEN status_wfm = 'in progress' AND channel != 'SC-One' THEN 1 END) / 2) as ogp_ncx,
                     (COUNT(CASE WHEN status_wfm = 'in progress' AND channel = 'SC-One' THEN 1 END) / 2) as ogp_scone,
-                    
+
                     -- Q3 CALCULATIONS (DIBAGI 2)
                     (COUNT(CASE WHEN status_wfm = 'done close bima' AND channel != 'SC-One' AND YEAR(order_created_date) = ? AND MONTH(order_created_date) IN (?,?,?) THEN 1 END) / 2) as done_ncx_q3,
                     (COUNT(CASE WHEN status_wfm = 'done close bima' AND channel = 'SC-One' AND YEAR(order_created_date) = ? AND MONTH(order_created_date) IN (?,?,?) THEN 1 END) / 2) as done_scone_q3,
@@ -100,7 +100,7 @@ class GalaksiController extends Controller
             $done_scone = $singleStats->done_scone + $bundleStats->done_scone;
             $ogp_ncx    = $singleStats->ogp_ncx + $bundleStats->ogp_ncx;
             $ogp_scone  = $singleStats->ogp_scone + $bundleStats->ogp_scone;
-            
+
             $total_ytd  = $done_ncx + $done_scone + $ogp_ncx + $ogp_scone;
 
             // Q3 Results
@@ -116,7 +116,7 @@ class GalaksiController extends Controller
                 'nama_po' => $officer->name,
                 'witel' => $officer->display_witel,
                 // Kita gunakan floatval atau number_format jika ingin memastikan desimal tampil
-                'done_ncx' => $done_ncx, 
+                'done_ncx' => $done_ncx,
                 'done_scone' => $done_scone,
                 'ogp_ncx' => $ogp_ncx,
                 'ogp_scone' => $ogp_scone,
@@ -143,7 +143,7 @@ class GalaksiController extends Controller
         // Fungsi ini hanya menampilkan list detail, biasanya list detail tidak dibagi 2
         // karena menampilkan baris per baris data asli.
         // Jika Anda ingin datanya tetap seperti biasa (list order), biarkan seperti sebelumnya.
-        
+
         $validated = $request->validate([
             'officer_id' => 'required|integer|exists:account_officers,id',
             'kpi_type' => 'required|string|in:done,ogp',

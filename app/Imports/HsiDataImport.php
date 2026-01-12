@@ -29,7 +29,7 @@ class HsiDataImport implements ToModel, WithHeadingRow, WithBatchInserts, WithCh
 
         // Filter: Hanya import jika Witel ada di daftar RSO 2
         if (!$witelInput || !in_array($witelInput, $this->allowedWitels)) {
-            return null; 
+            return null;
         }
 
         return new HsiData([
@@ -107,7 +107,7 @@ class HsiDataImport implements ToModel, WithHeadingRow, WithBatchInserts, WithCh
 
     /**
      * LOGIKA TRANSFORMASI TANGGAL
-     * Menangani format Excel serial number dan string, serta 
+     * Menangani format Excel serial number dan string, serta
      * fitur 'Swap Date' jika format US/UK tertukar.
      */
     private function transformDate($value)
@@ -121,7 +121,7 @@ class HsiDataImport implements ToModel, WithHeadingRow, WithBatchInserts, WithCh
             if (is_numeric($value)) {
                 $date = Date::excelToDateTimeObject($value);
                 $date = Carbon::instance($date);
-            } 
+            }
             // 2. Parsing jika sudah instance DateTime (kadang library Excel otomatis convert)
             elseif ($value instanceof \DateTimeInterface) {
                 $date = Carbon::instance($value);
@@ -137,7 +137,7 @@ class HsiDataImport implements ToModel, WithHeadingRow, WithBatchInserts, WithCh
                 // Syarat: Day saat ini <= 12 (karena akan jadi bulan).
                 if ($date->day <= 12) {
                      return Carbon::create(
-                        $date->year, 
+                        $date->year,
                         $date->day,   // Day jadi Month
                         $date->month, // Month jadi Day
                         $date->hour, $date->minute, $date->second
@@ -155,7 +155,7 @@ class HsiDataImport implements ToModel, WithHeadingRow, WithBatchInserts, WithCh
 
     // Mengatur ukuran batch insert (1000 baris per query) untuk performa
     public function batchSize(): int { return 1000; }
-    
+
     // Mengatur ukuran chunk read (membaca 1000 baris dari file ke RAM) untuk hemat memori
     public function chunkSize(): int { return 1000; }
 }

@@ -58,7 +58,7 @@ class ReportHsiController extends Controller
                 SUM(CASE WHEN kelompok_status = 'REJECT_FCC' THEN 1 ELSE 0 END) as cancel_by_fcc,
                 SUM(CASE WHEN kelompok_status = 'SURVEY_NEW_MANJA' THEN 1 ELSE 0 END) as survey_new_manja,
                 SUM(CASE WHEN kelompok_status = 'UNSC' THEN 1 ELSE 0 END) as unsc,
-                
+
                 -- PI AGING
                 SUM(CASE WHEN kelompok_status = 'PI' AND TIMESTAMPDIFF(HOUR, last_updated_date, NOW()) < 24 THEN 1 ELSE 0 END) as pi_under_1_hari,
                 SUM(CASE WHEN kelompok_status = 'PI' AND TIMESTAMPDIFF(HOUR, last_updated_date, NOW()) >= 24 AND TIMESTAMPDIFF(HOUR, last_updated_date, NOW()) <= 72 THEN 1 ELSE 0 END) as pi_1_3_hari,
@@ -75,21 +75,21 @@ class ReportHsiController extends Controller
                 SUM(CASE WHEN kelompok_status = 'FO_UIM' THEN 1 ELSE 0 END) as fo_uim,
                 SUM(CASE WHEN kelompok_status = 'FO_ASAP' THEN 1 ELSE 0 END) as fo_asp,
                 SUM(CASE WHEN kelompok_status = 'FO_OSM' THEN 1 ELSE 0 END) as fo_osm,
-                
+
                 -- TOTAL FALLOUT
                 SUM(CASE WHEN kelompok_status IN ('FO_UIM', 'FO_ASAP', 'FO_OSM', 'FO_WFM') THEN 1 ELSE 0 END) as total_fallout,
 
                 -- COMPLETION & OTHERS
                 SUM(CASE WHEN kelompok_status = 'ACT_COM' THEN 1 ELSE 0 END) as act_comp,
                 SUM(CASE WHEN kelompok_status = 'PS' THEN 1 ELSE 0 END) as jml_comp_ps,
-                
+
                 -- CANCEL DETAILS
                 SUM(CASE WHEN kelompok_status = 'CANCEL' AND kelompok_kendala = 'Kendala Pelanggan' THEN 1 ELSE 0 END) as cancel_kndl_plgn,
                 SUM(CASE WHEN kelompok_status = 'CANCEL' AND kelompok_kendala = 'Kendala Teknik' THEN 1 ELSE 0 END) as cancel_kndl_teknis,
                 SUM(CASE WHEN kelompok_status = 'CANCEL' AND kelompok_kendala = 'Kendala Lainnya' THEN 1 ELSE 0 END) as cancel_kndl_sys,
                 SUM(CASE WHEN kelompok_status = 'CANCEL' AND (kelompok_kendala IS NULL OR kelompok_kendala = '' OR kelompok_kendala = 'BLANK') THEN 1 ELSE 0 END) as cancel_others,
                 SUM(CASE WHEN kelompok_status = 'CANCEL' THEN 1 ELSE 0 END) as total_cancel,
-                
+
                 SUM(CASE WHEN kelompok_status = 'REVOKE' THEN 1 ELSE 0 END) as `revoke`
             ")
             ->groupBy('witel', 'witel_old')
@@ -118,11 +118,11 @@ class ReportHsiController extends Controller
             $parent = new \stdClass();
             $parent->witel_display = $witel;
             $parent->row_type = 'main';
-            
+
             foreach ($numericFields as $field) {
                 $parent->$field = $children->sum($field);
             }
-            
+
             $this->calculatePercentages($parent);
             $finalReportData->push($parent);
 

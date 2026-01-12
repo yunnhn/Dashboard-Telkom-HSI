@@ -60,7 +60,7 @@ export default function DashboardDigitalProduct({
     const witelOptions = useMemo(() => filterOptions.witelList || [], [filterOptions.witelList]);
     const subTypeOptions = useMemo(() => filterOptions.subTypes || [], [filterOptions.subTypes]);
     const branchOptions = useMemo(() => filterOptions.branchList || [], [filterOptions.branchList]);
-    
+
     // Mapping format: [{ nama_witel: "SURAMADU", telda: "BANGKALAN" }, { nama_witel: "SURAMADU", telda: "Non-Telda (NCX)" }]
     const witelBranchMap = useMemo(() => filterOptions.witelBranchMap || [], [filterOptions.witelBranchMap]);
 
@@ -76,13 +76,13 @@ export default function DashboardDigitalProduct({
     const dynamicBranchOptions = useMemo(() => {
         // Jika tidak ada witel dipilih, tampilkan semua opsi (termasuk NCX jika ada di master)
         if (!localFilters.witels || localFilters.witels.length === 0) {
-            return branchOptions; 
+            return branchOptions;
         }
 
         // Ambil branch yang sesuai dengan Witel terpilih dari mapping
         const validBranches = witelBranchMap
-            .filter(item => localFilters.witels.includes(item.nama_witel)) 
-            .map(item => item.telda); 
+            .filter(item => localFilters.witels.includes(item.nama_witel))
+            .map(item => item.telda);
 
         // Unique & Sort
         return [...new Set(validBranches)].sort();
@@ -92,10 +92,10 @@ export default function DashboardDigitalProduct({
     useEffect(() => {
         // Jika opsi dynamic sudah tersedia
         if (dynamicBranchOptions.length > 0) {
-            
+
             // A. Simpan pilihan user saat ini yang masih VALID (ada di opsi baru)
             const currentValidSelection = localFilters.branches.filter(b => dynamicBranchOptions.includes(b));
-            
+
             // B. Cek apakah opsi "Non-Telda (NCX)" tersedia di opsi saat ini?
             const isNullOptionAvailable = dynamicBranchOptions.includes(NULL_BRANCH_LABEL);
 
@@ -108,7 +108,7 @@ export default function DashboardDigitalProduct({
             }
 
             // E. Update State hanya jika ada perubahan isi array
-            const isChanged = 
+            const isChanged =
                 newSelection.length !== localFilters.branches.length ||
                 !newSelection.every(b => localFilters.branches.includes(b));
 
@@ -310,9 +310,9 @@ export default function DashboardDigitalProduct({
                                     <td className="px-6 py-4 font-semibold text-gray-700">{item.telda}</td>
                                     <td className="px-6 py-4">{item.witel_lama}</td>
                                     <td className="px-6 py-4">
-                                        <StatusBadge 
-                                            text={item.status_wfm?.toUpperCase()} 
-                                            color={item.status_wfm === 'in progress' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'} 
+                                        <StatusBadge
+                                            text={item.status_wfm?.toUpperCase()}
+                                            color={item.status_wfm === 'in progress' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}
                                         />
                                     </td>
                                     <td className="px-6 py-4">{item.customer_name}</td>

@@ -123,20 +123,20 @@ export default function Sidebar({ user, isSidebarOpen, toggleSidebar, isCmsMode,
     const [isAnalysisOpen, setIsAnalysisOpen] = useState(true);
 
     // Cek Route Aktif
-    const isDashboardActive = route().current('dashboardDigitalProduct') || 
-                              route().current('dashboard.sos') || 
-                              route().current('dashboard.jt') || 
+    const isDashboardActive = route().current('dashboardDigitalProduct') ||
+                              route().current('dashboard.sos') ||
+                              route().current('dashboard.jt') ||
                               route().current('dashboard.hsi') ||
-                              route().current('flow.hsi'); 
+                              route().current('flow.hsi');
 
-    const isReportsActive = route().current('data-report.index') || 
-                            route().current('galaksi.index') || 
-                            route().current('report.datin') || 
-                            route().current('report.jt') || 
+    const isReportsActive = route().current('data-report.index') ||
+                            route().current('galaksi.index') ||
+                            route().current('report.datin') ||
+                            route().current('report.jt') ||
                             route().current('report.hsi');
 
     // PERBAIKAN: Menggunakan nama route yang benar (admin.report_hsi.index)
-    const isAdminAnalysisActive = route().current('admin.analysisDigitalProduct.index') || 
+    const isAdminAnalysisActive = route().current('admin.analysisDigitalProduct.index') ||
                                   route().current('admin.analysisSOS.index') ||
                                   route().current('admin.report_hsi.index'); // <-- Update ini juga agar menu induk aktif
 
@@ -145,7 +145,7 @@ export default function Sidebar({ user, isSidebarOpen, toggleSidebar, isCmsMode,
 
     useEffect(() => {
         if (isSidebarOpen && isAdminAnalysisActive) setIsAnalysisOpen(true);
-        
+
         if (isSidebarOpen && isReportsActive) {
             setIsReportsOpen(true);
             if (route().current('data-report.index') || route().current('galaksi.index')) {
@@ -188,7 +188,7 @@ export default function Sidebar({ user, isSidebarOpen, toggleSidebar, isCmsMode,
             <Logo isSidebarOpen={isSidebarOpen} />
 
             <nav className="flex-grow pt-4 overflow-y-auto overflow-x-hidden">
-                
+
                 {/* --- SUPER ADMIN --- */}
                 {hasRole('superadmin') && (
                     <>
@@ -252,7 +252,7 @@ export default function Sidebar({ user, isSidebarOpen, toggleSidebar, isCmsMode,
                                             <div className="pl-6 mt-1 space-y-1">
                                                 <Link href={route('dashboard.jt')} className={`block px-4 py-2 text-sm rounded-md text-left ${route().current('dashboard.jt') ? 'bg-blue-100 text-blue-700 font-semibold' : 'text-gray-700 hover:bg-gray-100'}`}>Dashboard Jaringan Tambahan</Link>
                                                 <Link href={route('dashboard.sos')} className={`block px-4 py-2 text-sm rounded-md text-left ${route().current('dashboard.sos') ? 'bg-blue-100 text-blue-700 font-semibold' : 'text-gray-700 hover:bg-gray-100'}`}>Dashboard Datin</Link>
-                                                
+
                                                 {/* ========================================= */}
                                                 {/* MENU BARU HSI (GRAFIK & FLOW)             */}
                                                 {/* ========================================= */}

@@ -136,16 +136,16 @@ const legsTableConfigTemplate = [
 export default function DataReport({ smeReportData, legsReportData, inProgressData, galaksiData, filters, smeConfig, legsConfig, flash, filterOptions = {}, cutOffDate }) {
     const [smeTableConfig, setSmeTableConfig] = useState([]);
     const [legsTableConfig, setLegsTableConfig] = useState([]);
-    
+
     // --- STATE TANGGAL (FIX TIMEZONE) ---
     // Inisialisasi tanggal berdasarkan waktu lokal client, bukan UTC
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    
+
     // Jika ada filter dari server gunakan itu, jika tidak gunakan default lokal
     const [startDate, setStartDate] = useState(filters.start_date || formatDateLocal(startOfMonth));
     const [endDate, setEndDate] = useState(filters.end_date || formatDateLocal(now));
-    
+
     // STATE: Witel
     const [selectedWitel, setSelectedWitel] = useState(filters.witel || '');
 
@@ -173,8 +173,8 @@ export default function DataReport({ smeReportData, legsReportData, inProgressDa
 
     // --- HANDLER FILTER ---
     const handleFilterChange = (key, value) => {
-        const newFilters = { 
-            ...filters, 
+        const newFilters = {
+            ...filters,
             [key]: value,
             // Pastikan kedua tanggal selalu terkirim agar filter konsisten
             start_date: key === 'start_date' ? value : startDate,
@@ -228,7 +228,7 @@ export default function DataReport({ smeReportData, legsReportData, inProgressDa
         if (count > 0) {
             // 1. Sanitasi Tanggal: Jika kosong/undefined, jadikan null agar tidak dikirim string kosong ""
             // String kosong "" akan dianggap format tanggal invalid oleh Laravel
-            const safeStartDate = startDate ? startDate : null; 
+            const safeStartDate = startDate ? startDate : null;
             const safeEndDate = endDate ? endDate : null;
 
             // 2. Siapkan Parameter
@@ -247,7 +247,7 @@ export default function DataReport({ smeReportData, legsReportData, inProgressDa
                     method="get"
                     className="text-blue-600 hover:text-blue-800 hover:underline font-bold cursor-pointer"
                     // Tambahkan preserveState agar scroll tidak loncat (opsional)
-                    preserveState={false} 
+                    preserveState={false}
                 >
                     {count}
                 </Link>
@@ -261,7 +261,7 @@ export default function DataReport({ smeReportData, legsReportData, inProgressDa
             <Head title="Data Report" />
             <div className="py-12">
                 <div className="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
-                    
+
                     {/* GLOBAL FILTER SECTION (Card Utama) */}
                     <div className="p-4 sm:p-8 bg-white shadow sm:rounded-lg">
                         <section>
@@ -272,7 +272,7 @@ export default function DataReport({ smeReportData, legsReportData, inProgressDa
                                         {cutOffDate && <span className="text-sm font-normal text-gray-500 ml-2 block sm:inline">(Cut Off {cutOffDate})</span>}
                                     </h2>
                                 </div>
-                                
+
                                 <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
                                     {/* FILTER WITEL */}
                                     <select
@@ -294,7 +294,7 @@ export default function DataReport({ smeReportData, legsReportData, inProgressDa
                                     <div className="flex items-center gap-2 bg-white p-1 rounded-md border border-gray-300 h-10">
                                         <div className="flex flex-col justify-center px-1">
                                             <span className="text-[9px] text-gray-500 font-bold uppercase leading-none">Dari</span>
-                                            <input 
+                                            <input
                                                 type="date"
                                                 value={startDate}
                                                 onChange={(e) => {
@@ -307,7 +307,7 @@ export default function DataReport({ smeReportData, legsReportData, inProgressDa
                                         <span className="text-gray-400 font-light">|</span>
                                         <div className="flex flex-col justify-center px-1">
                                             <span className="text-[9px] text-gray-500 font-bold uppercase leading-none">Sampai</span>
-                                            <input 
+                                            <input
                                                 type="date"
                                                 value={endDate}
                                                 onChange={(e) => {
@@ -366,7 +366,7 @@ export default function DataReport({ smeReportData, legsReportData, inProgressDa
                                     </button>
                                 </div>
                             </header>
-                            
+
                             {/* Tabel In Progress - Filter Tahun dan Witel khusus sudah DIHAPUS, ikut filter atas */}
                             <InProgressTable dataPaginator={inProgressData} showActions={false} />
                         </section>

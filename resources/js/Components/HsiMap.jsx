@@ -13,15 +13,15 @@ const STATUS_COLORS = {
 const HsiMap = ({ data }) => {
     // Tentukan titik tengah peta (Default Indonesia/Jatim)
     // Jika ada data, ambil koordinat data pertama sebagai pusat
-    const center = data && data.length > 0 
-        ? [data[0].lat, data[0].lng] 
+    const center = data && data.length > 0
+        ? [data[0].lat, data[0].lng]
         : [-7.536064, 112.238402]; // Default Jatim
 
     return (
-        <MapContainer 
-            center={center} 
-            zoom={8} 
-            scrollWheelZoom={true} 
+        <MapContainer
+            center={center}
+            zoom={8}
+            scrollWheelZoom={true}
             style={{ height: "100%", width: "100%", borderRadius: "8px", zIndex: 0 }}
         >
             <TileLayer
@@ -37,7 +37,7 @@ const HsiMap = ({ data }) => {
                     <CircleMarker
                         key={index}
                         center={[item.lat, item.lng]}
-                        pathOptions={{ 
+                        pathOptions={{
                             color: color,       // Warna Garis Lingkaran
                             fillColor: color,   // Warna Isi Lingkaran
                             fillOpacity: 0.7,   // Transparansi

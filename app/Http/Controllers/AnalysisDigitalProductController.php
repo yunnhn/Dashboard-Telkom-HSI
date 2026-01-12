@@ -286,7 +286,7 @@ class AnalysisDigitalProductController extends Controller
 
         // [5] PAGINASI (Hapus bagian $netPriceData yang lama di bawah switch case)
         $emptyPaginator = fn () => new LengthAwarePaginator([], 0, $paginationCount);
-        
+
         $inProgressData = $emptyPaginator();
         $completeData = $emptyPaginator();
         $qcData = $emptyPaginator();

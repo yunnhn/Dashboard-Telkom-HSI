@@ -1153,10 +1153,10 @@ const TableConfigurator = ({ tableConfig, setTableConfig }) => {
             </div>
             {isExpanded && (
                 <div className="p-6 border-t">
-                    {/* 👇 Container Utama dengan Flexbox untuk layout 2 kolom 👇 */}
+                    {/* ðŸ‘‡ Container Utama dengan Flexbox untuk layout 2 kolom ðŸ‘‡ */}
                     <div className="flex flex-col md:flex-row md:gap-8">
 
-                        {/* 👉 Kolom Kiri: Aksi Utama (Lebih besar) 👈 */}
+                        {/* ðŸ‘‰ Kolom Kiri: Aksi Utama (Lebih besar) ðŸ‘ˆ */}
                         <div className="md:w-2/3">
                             <form onSubmit={handleSubmit} className="space-y-6">
                                 <div>
@@ -1346,7 +1346,7 @@ export default function AnalysisDigitalProduct({ auth, reportData = [], currentS
     const { props } = usePage();
     // [PERBAIKAN] Berikan default object kosong jika filters undefined
     const filters = props.filters || {};
-    
+
     // <-- LANGKAH 2: LETAKKAN LOGIKA (STATE & EFFECT) DI SINI -->
     const [progressStates, setProgressStates] = useState({
         mentah: null,

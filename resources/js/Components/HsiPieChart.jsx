@@ -13,12 +13,12 @@ const SPECIFIC_COLORS = {
     // --- WARNA KATEGORI CANCEL / FALLOUT ---
     'NULL': '#5e83e6',          // Biru (Sama dg Suramadu)
     'Null': '#5e83e6',
-    
+
     'LAINNYA': '#dfa56b',       // Oranye (Sama dg Jatim Barat)
     'ODP FULL': '#a082da',      // Ungu (Sama dg Jatim Timur)
     'ODP JAUH': '#bbc67a',      // Hijau Pucat (Sama dg Nusa Tenggara)
     'TIDAK ADA ODP': '#73b3c5', // Cyan Pucat (Sama dg Bali)
-    
+
     'DOUBLE INPUT': '#e0c668',  // Kuning Emas
     'BATAL': '#cb7eac',         // Pink/Magenta Pucat
     'KENDALA JALUR/RUTE TARIKAN': '#d2bc92', // Coklat Muda/Beige
@@ -64,12 +64,12 @@ const HsiPieChart = ({ data, title }) => {
         const y = cy + radius * Math.sin(-midAngle * RADIAN);
 
         return (
-            <text 
-                x={x} 
-                y={y} 
-                fill="white" 
-                textAnchor="middle" 
-                dominantBaseline="central" 
+            <text
+                x={x}
+                y={y}
+                fill="white"
+                textAnchor="middle"
+                dominantBaseline="central"
                 className="text-[10px] font-bold drop-shadow-md"
                 style={{ pointerEvents: 'none', userSelect: 'none' }}
             >
@@ -82,7 +82,7 @@ const HsiPieChart = ({ data, title }) => {
         <div className="w-full h-full flex flex-col items-center">
             {/* Judul Opsional di dalam komponen */}
             {title && <h4 className="text-sm font-bold text-gray-600 mb-2 uppercase">{title}</h4>}
-            
+
             <ResponsiveContainer width="100%" height={320}>
                 <PieChart>
                     <Pie
@@ -94,14 +94,14 @@ const HsiPieChart = ({ data, title }) => {
                         outerRadius={110}
                         innerRadius={50} // Efek Donut
                         dataKey="value"
-                        nameKey="product" 
+                        nameKey="product"
                         paddingAngle={2} // Jarak antar potongan
                         isAnimationActive={true}
                     >
                         {safeData.map((entry, index) => {
                             const name = entry.product || '';
                             const normalizedName = name.toString().toUpperCase().trim();
-                            
+
                             // --- LOGIKA PEWARNAAN ---
                             // 1. Cek apakah ada di SPECIFIC_COLORS? (Case Insensitive)
                             let finalColor = SPECIFIC_COLORS[normalizedName];
@@ -119,28 +119,28 @@ const HsiPieChart = ({ data, title }) => {
                             }
 
                             return (
-                                <Cell 
-                                    key={`cell-${index}`} 
-                                    fill={finalColor} 
+                                <Cell
+                                    key={`cell-${index}`}
+                                    fill={finalColor}
                                     stroke="#fff"
                                     strokeWidth={2}
                                 />
                             );
                         })}
                     </Pie>
-                    <Tooltip 
+                    <Tooltip
                         formatter={(value) => value.toLocaleString('id-ID')}
                         contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', fontSize: '12px', border: '1px solid #e5e7eb' }}
                         itemStyle={{ color: '#374151' }}
                     />
-                    <Legend 
-                        layout="vertical" 
-                        verticalAlign="middle" 
+                    <Legend
+                        layout="vertical"
+                        verticalAlign="middle"
                         align="right"
-                        wrapperStyle={{ 
-                            fontSize: '11px', 
+                        wrapperStyle={{
+                            fontSize: '11px',
                             paddingLeft: '10px',
-                            maxHeight: '280px', 
+                            maxHeight: '280px',
                             overflowY: 'auto'
                         }}
                     />

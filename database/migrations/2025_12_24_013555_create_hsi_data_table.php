@@ -26,11 +26,11 @@ return new class extends Migration
             $table->string('type_layanan')->nullable();     // TYPE_LAYANAN
             $table->string('status_resume')->nullable();    // STATUS_RESUME
             $table->string('provider')->nullable();         // PROVIDER
-            
+
             // Tanggal penting (DateTime agar bisa difilter per bulan/tahun)
             $table->dateTime('order_date')->nullable();         // ORDER_DATE
             $table->dateTime('last_updated_date')->nullable();  // LAST_UPDATED_DATE
-            
+
             $table->string('ncli')->nullable();             // NCLI
             $table->string('pots')->nullable();             // POTS
             $table->string('speedy')->nullable();           // SPEEDY
@@ -55,29 +55,29 @@ return new class extends Migration
             $table->string('tindak_lanjut')->nullable();    // TINDAK_LANJUT
             $table->text('isi_comment')->nullable();        // ISI_COMMENT
             $table->string('user_id_tl')->nullable();       // USER_ID_TL
-            
+
             $table->dateTime('tgl_comment')->nullable();    // TGL_COMMENT
             $table->dateTime('tanggal_manja')->nullable();  // TANGGAL_MANJA
-            
+
             $table->string('kelompok_kendala')->nullable(); // KELOMPOK_KENDALA
             $table->string('kelompok_status')->nullable();  // KELOMPOK_STATUS
             $table->string('hero')->nullable();             // HERO
             $table->string('addon')->nullable();            // ADDON
-            
+
             $table->dateTime('tgl_ps')->nullable();         // TGL_PS
-            
+
             $table->string('status_message')->nullable();   // STATUS_MESSAGE
             $table->string('package_name')->nullable();     // PACKAGE_NAME
             $table->string('group_paket')->nullable();      // GROUP_PAKET
             $table->string('reason_cancel')->nullable();    // REASON_CANCEL
             $table->text('keterangan_cancel')->nullable();  // KETERANGAN_CANCEL
-            
+
             $table->dateTime('tgl_manja')->nullable();      // TGL_MANJA
-            
+
             $table->string('detail_manja')->nullable();     // DETAIL_MANJA
             $table->string('suberrorcode')->nullable();     // SUBERRORCODE
             $table->string('engineermemo')->nullable();     // ENGINEERMEMO
-            
+
             // Kolom Periode & Validasi
             $table->integer('tahun')->nullable();           // TAHUN
             $table->integer('bulan')->nullable();           // BULAN

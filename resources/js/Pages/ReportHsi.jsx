@@ -4,7 +4,7 @@ import { Head, router } from '@inertiajs/react';
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 // Import Icon Download
-import { MdFileDownload } from "react-icons/md"; 
+import { MdFileDownload } from "react-icons/md";
 
 export default function ReportHsi({ auth, reportData, totals, filters = {} }) {
 
@@ -67,26 +67,26 @@ export default function ReportHsi({ auth, reportData, totals, filters = {} }) {
             <div className="py-6">
                 <div className="max-w-[99%] mx-auto sm:px-2 lg:px-4">
                     <div className="bg-white overflow-hidden shadow-xl sm:rounded-lg">
-                        
+
                         {/* HEADER & FILTER SECTION */}
                         <div className="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
                             <h3 className="text-lg font-bold text-gray-800 uppercase tracking-wide">
                                 Performance Report HSI Per Witel
                             </h3>
-                            
+
                             <div className="flex gap-2 items-center">
-                                <DatePicker 
-                                    selected={startDate} 
-                                    onChange={(date) => setStartDate(date)} 
+                                <DatePicker
+                                    selected={startDate}
+                                    onChange={(date) => setStartDate(date)}
                                     selectsStart
                                     startDate={startDate}
                                     endDate={endDate}
                                     placeholderText="Start Date"
                                     className="border border-gray-300 rounded text-xs p-1"
                                 />
-                                <DatePicker 
-                                    selected={endDate} 
-                                    onChange={(date) => setEndDate(date)} 
+                                <DatePicker
+                                    selected={endDate}
+                                    onChange={(date) => setEndDate(date)}
                                     selectsEnd
                                     startDate={startDate}
                                     endDate={endDate}
@@ -96,10 +96,10 @@ export default function ReportHsi({ auth, reportData, totals, filters = {} }) {
                                 <button onClick={handleFilter} className="bg-blue-600 text-white text-xs px-3 py-1.5 rounded hover:bg-blue-700 font-bold">
                                     Go
                                 </button>
-                                
+
                                 {/* TOMBOL EXPORT EXCEL */}
-                                <button 
-                                    onClick={handleExport} 
+                                <button
+                                    onClick={handleExport}
                                     className="bg-green-600 text-white text-xs px-3 py-1.5 rounded hover:bg-green-700 flex items-center gap-1 font-bold shadow-sm"
                                 >
                                     <MdFileDownload size={16}/> Excel
@@ -110,7 +110,7 @@ export default function ReportHsi({ auth, reportData, totals, filters = {} }) {
                         {/* TABLE SECTION */}
                         <div className="overflow-x-auto max-h-[80vh]">
                             <table className="w-full text-[10px] border-collapse border border-slate-400 text-center font-sans">
-                                
+
                                 {/* TABLE HEAD */}
                                 <thead className="text-white font-bold uppercase tracking-wider sticky top-0 z-20 shadow-sm">
                                     <tr>
@@ -135,7 +135,7 @@ export default function ReportHsi({ auth, reportData, totals, filters = {} }) {
                                         <th className={`border border-slate-300 p-1 ${colors.gray}`} colSpan={7}>FALLOUT</th>
                                         <th className={`border border-slate-300 p-1 ${colors.gray}`} rowSpan={3}>TOTAL FALLOUT</th>
                                         <th className={`border border-slate-300 p-1 ${colors.gray}`} rowSpan={3}>ACT COMP (QC2)</th>
-                                        
+
                                         <th className={`border border-slate-300 p-1 ${colors.red}`} rowSpan={3}>KNDL Plgn</th>
                                         <th className={`border border-slate-300 p-1 ${colors.red}`} rowSpan={3}>KNDL Teknis</th>
                                         <th className={`border border-slate-300 p-1 ${colors.red}`} rowSpan={3}>KNDL System</th>
@@ -166,20 +166,20 @@ export default function ReportHsi({ auth, reportData, totals, filters = {} }) {
                                 {/* TABLE BODY */}
                                 <tbody className="bg-white text-gray-700">
                                     {reportData.map((row, index) => (
-                                        <tr 
-                                            key={index} 
+                                        <tr
+                                            key={index}
                                             className={`
-                                                transition-colors 
+                                                transition-colors
                                                 ${row.row_type === 'main' ? 'bg-slate-100' : 'bg-white hover:bg-blue-50'}
                                                 ${row.row_type === 'main' ? 'font-bold text-black border-t-2 border-slate-300' : ''}
                                             `}
                                         >
-                                            <td className={`border border-slate-300 p-1 text-left sticky left-0 z-10 px-2 
+                                            <td className={`border border-slate-300 p-1 text-left sticky left-0 z-10 px-2
                                                 ${row.row_type === 'main' ? 'bg-slate-100 font-extrabold uppercase' : 'bg-inherit pl-6'}
                                             `}>
                                                 {row.witel_display}
                                             </td>
-                                            
+
                                             <td className="border border-slate-300 p-1">{formatNumber(row.pre_pi)}</td>
                                             <td className="border border-slate-300 p-1">{formatNumber(row.registered)}</td>
                                             <td className="border border-slate-300 p-1">{formatNumber(row.inprogress_sc)}</td>
@@ -193,17 +193,17 @@ export default function ReportHsi({ auth, reportData, totals, filters = {} }) {
                                             <td className="border border-slate-300 p-1">{formatNumber(row.pi_1_3_hari)}</td>
                                             <td className="border border-slate-300 p-1">{formatNumber(row.pi_over_3_hari)}</td>
                                             <td className="border border-slate-300 p-1 bg-slate-50">{formatNumber(row.total_pi)}</td>
-                                            
+
                                             <td className="border border-slate-300 p-1">{formatNumber(row.fo_wfm_kndl_plgn)}</td>
                                             <td className="border border-slate-300 p-1">{formatNumber(row.fo_wfm_kndl_teknis)}</td>
                                             <td className="border border-slate-300 p-1">{formatNumber(row.fo_wfm_kndl_sys)}</td>
                                             <td className="border border-slate-300 p-1">{formatNumber(row.fo_wfm_others)}</td>
-                                            
+
                                             <td className="border border-slate-300 p-1">{formatNumber(row.fo_uim)}</td>
                                             <td className="border border-slate-300 p-1">{formatNumber(row.fo_asp)}</td>
                                             <td className="border border-slate-300 p-1">{formatNumber(row.fo_osm)}</td>
                                             <td className="border border-slate-300 p-1 bg-slate-50">{formatNumber(row.total_fallout)}</td>
-                                            
+
                                             <td className="border border-slate-300 p-1">{formatNumber(row.act_comp)}</td>
                                             <td className="border border-slate-300 p-1 bg-slate-50">{formatNumber(row.jml_comp_ps)}</td>
 
